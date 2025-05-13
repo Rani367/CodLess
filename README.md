@@ -35,6 +35,17 @@ Our mission is to help teams around the world participate fully in FLL — no ma
 
 No setup headaches. No code errors. Just results.
 
+
+---
+
+## License
+
+This project is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.  
+You may view, download, and share the contents of this repository for personal and educational use only.  
+No commercial use or redistribution is allowed.
+
+[View Full License](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+
 ---
 
 ## Open Source and Open to All
