@@ -124,6 +124,7 @@ def disable_simulation_mode():
 
 async def find_devices():
     """Find available SPIKE Prime devices over BLE."""
+    global simulation_mode
     # In simulation mode, return mock devices
     if simulation_mode:
         await asyncio.sleep(1.0)  # Simulate search delay
@@ -134,6 +135,7 @@ async def find_devices():
     if not api_available:
         if not force_real_mode:
             # Fallback to simulation mode
+            simulation_mode = True
             return await find_devices()
         raise Exception(f"Bluetooth functionality not available: {api_error}")
     
@@ -143,7 +145,6 @@ async def find_devices():
     except Exception as e:
         # If we fail here and not forcing real mode, fall back to simulation
         if not force_real_mode:
-            global simulation_mode
             simulation_mode = True
             return await find_devices()
         raise Exception(f"Error finding devices: {str(e)}")

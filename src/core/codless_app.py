@@ -32,14 +32,15 @@ class CodLessApp(tk.Tk):
         self.map_image_path = None
         
         # Ensure assets directory exists
-        if not os.path.exists("assets"):
-            os.makedirs("assets")
+        self.assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets")
+        if not os.path.exists(self.assets_dir):
+            os.makedirs(self.assets_dir)
         
         # Set up the UI
         self.setup_ui()
         
-        # Auto-load map image from assets folder
-        self.auto_load_map_image()
+        # Auto-load map image from assets folder if available
+        self.try_load_default_map()
         
         # Check pybricksdev availability
         pybricks_status = pybricks_adapter.get_status()
@@ -952,19 +953,19 @@ wait(2000)
         
         return code
 
-    def auto_load_map_image(self):
+    def try_load_default_map(self):
         """Auto-load the first image found in the assets folder"""
         try:
             # Get all image files from the assets folder
-            if not os.path.exists("assets"):
-                os.makedirs("assets")
+            if not os.path.exists(self.assets_dir):
+                os.makedirs(self.assets_dir)
                 return
                 
-            map_files = [f for f in os.listdir("assets") 
+            map_files = [f for f in os.listdir(self.assets_dir) 
                         if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
             
             if map_files:
-                map_path = os.path.join("assets", map_files[0])
+                map_path = os.path.join(self.assets_dir, map_files[0])
                 try:
                     self.load_map_image(map_path)
                     self.map_image_path = map_path
@@ -975,7 +976,7 @@ wait(2000)
             else:
                 print("No map images found in assets folder")
         except Exception as e:
-            print(f"Error in auto_load_map_image: {str(e)}")
+            print(f"Error in try_load_default_map: {str(e)}")
             # Continue with the default grid if any errors occur
 
 
