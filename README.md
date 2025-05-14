@@ -11,12 +11,29 @@ A desktop application that allows you to plan and control SPIKE Prime robot navi
 - Visualize robot paths with waypoints
 - Import/export routes for sharing
 
+## Repository Structure
+
+```
+CodLess/
+├── main.py                 # Main entry point
+├── run_codless.py          # Launcher script with dependency checks
+├── requirements.txt        # Python dependencies
+├── src/                    # Source code
+│   ├── core/               # Core application modules
+│   │   ├── codless_app.py  # Main application UI and logic
+│   │   └── pybricks_adapter.py # Bluetooth adapter for SPIKE Prime
+│   └── utils/              # Utility scripts
+│       └── check_pybricksdev.py # Diagnostic tool
+├── assets/                 # Map images and other resources
+└── README.md               # This file
+```
+
 ## Running the Application
 
 To run the application:
 
 ```bash
-python run_codless.py
+python main.py
 ```
 
 ### Command-Line Options
@@ -30,9 +47,42 @@ The application supports several command-line options:
 
 Examples:
 ```bash
-python run_codless.py --simulation   # Run in simulation mode
-python run_codless.py --force-real   # Require real Bluetooth, no simulation fallback
+python main.py --simulation   # Run in simulation mode
+python main.py --force-real   # Require real Bluetooth, no simulation fallback
 ```
+
+## Dependencies
+
+The application requires the following Python packages:
+
+- tkinter: Included with Python (for the GUI)
+- pillow: For image processing
+- matplotlib: For plotting the robot path
+- pybricksdev: For connecting to SPIKE Prime hubs
+
+## Installation
+
+1. Clone the repository
+2. Install the required packages:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the application:
+   ```bash
+   python main.py
+   ```
+
+## Simulation Mode
+
+If you don't have a SPIKE Prime hub or Bluetooth is not available, you can run the application in simulation mode:
+
+```bash
+python main.py --simulation
+```
+
+## Developer Information
+
+See [DEVELOPER.md](DEVELOPER.md) for information about the codebase and how to extend it.
 
 ## Modes
 

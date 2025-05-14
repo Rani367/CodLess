@@ -28,4 +28,12 @@ ENV/
 .DS_Store
 
 # Logs
-*.log 
+*.log
+
+# Local development files
+.dependency_check_done
+
+# Original files that have been moved
+/pybricks_adapter.py
+/codless_app.py
+/check_pybricksdev.py 

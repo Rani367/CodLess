@@ -10,6 +10,9 @@ import subprocess
 import importlib.util
 import importlib
 
+# Add src directory to python path
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
+
 REQUIRED_PACKAGES = {
     'tkinter': 'Included with Python (should be pre-installed)',
     'pillow': 'pip install pillow',
@@ -140,7 +143,7 @@ def main():
     
     # Import our pybricks adapter to configure mode
     try:
-        import pybricks_adapter
+        from src.core import pybricks_adapter
         
         # Handle simulation mode
         if simulation_flag:
@@ -174,7 +177,7 @@ def main():
     # Run the app
     print("\nStarting CodLess app...")
     try:
-        from codless_app import CodLessApp
+        from src.core.codless_app import CodLessApp
         app = CodLessApp()
         app.mainloop()
     except Exception as e:
