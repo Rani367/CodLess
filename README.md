@@ -1,40 +1,80 @@
-# CodLess – Intuitive Navigation for FLL Robots
+# CodLess - SPIKE Prime Robot Navigation
 
-**CodLess** is a no-code platform designed to make FLL robot navigation simple, accessible, and reliable for teams of all levels. Whether you're a beginner or an experienced team, CodLess helps you bring your robot to life — without writing a single line of code.
-
-Built specifically for LEGO **SPIKE Prime**, CodLess allows you to plan and visualize missions with precision, then automatically generates the necessary code to execute them on the field using the Pybricks framework.
-
-*It’s fast. It’s simple. It just works.*
-
----
+A desktop application that allows you to plan and control SPIKE Prime robot navigation paths.
 
 ## Features
 
-- Intuitive interface for creating robot paths and actions  
-- Designed exclusively for SPIKE Prime  
-- No programming knowledge required  
-- Logic tools for movement, turns, and sensor-based decisions  
-- Generates ready-to-run Pybricks code for your missions
+- Connect to SPIKE Prime hub via Bluetooth
+- Plan robot navigation paths by clicking on a custom map
+- Configure robot parameters (wheel diameter and axle track)
+- Save and load multiple route plans
+- Visualize robot paths with waypoints
+- Import/export routes for sharing
 
----
+## Running the Application
 
-## Why CodLess?
+To run the application:
 
-Too many great ideas get lost in technical complexity. CodLess was created to remove that barrier and let teams focus on what matters: strategy, creativity, and performance.
+```bash
+python run_codless.py
+```
 
-Our mission is to help teams around the world participate fully in FLL — no matter their coding experience.
+### Command-Line Options
 
----
+The application supports several command-line options:
 
-## How It Works
+- `--check-deps`: Force dependency check even if already completed
+- `--simulation`: Run in simulation mode (no actual Bluetooth connection)
+- `--force-real`: Force real Bluetooth mode (will fail if Bluetooth isn't working properly)
+- `--help`: Display help information
 
-1. Define your robot’s starting position  
-2. Create a sequence of movements using the visual editor  
-3. Add logic for turns, sensors, and mission triggers  
-4. Export the code and run it on your SPIKE Prime robot  
+Examples:
+```bash
+python run_codless.py --simulation   # Run in simulation mode
+python run_codless.py --force-real   # Require real Bluetooth, no simulation fallback
+```
 
-No setup headaches. No code errors. Just results.
+## Modes
 
+### Real Mode (Default)
+
+By default, CodLess runs in real mode, which attempts to establish actual Bluetooth connections with SPIKE Prime hubs. This mode requires:
+
+- Working pybricksdev installation
+- Bluetooth enabled on your computer
+- SPIKE Prime hub turned on and within range
+
+### Simulation Mode
+
+If you want to plan robot paths without a physical hub or if you're having issues with Bluetooth connectivity, you can use simulation mode:
+
+```bash
+python run_codless.py --simulation
+```
+
+In simulation mode, all Bluetooth operations are simulated, allowing you to:
+- Test the application interface
+- Plan and save robot paths
+- Practice using the application
+
+## Requirements
+
+- Python 3.x
+- Tkinter (included with Python)
+- Pillow (PIL)
+- Matplotlib
+- pybricksdev
+
+The application will check for required dependencies on first run and offer to install them if missing.
+
+## Troubleshooting
+
+If you're having issues with Bluetooth connectivity:
+
+1. Make sure Bluetooth is enabled on your computer
+2. Ensure your SPIKE Prime hub is turned on and within range
+3. Try reinstalling pybricksdev: `pip install --force-reinstall pybricksdev`
+4. Use simulation mode (`--simulation`) if you need to work without a physical hub
 
 ---
 

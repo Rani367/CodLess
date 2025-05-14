@@ -1,0 +1,14 @@
+To use custom map backgrounds:
+
+1. Add image files (PNG, JPG, JPEG, GIF, BMP) to this "assets" folder
+
+2. The app will automatically load the first image found in this folder when it starts
+
+3. You can also select a different map image using the "Select Map Image" button in the Map tab
+
+4. Examples of useful images include:
+   - FLL competition field layouts
+   - Custom maps of your testing area
+   - Diagrams of robot paths
+
+Note: The coordinate system in the app (0-100 cm) will be overlaid on any image you add.
