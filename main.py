@@ -1324,8 +1324,11 @@ class ConfigDialog(QDialog):
         
     def setup_ui(self):
         self.setWindowTitle("Robot Configuration")
-        self.setFixedSize(450, 700)
+        self.setFixedSize(450, 500)  # Increased height to fit all content properly
         self.setModal(True)
+        
+        # Apply the same dark theme styling as the main window
+        self.setup_dialog_style()
         
         layout = QVBoxLayout(self)
         
@@ -1335,64 +1338,94 @@ class ConfigDialog(QDialog):
         layout.addWidget(title)
         
         drive_group = QGroupBox("Drive Configuration")
+        drive_group.setObjectName("group_box")
         drive_layout = QVBoxLayout(drive_group)
         
         axle_layout = QHBoxLayout()
         axle_layout.addWidget(QLabel("Axle Track (mm):"))
         self.axle_track_input = QLineEdit(str(self.config.axle_track))
+        self.axle_track_input.setObjectName("line_edit")
         axle_layout.addWidget(self.axle_track_input)
         drive_layout.addLayout(axle_layout)
         
-        drive_layout.addWidget(QLabel("Distance between left and right wheels"))
+        info_label1 = QLabel("Distance between left and right wheels")
+        info_label1.setObjectName("info_text")
+        drive_layout.addWidget(info_label1)
         
         wheel_layout = QHBoxLayout()
         wheel_layout.addWidget(QLabel("Wheel Diameter (mm):"))
         self.wheel_diameter_input = QLineEdit(str(self.config.wheel_diameter))
+        self.wheel_diameter_input.setObjectName("line_edit")
         wheel_layout.addWidget(self.wheel_diameter_input)
         drive_layout.addLayout(wheel_layout)
         
-        drive_layout.addWidget(QLabel("Diameter of the driving wheels"))
+        info_label2 = QLabel("Diameter of the driving wheels")
+        info_label2.setObjectName("info_text")
+        drive_layout.addWidget(info_label2)
         
         layout.addWidget(drive_group)
         
-        motion_group = QGroupBox("Motion Settings (Acceleration/Deceleration)")
-        motion_layout = QVBoxLayout(motion_group)
+        # Advanced options checkbox
+        self.advanced_checkbox = QCheckBox("⚙️ Advanced Options (Speed/Acceleration Settings)")
+        self.advanced_checkbox.setObjectName("checkbox")
+        self.advanced_checkbox.toggled.connect(self.toggle_advanced_options)
+        layout.addWidget(self.advanced_checkbox)
+        
+        # Motion settings group (initially hidden)
+        self.motion_group = QGroupBox("Motion Settings (Acceleration/Deceleration)")
+        self.motion_group.setObjectName("group_box")
+        motion_layout = QVBoxLayout(self.motion_group)
         
         straight_speed_layout = QHBoxLayout()
         straight_speed_layout.addWidget(QLabel("Max Straight Speed (mm/s):"))
         self.straight_speed_input = QLineEdit(str(self.config.straight_speed))
+        self.straight_speed_input.setObjectName("line_edit")
         straight_speed_layout.addWidget(self.straight_speed_input)
         motion_layout.addLayout(straight_speed_layout)
         
-        motion_layout.addWidget(QLabel("Maximum speed for forward/backward movement"))
+        info_label3 = QLabel("Maximum speed for forward/backward movement")
+        info_label3.setObjectName("info_text")
+        motion_layout.addWidget(info_label3)
         
         straight_accel_layout = QHBoxLayout()
         straight_accel_layout.addWidget(QLabel("Straight Acceleration (mm/s²):"))
         self.straight_acceleration_input = QLineEdit(str(self.config.straight_acceleration))
+        self.straight_acceleration_input.setObjectName("line_edit")
         straight_accel_layout.addWidget(self.straight_acceleration_input)
         motion_layout.addLayout(straight_accel_layout)
         
-        motion_layout.addWidget(QLabel("How quickly the robot accelerates/decelerates"))
+        info_label4 = QLabel("How quickly the robot accelerates/decelerates")
+        info_label4.setObjectName("info_text")
+        motion_layout.addWidget(info_label4)
         
         turn_rate_layout = QHBoxLayout()
         turn_rate_layout.addWidget(QLabel("Max Turn Rate (deg/s):"))
         self.turn_rate_input = QLineEdit(str(self.config.turn_rate))
+        self.turn_rate_input.setObjectName("line_edit")
         turn_rate_layout.addWidget(self.turn_rate_input)
         motion_layout.addLayout(turn_rate_layout)
         
-        motion_layout.addWidget(QLabel("Maximum turning speed"))
+        info_label5 = QLabel("Maximum turning speed")
+        info_label5.setObjectName("info_text")
+        motion_layout.addWidget(info_label5)
         
         turn_accel_layout = QHBoxLayout()
         turn_accel_layout.addWidget(QLabel("Turn Acceleration (deg/s²):"))
         self.turn_acceleration_input = QLineEdit(str(self.config.turn_acceleration))
+        self.turn_acceleration_input.setObjectName("line_edit")
         turn_accel_layout.addWidget(self.turn_acceleration_input)
         motion_layout.addLayout(turn_accel_layout)
         
-        motion_layout.addWidget(QLabel("How quickly the robot accelerates/decelerates turning"))
+        info_label6 = QLabel("How quickly the robot accelerates/decelerates turning")
+        info_label6.setObjectName("info_text")
+        motion_layout.addWidget(info_label6)
         
-        layout.addWidget(motion_group)
+        # Initially hide the motion group
+        self.motion_group.hide()
+        layout.addWidget(self.motion_group)
         
         ports_group = QGroupBox("Motor Ports")
+        ports_group.setObjectName("group_box")
         ports_layout = QVBoxLayout(ports_group)
         
         port_options = ["A", "B", "C", "D", "E", "F"]
@@ -1434,14 +1467,156 @@ class ConfigDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         cancel_btn = QPushButton("Cancel")
+        cancel_btn.setObjectName("danger_btn")
         cancel_btn.clicked.connect(self.reject)
         
         save_btn = QPushButton("Save")
+        save_btn.setObjectName("success_btn")
         save_btn.clicked.connect(self.accept)
         
         button_layout.addWidget(cancel_btn)
         button_layout.addWidget(save_btn)
         layout.addLayout(button_layout)
+    
+    def toggle_advanced_options(self, checked):
+        """Toggle visibility of advanced motion settings"""
+        if checked:
+            self.motion_group.show()
+            self.setFixedSize(450, 750)  # Expand dialog when showing advanced options
+        else:
+            self.motion_group.hide()
+            self.setFixedSize(450, 500)  # Collapse dialog when hiding advanced options
+    
+    def setup_dialog_style(self):
+        """Apply dark theme styling to match the main window"""
+        style = """
+        /* Dialog window */
+        QDialog {
+            background-color: rgb(45, 45, 45);
+            color: rgb(255, 255, 255);
+        }
+        
+        /* Group boxes */
+        QGroupBox {
+            border: 1px solid rgb(70, 70, 70);
+            border-radius: 5px;
+            color: rgb(255, 255, 255);
+            background: rgb(45, 45, 45);
+            font-weight: bold;
+            padding-top: 10px;
+            margin-top: 5px;
+        }
+        
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 10px;
+            padding: 0 5px 0 5px;
+        }
+        
+        /* Input fields */
+        #line_edit {
+            color: rgb(255, 255, 255);
+            border: 2px solid rgb(70, 70, 70);
+            border-radius: 4px;
+            background: rgb(60, 60, 60);
+            padding: 5px;
+        }
+        
+        #line_edit:focus {
+            border-color: rgb(0, 143, 170);
+        }
+        
+        /* Buttons */
+        #success_btn {
+            border: 2px solid rgb(40, 167, 69);
+            border-radius: 5px;
+            color: rgb(255, 255, 255);
+            background-color: rgb(40, 167, 69);
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        
+        #success_btn:hover {
+            background-color: rgb(34, 142, 58);
+        }
+        
+        #danger_btn {
+            border: 2px solid rgb(220, 53, 69);
+            border-radius: 5px;
+            color: rgb(255, 255, 255);
+            background-color: rgb(220, 53, 69);
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        
+        #danger_btn:hover {
+            background-color: rgb(200, 35, 51);
+        }
+        
+        /* Text displays */
+        #info_text {
+            color: rgb(200, 200, 200);
+            font-size: 11px;
+        }
+        
+        /* Checkbox */
+        QCheckBox {
+            color: rgb(255, 255, 255);
+        }
+        
+        QCheckBox::indicator {
+            width: 15px;
+            height: 15px;
+        }
+        
+        QCheckBox::indicator:unchecked {
+            border: 2px solid rgb(70, 70, 70);
+            background-color: rgb(60, 60, 60);
+        }
+        
+        QCheckBox::indicator:checked {
+            border: 2px solid rgb(0, 143, 170);
+            background-color: rgb(0, 143, 170);
+        }
+        
+        /* ComboBox */
+        QComboBox {
+            color: rgb(255, 255, 255);
+            border: 2px solid rgb(70, 70, 70);
+            border-radius: 4px;
+            background: rgb(60, 60, 60);
+            padding: 5px;
+        }
+        
+        QComboBox:focus {
+            border-color: rgb(0, 143, 170);
+        }
+        
+        QComboBox::drop-down {
+            width: 0px;
+            border: none;
+        }
+        
+        QComboBox::down-arrow {
+            image: none;
+            width: 0px;
+            height: 0px;
+        }
+        
+        QComboBox QAbstractItemView {
+            background-color: rgb(60, 60, 60);
+            border: 1px solid rgb(70, 70, 70);
+            color: rgb(255, 255, 255);
+            selection-background-color: rgb(0, 143, 170);
+        }
+        
+        /* Labels */
+        QLabel {
+            color: rgb(255, 255, 255);
+        }
+        """
+        
+        self.setStyleSheet(style)
         
     def get_config(self):
         return RobotConfig(
