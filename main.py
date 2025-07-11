@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 FLL ROBOTICS CONTROL APP
+FLL ROBOTICS CONTROL APP
 
 HOW TO USE:
 1. Upload 'hub_control.py' to your robot hub via code.pybricks.com
