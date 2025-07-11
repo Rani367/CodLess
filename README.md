@@ -1,6 +1,6 @@
-# FLL ROBOTICS CONTROL APP – Real-Time Robot Control & Training Platform
+# CodLess – Real-Time Robot Control & Training Platform
 
-**FLL Robotics Control App** is a comprehensive platform designed to make FLL robot control, testing, and training intuitive and efficient for teams of all levels. Whether you're developing new strategies or fine-tuning robot performance, this app provides real-time control and realistic simulation to perfect your runs.
+**CodLess** is a comprehensive platform designed to make FLL robot control, testing, and training intuitive and efficient for teams of all levels. Whether you're developing new strategies or fine-tuning robot performance, CodLess provides real-time control and realistic simulation to perfect your runs.
 
 Built specifically for **LEGO SPIKE Prime** and **Pybricks**, the app offers direct keyboard control, movement recording/playback, and an advanced physics simulator that behaves like a real robot — giving you the tools to develop winning strategies before stepping onto the competition field.
 
@@ -20,7 +20,7 @@ Built specifically for **LEGO SPIKE Prime** and **Pybricks**, the app offers dir
 
 ---
 
-## Why FLL Robotics Control App?
+## Why CodLess?
 
 Competition success requires practice, precision, and iteration. This app removes the complexity of programming individual runs and lets teams focus on what matters: strategy development, movement optimization, and consistent performance.
 
@@ -98,6 +98,6 @@ No commercial use or redistribution is allowed.
 
 ## Open Source and Open to All
 
-FLL Robotics Control App is an open-source project developed to make robotics education and competition preparation more accessible. Contributions, feedback, and ideas are welcome from the global FLL community.
+CodLess is an open-source project developed to make robotics education and competition preparation more accessible. Contributions, feedback, and ideas are welcome from the global FLL community.
 
 **Built for teams, by teams. 🤖** 
