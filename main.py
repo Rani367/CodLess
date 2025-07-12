@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""
-FLL ROBOTICS CONTROL APP
-
-HOW TO USE:
-1. Upload 'hub_control.py' to your robot hub via code.pybricks.com
-2. Keep the Pybricks website open and connected to your hub  
-3. Run this app: python main.py
-4. Click "Connect to Pybricks Hub" to establish communication
-5. Use WASD keys for movement, QE/RF for arms
-
-COMMUNICATION FLOW:
-PC App ←→ Pybricks Website ←→ Robot Hub
-The website acts as a bridge for communication.
-"""
 
 import os
 os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
@@ -78,15 +64,15 @@ class RobotSimulator(QWidget):
         self.arm1_angle = 0
         self.arm2_angle = 0
         
-        self.target_speed = 0
-        self.target_turn_rate = 0
-        self.target_arm1_speed = 0
-        self.target_arm2_speed = 0
+        self.target_spd = 0
+        self.target_turn = 0
+        self.target_arm1_spd = 0
+        self.target_arm2_spd = 0
         
-        self.actual_speed = 0
-        self.actual_turn_rate = 0
-        self.actual_arm1_speed = 0
-        self.actual_arm2_speed = 0
+        self.actual_spd = 0
+        self.actual_turn = 0
+        self.actual_arm1_spd = 0
+        self.actual_arm2_spd = 0
         
         self.speed_accel = 0
         self.turn_accel = 0
@@ -98,11 +84,11 @@ class RobotSimulator(QWidget):
         self.arm_inertia = 0.05
         
         self.max_drive_accel = 800
-        self.max_turn_accel = 600
+        self.max_turn_accel = 600  
         self.max_arm_accel = 1000
         
-        self.friction_coefficient = 0.05
-        self.motor_response_lag = 0.03
+        self.friction_coeff = 0.05
+        self.motor_lag = 0.03
         
         self.dt = 0.02
         self.timer = QTimer()
@@ -110,21 +96,15 @@ class RobotSimulator(QWidget):
         self.timer.start(20)
         
     def update_command(self, command):
-        """Update simulator based on robot command"""
         cmd_type = command.get('type', '')
         
         if cmd_type == 'drive':
-            self.target_speed = command.get('speed', 0) * 1.5
-            self.target_turn_rate = command.get('turn_rate', 0) * 1.2
+            self.target_spd = command.get('speed', 0) * 1.5
+            self.target_turn = command.get('turn_rate', 0) * 1.2
         elif cmd_type == 'arm1':
-            self.target_arm1_speed = command.get('speed', 0) * 1.0
+            self.target_arm1_spd = command.get('speed', 0) * 1.0
         elif cmd_type == 'arm2':
-            self.target_arm2_speed = command.get('speed', 0) * 1.0
-        elif cmd_type == 'stop_all':
-            self.target_speed = 0
-            self.target_turn_rate = 0
-            self.target_arm1_speed = 0
-            self.target_arm2_speed = 0
+            self.target_arm2_spd = command.get('speed', 0) * 1.0
             
     def update_simulation(self):
         self.apply_realistic_motor_physics()
@@ -133,10 +113,10 @@ class RobotSimulator(QWidget):
         self.update()
         
     def apply_realistic_motor_physics(self):
-        speed_error = self.target_speed - self.actual_speed
-        turn_error = self.target_turn_rate - self.actual_turn_rate
-        arm1_error = self.target_arm1_speed - self.actual_arm1_speed
-        arm2_error = self.target_arm2_speed - self.actual_arm2_speed
+        speed_error = self.target_spd - self.actual_spd
+        turn_error = self.target_turn - self.actual_turn
+        arm1_error = self.target_arm1_spd - self.actual_arm1_spd
+        arm2_error = self.target_arm2_spd - self.actual_arm2_spd
         
         max_speed_change = self.max_drive_accel * self.dt
         max_turn_change = self.max_turn_accel * self.dt
@@ -156,7 +136,7 @@ class RobotSimulator(QWidget):
             else:
                 new_accel = target_accel
                 
-            friction_factor = 1.0 - self.friction_coefficient * self.dt
+            friction_factor = 1.0 - self.friction_coeff * self.dt
             damping = 0.92 + 0.08 * math.exp(-abs(error) * 0.1)
             
             return new_accel * friction_factor * damping
@@ -166,22 +146,22 @@ class RobotSimulator(QWidget):
         self.arm1_accel = s_curve_profile(arm1_error, max_arm_change, self.arm1_accel, self.max_arm_accel)
         self.arm2_accel = s_curve_profile(arm2_error, max_arm_change, self.arm2_accel, self.max_arm_accel)
         
-        motor_lag = 1.0 - self.motor_response_lag
-        self.actual_speed += self.speed_accel * self.dt * motor_lag
-        self.actual_turn_rate += self.turn_accel * self.dt * motor_lag
-        self.actual_arm1_speed += self.arm1_accel * self.dt * motor_lag
-        self.actual_arm2_speed += self.arm2_accel * self.dt * motor_lag
+        motor_lag = 1.0 - self.motor_lag
+        self.actual_spd += self.speed_accel * self.dt * motor_lag
+        self.actual_turn += self.turn_accel * self.dt * motor_lag
+        self.actual_arm1_spd += self.arm1_accel * self.dt * motor_lag
+        self.actual_arm2_spd += self.arm2_accel * self.dt * motor_lag
         
         inertial_damping = 0.995
-        self.actual_speed *= inertial_damping
-        self.actual_turn_rate *= inertial_damping
-        self.actual_arm1_speed *= inertial_damping
-        self.actual_arm2_speed *= inertial_damping
+        self.actual_spd *= inertial_damping
+        self.actual_turn *= inertial_damping
+        self.actual_arm1_spd *= inertial_damping
+        self.actual_arm2_spd *= inertial_damping
         
     def update_robot_position(self):
-        if abs(self.actual_speed) > 0.01 or abs(self.actual_turn_rate) > 0.01:
-            sim_speed = self.actual_speed * 0.15
-            sim_turn = self.actual_turn_rate * 0.8
+        if abs(self.actual_spd) > 0.01 or abs(self.actual_turn) > 0.01:
+            sim_speed = self.actual_spd * 0.15
+            sim_turn = self.actual_turn * 0.8
             
             momentum_factor = 1.0 / (1.0 + self.robot_mass * 0.1)
             inertia_factor = 1.0 / (1.0 + self.robot_inertia * 2.0)
@@ -200,14 +180,14 @@ class RobotSimulator(QWidget):
             self.robot_y = max(30, min(self.height() - 30, self.robot_y))
             
     def update_arm_positions(self):
-        if abs(self.actual_arm1_speed) > 0.1:
+        if abs(self.actual_arm1_spd) > 0.1:
             arm_momentum = 1.0 / (1.0 + self.arm_inertia * 0.8)
-            self.arm1_angle += self.actual_arm1_speed * 0.3 * self.dt * arm_momentum
+            self.arm1_angle += self.actual_arm1_spd * 0.3 * self.dt * arm_momentum
             self.arm1_angle = max(-90, min(90, self.arm1_angle))
             
-        if abs(self.actual_arm2_speed) > 0.1:
+        if abs(self.actual_arm2_spd) > 0.1:
             arm_momentum = 1.0 / (1.0 + self.arm_inertia * 0.8)
-            self.arm2_angle += self.actual_arm2_speed * 0.3 * self.dt * arm_momentum
+            self.arm2_angle += self.actual_arm2_spd * 0.3 * self.dt * arm_momentum
             self.arm2_angle = max(-90, min(90, self.arm2_angle))
         
     def paintEvent(self, event):
@@ -231,7 +211,7 @@ class RobotSimulator(QWidget):
         
         painter.drawText(10, 20, status_text)
         
-        physics_text = f"Speed: {self.actual_speed:.1f} | Turn: {self.actual_turn_rate:.1f}"
+        physics_text = f"Speed: {self.actual_spd:.1f} | Turn: {self.actual_turn:.1f}"
         painter.drawText(10, 40, physics_text)
         
         accel_text = f"Accel: {self.speed_accel:.1f} | T-Accel: {self.turn_accel:.1f}"
@@ -271,16 +251,13 @@ class RobotSimulator(QWidget):
         painter.restore()
         
     def draw_arm(self, painter, base_x, base_y, angle, color):
-        """Draw a robot arm"""
         painter.save()
         painter.translate(base_x, base_y)
         painter.rotate(angle)
         
-        # Arm segment
         painter.setPen(QPen(color, 3))
         painter.drawLine(0, 0, 15, 0)
         
-        # Arm joint
         painter.setBrush(QBrush(color))
         painter.drawEllipse(-3, -3, 6, 6)
         
@@ -327,7 +304,7 @@ class BLEController:
                         if self.ready_event:
                             self.ready_event.set()
                     else:
-                        self.log_callback(f"📱 {payload.decode('utf-8', errors='ignore')}")
+                        self.log_callback(f"HUB: {payload.decode('utf-8', errors='ignore')}")
                         
             self.client = BleakClient(self.device, handle_disconnect)
             await self.client.connect()
@@ -394,12 +371,19 @@ class FLLRoboticsGUI(QMainWindow):
         self.setup_style()
         self.setup_connections()
         
+        self.startup_anim = None
+        self.exit_anim = None
+        self.opacity_anim = None
+        self.is_closing = False
+        self.setup_startup_animation()
+        self.setup_exit_animation()
+        
 
 
         
     def setup_ui(self):
         self.setWindowTitle("FLL Robotics Control Center")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(120, 80, 1200, 800)
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         
@@ -438,22 +422,22 @@ class FLLRoboticsGUI(QMainWindow):
         layout = QHBoxLayout(title_bar)
         layout.setContentsMargins(15, 0, 15, 0)
         
-        title_label = QLabel("🤖 FLL Robotics Control Center")
+        title_label = QLabel("CodeLess - FLL Robotics Control Center")
         title_label.setObjectName("title_label")
         title_label.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(title_label)
         
         layout.addStretch()
         
-        self.min_btn = QPushButton("─")
+        self.min_btn = QPushButton("-")
         self.min_btn.setObjectName("window_btn")
         self.min_btn.setFixedSize(30, 30)
         
-        self.max_btn = QPushButton("□")
+        self.max_btn = QPushButton("[]")
         self.max_btn.setObjectName("window_btn")
         self.max_btn.setFixedSize(30, 30)
         
-        self.close_btn = QPushButton("✕")
+        self.close_btn = QPushButton("X")
         self.close_btn.setObjectName("close_btn")
         self.close_btn.setFixedSize(30, 30)
         
@@ -473,7 +457,7 @@ class FLLRoboticsGUI(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
         
-        conn_group = QGroupBox("🔗 Hub Connection")
+        conn_group = QGroupBox("Hub Connection")
         conn_group.setObjectName("group_box")
         conn_layout = QVBoxLayout(conn_group)
         
@@ -494,7 +478,7 @@ class FLLRoboticsGUI(QMainWindow):
         
         layout.addWidget(conn_group)
         
-        config_group = QGroupBox("⚙️ Robot Configuration")
+        config_group = QGroupBox("Robot Configuration")
         config_group.setObjectName("group_box")
         config_layout = QVBoxLayout(config_group)
         
@@ -506,7 +490,7 @@ class FLLRoboticsGUI(QMainWindow):
         
         layout.addWidget(config_group)
         
-        keys_group = QGroupBox("🎮 Control Keys")
+        keys_group = QGroupBox("Control Keys")
         keys_group.setObjectName("group_box")
         keys_layout = QVBoxLayout(keys_group)
         
@@ -516,16 +500,14 @@ class FLLRoboticsGUI(QMainWindow):
 
 Arms (hold to move):
   Q - Arm 1 Up   E - Arm 1 Down
-  R - Arm 2 Up   F - Arm 2 Down
-
-Emergency: SPACE - Stop All""")
+  R - Arm 2 Up   F - Arm 2 Down""")
         keys_text.setObjectName("info_text")
         keys_text.setFont(QFont("Monaco", 9))
         
         keys_layout.addWidget(keys_text)
         layout.addWidget(keys_group)
         
-        runs_group = QGroupBox("💾 Saved Runs")
+        runs_group = QGroupBox("Saved Runs")
         runs_group.setObjectName("group_box")
         runs_layout = QVBoxLayout(runs_group)
         
@@ -534,9 +516,9 @@ Emergency: SPACE - Stop All""")
         self.runs_list.setMaximumHeight(150)
         
         runs_btn_layout = QHBoxLayout()
-        self.play_btn = QPushButton("▶ Play")
+        self.play_btn = QPushButton("Play")
         self.play_btn.setObjectName("success_btn")
-        self.delete_btn = QPushButton("🗑 Delete")
+        self.delete_btn = QPushButton("Delete")
         self.delete_btn.setObjectName("danger_btn")
         
         runs_btn_layout.addWidget(self.play_btn)
@@ -558,7 +540,7 @@ Emergency: SPACE - Stop All""")
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        self.simulator_group = QGroupBox("🤖 Robot Simulator")
+        self.simulator_group = QGroupBox("Robot Simulator")
         self.simulator_group.setObjectName("group_box")
         simulator_layout = QVBoxLayout(self.simulator_group)
         
@@ -568,7 +550,7 @@ Emergency: SPACE - Stop All""")
         sim_info = QLabel("Real-time visual simulation of your robot's movement and arm positions")
         sim_info.setObjectName("info_text")
         
-        self.reset_sim_btn = QPushButton("🔄 Reset Position")
+        self.reset_sim_btn = QPushButton("Reset Position")
         self.reset_sim_btn.setObjectName("success_btn")
         self.reset_sim_btn.setMinimumHeight(30)
         self.reset_sim_btn.clicked.connect(self.reset_simulator)
@@ -581,7 +563,7 @@ Emergency: SPACE - Stop All""")
         
         layout.addWidget(self.simulator_group)
         self.simulator_group.hide()
-        record_group = QGroupBox("🎬 Recording Controls")
+        record_group = QGroupBox("Recording Controls")
         record_group.setObjectName("group_box")
         record_layout = QVBoxLayout(record_group)
         name_layout = QHBoxLayout()
@@ -591,11 +573,11 @@ Emergency: SPACE - Stop All""")
         name_layout.addWidget(self.run_name_input)
         record_layout.addLayout(name_layout)
         record_btn_layout = QHBoxLayout()
-        self.record_btn = QPushButton("🔴 Record Run")
+        self.record_btn = QPushButton("Record Run")
         self.record_btn.setObjectName("danger_btn")
         self.record_btn.setMinimumHeight(50)
         
-        self.save_btn = QPushButton("💾 Save Run")
+        self.save_btn = QPushButton("Save Run")
         self.save_btn.setObjectName("success_btn")
         self.save_btn.setMinimumHeight(50)
         self.save_btn.setEnabled(False)
@@ -608,7 +590,7 @@ Emergency: SPACE - Stop All""")
         record_layout.addWidget(self.record_status)
         
         layout.addWidget(record_group)
-        manual_group = QGroupBox("🕹️ Manual Controls")
+        manual_group = QGroupBox("Manual Controls")
         manual_group.setObjectName("group_box")
         manual_layout = QVBoxLayout(manual_group)
         
@@ -621,13 +603,8 @@ Emergency: SPACE - Stop All""")
         self.key_status.setFont(QFont("Monaco", 10))
         manual_layout.addWidget(self.key_status)
         
-        self.stop_btn = QPushButton("🛑 EMERGENCY STOP")
-        self.stop_btn.setObjectName("danger_btn")
-        self.stop_btn.setMinimumHeight(45)
-        manual_layout.addWidget(self.stop_btn)
-        
         layout.addWidget(manual_group)
-        status_group = QGroupBox("📊 Robot Status")
+        status_group = QGroupBox("Robot Status")
         status_group.setObjectName("group_box")
         status_layout = QVBoxLayout(status_group)
         
@@ -660,12 +637,10 @@ Emergency: SPACE - Stop All""")
         
     def setup_style(self):
         style = """
-        /* Main window */
         QMainWindow {
             background-color: rgb(45, 45, 45);
         }
         
-        /* Title bar */
         #title_bar {
             background-color: rgb(35, 35, 35);
             border-bottom: 1px solid rgb(70, 70, 70);
@@ -693,11 +668,10 @@ Emergency: SPACE - Stop All""")
             font-size: 12px;
         }
         
-        #close_btn:hover {
+        #close_btn:hover{
             background-color: rgb(220, 53, 69);
         }
         
-        /* Content areas */
         #content_widget {
             background-color: rgb(51, 51, 51);
         }
@@ -711,7 +685,6 @@ Emergency: SPACE - Stop All""")
             background-color: rgb(51, 51, 51);
         }
         
-        /* Group boxes */
         QGroupBox {
             border: 1px solid rgb(70, 70, 70);
             border-radius: 5px;
@@ -728,7 +701,6 @@ Emergency: SPACE - Stop All""")
             padding: 0 5px 0 5px;
         }
         
-        /* Buttons */
         #primary_btn {
             border: 2px solid rgb(0, 143, 170);
             border-radius: 5px;
@@ -774,7 +746,6 @@ Emergency: SPACE - Stop All""")
             background-color: rgb(200, 35, 51);
         }
         
-        /* Input fields */
         #line_edit {
             color: rgb(255, 255, 255);
             border: 2px solid rgb(70, 70, 70);
@@ -787,7 +758,6 @@ Emergency: SPACE - Stop All""")
             border-color: rgb(0, 143, 170);
         }
         
-        /* Text displays */
         #info_text {
             color: rgb(200, 200, 200);
         }
@@ -799,7 +769,6 @@ Emergency: SPACE - Stop All""")
             font-family: 'Consolas', monospace;
         }
         
-        /* List widget */
         #runs_list {
             background-color: rgb(60, 60, 60);
             border: 1px solid rgb(70, 70, 70);
@@ -815,7 +784,6 @@ Emergency: SPACE - Stop All""")
             background-color: rgb(0, 143, 170);
         }
         
-        /* Checkbox */
         QCheckBox {
             color: rgb(255, 255, 255);
         }
@@ -835,7 +803,6 @@ Emergency: SPACE - Stop All""")
             background-color: rgb(0, 143, 170);
         }
         
-        /* Status indicators */
         #status_disconnected {
             color: rgb(220, 53, 69);
             font-weight: bold;
@@ -846,7 +813,6 @@ Emergency: SPACE - Stop All""")
             font-weight: bold;
         }
         
-        /* Status bar */
         #status_bar {
             background-color: rgb(35, 35, 35);
             border-top: 1px solid rgb(70, 70, 70);
@@ -856,12 +822,10 @@ Emergency: SPACE - Stop All""")
             color: rgb(200, 200, 200);
         }
         
-        /* Labels */
         QLabel {
             color: rgb(255, 255, 255);
         }
         
-        /* Robot Simulator */
         #robot_simulator {
             background-color: rgb(45, 45, 45);
             border: 2px solid rgb(70, 70, 70);
@@ -874,18 +838,53 @@ Emergency: SPACE - Stop All""")
     def setup_connections(self):
         self.min_btn.clicked.connect(self.showMinimized)
         self.max_btn.clicked.connect(self.toggle_maximize)
-        self.close_btn.clicked.connect(self.close)
+        self.close_btn.clicked.connect(self.start_exit_animation)
         self.connect_btn.clicked.connect(self.connect_hub)
         self.config_btn.clicked.connect(self.open_config_dialog)
         self.record_btn.clicked.connect(self.toggle_recording)
         self.save_btn.clicked.connect(self.save_current_run)
         self.play_btn.clicked.connect(self.play_selected_run)
         self.delete_btn.clicked.connect(self.delete_selected_run)
-        self.stop_btn.clicked.connect(self.emergency_stop)
         self.developer_check.toggled.connect(self.toggle_developer_mode)
         self.setFocusPolicy(Qt.StrongFocus)
         
         self.update_runs_list()
+    
+    def setup_startup_animation(self):
+        self.target_geom = self.geometry()
+        
+        self.startup_anim = QPropertyAnimation(self, b"geometry")
+        self.startup_anim.setDuration(850)  
+        self.startup_anim.setEasingCurve(QEasingCurve.OutCubic)
+        
+        rect = self.target_geom
+        w = int(rect.width() * 0.5)
+        h = int(rect.height() * 0.5)
+        x = rect.x() + (rect.width() - w) // 2
+        y = rect.y() + (rect.height() - h) // 2
+        
+        self.start_geom = QtCore.QRect(x, y, w, h)
+    
+    def setup_exit_animation(self):
+        self.exit_anim = QPropertyAnimation(self, b"geometry")
+        self.exit_anim.setDuration(650)  
+        self.exit_anim.setEasingCurve(QEasingCurve.InCubic)
+        
+        self.opacity_anim = QPropertyAnimation(self, b"windowOpacity")
+        self.opacity_anim.setDuration(650)
+        self.opacity_anim.setEasingCurve(QEasingCurve.InCubic)
+        
+        self.exit_anim.finished.connect(self.force_close)
+        
+    def showEvent(self, event):
+        super().showEvent(event)
+        
+        if self.startup_anim and not hasattr(self, '_animated'):
+            self._animated = True
+            self.setGeometry(self.start_geom)
+            self.startup_anim.setStartValue(self.start_geom)
+            self.startup_anim.setEndValue(self.target_geom)
+            self.startup_anim.start()
         
     def keyPressEvent(self, event):
         key = event.text().lower()
@@ -923,10 +922,10 @@ Emergency: SPACE - Stop All""")
     def toggle_maximize(self):
         if self.isMaximized():
             self.showNormal()
-            self.max_btn.setText("□")
+            self.max_btn.setText("[]")
         else:
             self.showMaximized()
-            self.max_btn.setText("❐")
+            self.max_btn.setText("=[]")
             
     def log_status(self, message: str, level: str = "info"):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -968,7 +967,7 @@ Emergency: SPACE - Stop All""")
             return
             
         if self.developer_check.isChecked():
-            self.log_status("🔧 Developer mode: Simulating hub connection", "warning")
+            self.log_status("Developer mode: Simulating hub connection", "warning")
             self.hub_status.setText("● Hub Connected (Simulation)")
             self.hub_status.setObjectName("status_connected")
             self.hub_status.setStyleSheet("#status_connected { color: rgb(40, 167, 69); font-weight: bold; }")
@@ -985,7 +984,7 @@ Emergency: SPACE - Stop All""")
             self.hub_status.setStyleSheet("#status_connected { color: rgb(40, 167, 69); font-weight: bold; }")
             self.connect_btn.setText("Disconnect Hub")
         else:
-            self.log_status("❌ Connection failed. Check setup guide.", "error")
+            self.log_status("Connection failed. Check setup guide.", "error")
             
     def disconnect_hub(self):
         if self.ble_controller:
@@ -997,13 +996,13 @@ Emergency: SPACE - Stop All""")
         self.connect_btn.setText("Connect to Pybricks Hub")
         
         if self.developer_check.isChecked():
-            self.log_status("🔌 Disconnected from simulated hub", "info")
+            self.log_status("Disconnected from simulated hub", "info")
         else:
-            self.log_status("🔌 Disconnected from hub", "info")
+            self.log_status("Disconnected from hub", "info")
         
     def toggle_developer_mode(self):
         if self.developer_check.isChecked():
-            self.log_status("🔧 Developer mode enabled - simulation mode", "warning")
+            self.log_status("Developer mode enabled - simulation mode", "warning")
             self.simulator_group.show()
             self.reset_simulator()
             
@@ -1012,7 +1011,7 @@ Emergency: SPACE - Stop All""")
             self.hub_status.setStyleSheet("#status_connected { color: rgb(40, 167, 69); font-weight: bold; }")
             self.connect_btn.setText("Disconnect Hub")
         else:
-            self.log_status("🔧 Developer mode disabled", "info")
+            self.log_status("Developer mode disabled", "info")
             self.simulator_group.hide()
             
             self.hub_status.setText("● Hub Disconnected")
@@ -1021,27 +1020,26 @@ Emergency: SPACE - Stop All""")
             self.connect_btn.setText("Connect to Pybricks Hub")
             
     def reset_simulator(self):
-        """Reset robot simulator to center position"""
         if hasattr(self, 'robot_simulator'):
             self.robot_simulator.robot_x = self.robot_simulator.width() // 2
             self.robot_simulator.robot_y = self.robot_simulator.height() // 2
             self.robot_simulator.robot_angle = 0
             self.robot_simulator.arm1_angle = 0
             self.robot_simulator.arm2_angle = 0
-            self.robot_simulator.target_speed = 0
-            self.robot_simulator.target_turn_rate = 0
-            self.robot_simulator.target_arm1_speed = 0
-            self.robot_simulator.target_arm2_speed = 0
-            self.robot_simulator.actual_speed = 0
-            self.robot_simulator.actual_turn_rate = 0
-            self.robot_simulator.actual_arm1_speed = 0
-            self.robot_simulator.actual_arm2_speed = 0
+            self.robot_simulator.target_spd = 0
+            self.robot_simulator.target_turn = 0
+            self.robot_simulator.target_arm1_spd = 0
+            self.robot_simulator.target_arm2_spd = 0
+            self.robot_simulator.actual_spd = 0
+            self.robot_simulator.actual_turn = 0
+            self.robot_simulator.actual_arm1_spd = 0
+            self.robot_simulator.actual_arm2_spd = 0
             
     def open_config_dialog(self):
         dialog = ConfigDialog(self, self.config)
         if dialog.exec() == QDialog.Accepted:
             self.config = dialog.get_config()
-            self.log_status("⚙️ Robot configuration updated", "success")
+            self.log_status("Robot configuration updated", "success")
             
             if ((self.ble_controller and self.ble_controller.connected) or self.developer_check.isChecked()):
                 config_command = {
@@ -1059,146 +1057,131 @@ Emergency: SPACE - Stop All""")
         if not (self.ble_controller and self.ble_controller.connected) and not self.developer_check.isChecked():
             return
             
-        timestamp = time.time()
-        
-        if key == ' ' and is_pressed:
-            command = {'type': 'stop_all'}
-            self.execute_command(command)
-            if self.is_recording:
-                recorded_cmd = RecordedCommand(
-                    timestamp=timestamp - self.recording_start_time,
-                    command_type=command['type'],
-                    parameters=command
-                )
-                self.recorded_commands.append(recorded_cmd)
-            return
+        ts = time.time()
         
         if key in ['w', 'a', 's', 'd']:
-            speed = 0
-            turn_rate = 0
+            spd = 0
+            turn = 0
             
             if 'w' in self.pressed_keys:
-                speed += 200
+                spd += 200
             if 's' in self.pressed_keys:
-                speed -= 200
+                spd -= 200
                 
             if 'a' in self.pressed_keys:
-                turn_rate -= 100
+                turn -= 100
             if 'd' in self.pressed_keys:
-                turn_rate += 100
+                turn += 100
                 
-            command = {'type': 'drive', 'speed': speed, 'turn_rate': turn_rate}
-            self.execute_command(command)
+            cmd = {'type': 'drive', 'speed': spd, 'turn_rate': turn}
+            self.execute_command(cmd)
             
             if self.is_recording:
                 recorded_cmd = RecordedCommand(
-                    timestamp=timestamp - self.recording_start_time,
-                    command_type=command['type'],
-                    parameters=command
+                    timestamp=ts - self.recording_start_time,
+                    command_type=cmd['type'],
+                    parameters=cmd
                 )
                 self.recorded_commands.append(recorded_cmd)
                 
         elif key in ['q', 'e', 'r', 'f']:
-            speed = 200 if is_pressed else 0
+            spd = 200 if is_pressed else 0
             
             if key == 'q':
-                command = {'type': 'arm1', 'speed': speed}
+                cmd = {'type': 'arm1', 'speed': spd}
             elif key == 'e':
-                command = {'type': 'arm1', 'speed': -speed}
+                cmd = {'type': 'arm1', 'speed': -spd}
             elif key == 'r':
-                command = {'type': 'arm2', 'speed': speed}
+                cmd = {'type': 'arm2', 'speed': spd}
             elif key == 'f':
-                command = {'type': 'arm2', 'speed': -speed}
+                cmd = {'type': 'arm2', 'speed': -spd}
                 
-            if command:
-                self.execute_command(command)
+            if cmd:
+                self.execute_command(cmd)
                 
                 if self.is_recording:
-                    recorded_cmd = RecordedCommand(
-                        timestamp=timestamp - self.recording_start_time,
-                        command_type=command['type'],
-                        parameters=command
+                    rec_cmd = RecordedCommand(
+                        timestamp=ts - self.recording_start_time,
+                        command_type=cmd['type'],
+                        parameters=cmd
                     )
-                    self.recorded_commands.append(recorded_cmd)
+                    self.recorded_commands.append(rec_cmd)
                 
-    def execute_command(self, command: Dict):
+    def execute_command(self, cmd: Dict):
         try:
             if self.developer_check.isChecked():
-                action = self.format_command_for_display(command)
-                self.log_status(f"🎮 SIM: {action}", "info")
-                self.robot_simulator.update_command(command)
+                action = self.format_cmd_display(cmd)
+                self.log_status(f"SIM: {action}", "info")
+                self.robot_simulator.update_command(cmd)
             elif self.ble_controller and self.ble_controller.connected:
-                self.run_async_task(self.ble_controller.send_command(command))
+                self.run_async_task(self.ble_controller.send_command(cmd))
                 
         except Exception as e:
-            self.log_status(f"❌ Command error: {str(e)}", "error")
+            self.log_status(f"Command error: {str(e)}", "error")
             
-    def format_command_for_display(self, command: Dict) -> str:
-        cmd_type = command['type']
+    def format_cmd_display(self, cmd: Dict) -> str:
+        cmd_type = cmd['type']
         if cmd_type == 'drive':
-            speed = command.get('speed', 0)
-            turn_rate = command.get('turn_rate', 0)
+            spd = cmd.get('speed', 0)
+            turn = cmd.get('turn_rate', 0)
             
-            movements = []
-            if speed > 0:
-                movements.append("Forward")
-            elif speed < 0:
-                movements.append("Backward")
+            moves = []
+            if spd > 0:
+                moves.append("Forward")
+            elif spd < 0:
+                moves.append("Backward")
                 
-            if turn_rate > 0:
-                movements.append("Turn Right")
-            elif turn_rate < 0:
-                movements.append("Turn Left")
+            if turn > 0:
+                moves.append("Turn Right")
+            elif turn < 0:
+                moves.append("Turn Left")
                 
-            if not movements:
+            if not moves:
                 return "Drive: Stopped"
             
-            return f"Drive: {' + '.join(movements)} (speed={speed}, turn={turn_rate})"
+            return f"Drive: {' + '.join(moves)} (speed={spd}, turn={turn})"
             
         elif cmd_type in ['arm1', 'arm2']:
-            speed = command.get('speed', 0)
-            if speed > 0:
-                direction = "Up"
-            elif speed < 0:
-                direction = "Down"
+            spd = cmd.get('speed', 0)
+            if spd > 0:
+                dir = "Up"
+            elif spd < 0:
+                dir = "Down"
             else:
-                direction = "Stop"
-            return f"{cmd_type.upper()}: {direction} (speed={speed})"
-        elif cmd_type == 'stop_all':
-            return "EMERGENCY STOP ALL"
-        return str(command)
+                dir = "Stop"
+            return f"{cmd_type.upper()}: {dir} (speed={spd})"
+        return str(cmd)
         
     def toggle_recording(self):
         if not ((self.ble_controller and self.ble_controller.connected) or self.developer_check.isChecked()):
-            self.log_status("⚠️ Please connect to hub first!", "warning")
+            self.log_status("Please connect to hub first!", "warning")
             return
             
         if not self.is_recording:
-            # Start recording
-            self.current_run_name = self.run_name_input.text().strip()
-            if not self.current_run_name:
-                self.current_run_name = f"Run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                self.run_name_input.setText(self.current_run_name)
+            run_name = self.run_name_input.text().strip()
+            if not run_name:
+                run_name = f"Run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                self.run_name_input.setText(run_name)
                 
+            self.current_run_name = run_name
             self.is_recording = True
             self.recorded_commands = []
             self.recording_start_time = time.time()
             
-            self.record_btn.setText("⏹ Stop Recording")
-            self.record_status.setText(f"🔴 Recording: {self.current_run_name}")
+            self.record_btn.setText("Stop Recording")
+            self.record_status.setText(f"Recording: {run_name}")
             self.save_btn.setEnabled(False)
-            self.log_status(f"🎬 Started recording: {self.current_run_name}", "success")
+            self.log_status(f"Started recording: {run_name}", "success")
         else:
-            # Stop recording
             self.is_recording = False
-            self.record_btn.setText("🔴 Record Run")
-            self.record_status.setText(f"⏹ Recorded {len(self.recorded_commands)} commands")
+            self.record_btn.setText("Record Run") 
+            self.record_status.setText(f"Recorded {len(self.recorded_commands)} commands")
             self.save_btn.setEnabled(True)
-            self.log_status(f"⏹ Stopped recording. {len(self.recorded_commands)} commands captured", "success")
+            self.log_status(f"Stopped recording. {len(self.recorded_commands)} commands captured", "success")
             
     def save_current_run(self):
         if not self.recorded_commands:
-            self.log_status("⚠️ No commands recorded!", "warning")
+            self.log_status("No commands recorded!", "warning")
             return
             
         run_data = {
@@ -1218,13 +1201,13 @@ Emergency: SPACE - Stop All""")
             self.saved_runs[self.current_run_name] = run_data
             self.update_runs_list()
             self.save_btn.setEnabled(False)
-            self.log_status(f"💾 Run saved: {filename}", "success")
+            self.log_status(f"Run saved: {filename}", "success")
             
             self.recorded_commands = []
             self.record_status.setText("Not Recording")
             
         except Exception as e:
-            self.log_status(f"❌ Failed to save run: {str(e)}", "error")
+            self.log_status(f"Failed to save run: {str(e)}", "error")
             
     def load_saved_runs(self) -> Dict:
         runs = {}
@@ -1250,11 +1233,11 @@ Emergency: SPACE - Stop All""")
     def play_selected_run(self):
         current_item = self.runs_list.currentItem()
         if not current_item:
-            self.log_status("⚠️ Please select a run to play!", "warning")
+            self.log_status("Please select a run to play!", "warning")
             return
             
         if not ((self.ble_controller and self.ble_controller.connected) or self.developer_check.isChecked()):
-            self.log_status("⚠️ Please connect to hub first!", "warning")
+            self.log_status("Please connect to hub first!", "warning")
             return
             
         run_name = current_item.text()
@@ -1264,7 +1247,7 @@ Emergency: SPACE - Stop All""")
         
     def playback_run(self, run_data: Dict):
         commands = [RecordedCommand(**cmd) for cmd in run_data['commands']]
-        self.log_status(f"▶ Playing back: {run_data['name']}", "success")
+        self.log_status(f"Playing back: {run_data['name']}", "success")
         
         start_time = time.time()
         for cmd in commands:
@@ -1274,12 +1257,12 @@ Emergency: SPACE - Stop All""")
                 
             self.execute_command(cmd.parameters)
             
-        self.log_status("✅ Playback completed", "success")
+        self.log_status("Playback completed", "success")
         
     def delete_selected_run(self):
         current_item = self.runs_list.currentItem()
         if not current_item:
-            self.log_status("⚠️ Please select a run to delete!", "warning")
+            self.log_status("Please select a run to delete!", "warning")
             return
             
         run_name = current_item.text()
@@ -1296,25 +1279,47 @@ Emergency: SPACE - Stop All""")
                 if os.path.exists(filename):
                     os.remove(filename)
                 self.update_runs_list()
-                self.log_status(f"🗑 Deleted run: {run_name}", "success")
+                self.log_status(f"Deleted run: {run_name}", "success")
             except Exception as e:
-                self.log_status(f"❌ Error deleting run: {str(e)}", "error")
+                self.log_status(f"Error deleting run: {str(e)}", "error")
                 
-    def emergency_stop(self):
-        try:
-            command = {'type': 'stop_all'}
-            self.execute_command(command)
-            self.log_status("🛑 EMERGENCY STOP ACTIVATED", "warning")
-        except Exception as e:
-            self.log_status(f"❌ Emergency stop error: {str(e)}", "error")
-            
-
-            
     def closeEvent(self, event):
+        if self.is_closing:
+            event.accept()
+            return
+            
+        event.ignore()
+        self.start_exit_animation()
+        
+    def start_exit_animation(self):
+        if self.is_closing:
+            return
+            
+        self.is_closing = True
+        
         if self.ble_controller and self.ble_controller.connected:
-            self.emergency_stop()
             self.disconnect_hub()
-        event.accept()
+        
+        rect = self.geometry()
+        w = int(rect.width() * 0.3)
+        h = int(rect.height() * 0.3)
+        x = rect.x() + (rect.width() - w) // 2
+        y = rect.y() + (rect.height() - h) // 2
+        
+        end_geom = QtCore.QRect(x, y, w, h)
+        
+        self.exit_anim.setStartValue(rect)
+        self.exit_anim.setEndValue(end_geom)
+        
+        self.opacity_anim.setStartValue(1.0)
+        self.opacity_anim.setEndValue(0.0)
+        
+        self.exit_anim.start()
+        self.opacity_anim.start()
+        
+    def force_close(self):
+        self.is_closing = True
+        QApplication.quit()
 
 class ConfigDialog(QDialog):
     def __init__(self, parent, config: RobotConfig):
@@ -1324,15 +1329,14 @@ class ConfigDialog(QDialog):
         
     def setup_ui(self):
         self.setWindowTitle("Robot Configuration")
-        self.setFixedSize(450, 500)  # Increased height to fit all content properly
+        self.setFixedSize(460, 520)
         self.setModal(True)
         
-        # Apply the same dark theme styling as the main window
         self.setup_dialog_style()
         
         layout = QVBoxLayout(self)
         
-        title = QLabel("⚙️ Robot Configuration")
+        title = QLabel("Robot Configuration")
         title.setFont(QFont("Arial", 16, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
@@ -1365,13 +1369,11 @@ class ConfigDialog(QDialog):
         
         layout.addWidget(drive_group)
         
-        # Advanced options checkbox
-        self.advanced_checkbox = QCheckBox("⚙️ Advanced Options (Speed/Acceleration Settings)")
+        self.advanced_checkbox = QCheckBox("Advanced Options (Speed/Acceleration Settings)")
         self.advanced_checkbox.setObjectName("checkbox")
         self.advanced_checkbox.toggled.connect(self.toggle_advanced_options)
         layout.addWidget(self.advanced_checkbox)
         
-        # Motion settings group (initially hidden)
         self.motion_group = QGroupBox("Motion Settings (Acceleration/Deceleration)")
         self.motion_group.setObjectName("group_box")
         motion_layout = QVBoxLayout(self.motion_group)
@@ -1420,7 +1422,6 @@ class ConfigDialog(QDialog):
         info_label6.setObjectName("info_text")
         motion_layout.addWidget(info_label6)
         
-        # Initially hide the motion group
         self.motion_group.hide()
         layout.addWidget(self.motion_group)
         
@@ -1464,7 +1465,6 @@ class ConfigDialog(QDialog):
         
         layout.addWidget(ports_group)
         
-        # Buttons
         button_layout = QHBoxLayout()
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setObjectName("danger_btn")
@@ -1479,24 +1479,20 @@ class ConfigDialog(QDialog):
         layout.addLayout(button_layout)
     
     def toggle_advanced_options(self, checked):
-        """Toggle visibility of advanced motion settings"""
         if checked:
             self.motion_group.show()
-            self.setFixedSize(450, 750)  # Expand dialog when showing advanced options
+            self.setFixedSize(460, 760)
         else:
             self.motion_group.hide()
-            self.setFixedSize(450, 500)  # Collapse dialog when hiding advanced options
+            self.setFixedSize(460, 520)
     
     def setup_dialog_style(self):
-        """Apply dark theme styling to match the main window"""
         style = """
-        /* Dialog window */
         QDialog {
             background-color: rgb(45, 45, 45);
             color: rgb(255, 255, 255);
         }
         
-        /* Group boxes */
         QGroupBox {
             border: 1px solid rgb(70, 70, 70);
             border-radius: 5px;
@@ -1513,7 +1509,6 @@ class ConfigDialog(QDialog):
             padding: 0 5px 0 5px;
         }
         
-        /* Input fields */
         #line_edit {
             color: rgb(255, 255, 255);
             border: 2px solid rgb(70, 70, 70);
@@ -1526,7 +1521,6 @@ class ConfigDialog(QDialog):
             border-color: rgb(0, 143, 170);
         }
         
-        /* Buttons */
         #success_btn {
             border: 2px solid rgb(40, 167, 69);
             border-radius: 5px;
@@ -1553,13 +1547,11 @@ class ConfigDialog(QDialog):
             background-color: rgb(200, 35, 51);
         }
         
-        /* Text displays */
         #info_text {
             color: rgb(200, 200, 200);
             font-size: 11px;
         }
         
-        /* Checkbox */
         QCheckBox {
             color: rgb(255, 255, 255);
         }
@@ -1579,7 +1571,6 @@ class ConfigDialog(QDialog):
             background-color: rgb(0, 143, 170);
         }
         
-        /* ComboBox */
         QComboBox {
             color: rgb(255, 255, 255);
             border: 2px solid rgb(70, 70, 70);
@@ -1610,7 +1601,6 @@ class ConfigDialog(QDialog):
             selection-background-color: rgb(0, 143, 170);
         }
         
-        /* Labels */
         QLabel {
             color: rgb(255, 255, 255);
         }
