@@ -62,6 +62,8 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
         MACOSX_BUNDLE_COPYRIGHT "Copyright 2024 FLL Robotics"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.fll-robotics.codless"
+        INSTALL_RPATH "@executable_path/../Frameworks"
+        BUILD_WITH_INSTALL_RPATH TRUE
     )
 endif()
 
