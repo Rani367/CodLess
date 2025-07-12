@@ -1,0 +1,130 @@
+name: Build CodLess Executables
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt6
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.3'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtcharts qtdatavisualization'
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Configure CMake
+      run: |
+        cd cpp
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+
+    - name: Build
+      run: |
+        cd cpp
+        cmake --build build --config Release
+
+    - name: Deploy Qt
+      run: |
+        cd cpp/build
+        windeployqt.exe --qmldir ../src --compiler-runtime CodLess.exe
+
+    - name: Create Windows Archive
+      run: |
+        cd cpp/build
+        7z a CodLess-Windows.zip CodLess.exe *.dll platforms/ styles/ imageformats/
+
+    - name: Upload Windows Executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: CodLess-Windows
+        path: cpp/build/CodLess-Windows.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt6
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.3'
+        target: 'desktop'
+        arch: 'clang_64'
+        modules: 'qtcharts qtdatavisualization'
+
+    - name: Configure CMake
+      run: |
+        cd cpp
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+
+    - name: Build
+      run: |
+        cd cpp
+        cmake --build build --config Release
+
+    - name: Deploy Qt and Create DMG
+      run: |
+        cd cpp
+        macdeployqt build/CodLess.app -dmg
+
+    - name: Upload macOS DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: CodLess-macOS
+        path: cpp/build/CodLess.dmg
+
+  create-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: CodLess-Windows
+
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: CodLess-macOS
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          CodLess-Windows.zip
+          CodLess.dmg
+        body: |
+          ## CodLess Release
+          
+          **New Features:**
+          - Complete FLL robot control platform
+          - Real-time keyboard control (WASD/QE/RF/SPACE)
+          - Bluetooth communication with LEGO SPIKE Prime
+          - Physics simulation with S-curve acceleration
+          - Recording and playback system
+          - Robot configuration management
+          - Map upload for realistic training
+          - Real-time telemetry monitoring
+          
+          **Installation:**
+          - **Windows**: Download `CodLess-Windows.zip`, extract, and run `CodLess.exe`
+          - **macOS**: Download `CodLess.dmg`, mount, and drag to Applications
+          
+          **Requirements:**
+          - LEGO SPIKE Prime with Pybricks firmware
+          - Active internet connection for hub communication
+          - Windows 10+ or macOS 10.15+
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
