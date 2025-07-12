@@ -1,0 +1,1 @@
+no comments and make the code seem as if a human wrote it as much as possible. only add comments absulutly neccicery to make the code readable.

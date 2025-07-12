@@ -1,0 +1,38 @@
+# Build artifacts
+cpp/build/
+*.o
+*.exe
+*.app
+*.so
+*.dylib
+*.dll
+
+# IDE files
+.vscode/
+.idea/
+*.pro.user
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Qt generated files
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Temporary files
+*.tmp
+*.temp
+*~ 
