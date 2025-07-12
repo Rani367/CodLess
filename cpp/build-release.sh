@@ -20,7 +20,11 @@ cmake --build build --config Release
 # Check if we're on macOS
 if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "🍎 Creating macOS DMG..."
+    echo "🔐 Signing application..."
+    codesign --force --deep --sign - build/CodLess.app
     macdeployqt build/CodLess.app -dmg
+    echo "🔓 Removing quarantine attributes..."
+    xattr -rd com.apple.quarantine build/CodLess.dmg
     
     if [ -f "build/CodLess.dmg" ]; then
         echo "✅ macOS DMG created: build/CodLess.dmg"
