@@ -21,6 +21,9 @@
 #include <QScrollBar>
 #include <QHeaderView>
 #include <QSizeGrip>
+#include <QClipboard>
+#include <QFileInfo>
+#include <QGridLayout>
 #include <algorithm>
 #include <chrono>
 #include <QDebug> // Added for qDebug
@@ -31,6 +34,7 @@ MainWindow::MainWindow(QWidget* parent)
     , bleController(std::make_unique<BLEController>(this))
     , keyUpdateTimer(std::make_unique<QTimer>(this))
     , playbackTimer(std::make_unique<QTimer>(this))
+    , telemetryTimer(std::make_unique<QTimer>(this))
     , recordingTimer(std::make_unique<QElapsedTimer>())
     , robotConfig()
     , currentRecording()
@@ -172,6 +176,24 @@ void MainWindow::createSidebar() {
     
     sidebarLayout->addWidget(configGroup);
     
+    pybricksGroup = new QGroupBox("Copy Pybricks Code");
+    pybricksGroup->setObjectName("group_box");
+    auto* pybricksLayout = new QVBoxLayout(pybricksGroup);
+    
+    pybricksInfo = new QLabel("Click to copy the hub control code\nto your clipboard, then paste it into\ncode.pybricks.com");
+    pybricksInfo->setObjectName("info_text");
+    pybricksInfo->setWordWrap(true);
+    
+    copyPybricksButton = new QPushButton("Copy Hub Code");
+    copyPybricksButton->setObjectName("primary_btn");
+    copyPybricksButton->setMinimumHeight(35);
+    copyPybricksButton->setToolTip("Copy the Python code to upload to your SPIKE Prime hub");
+    
+    pybricksLayout->addWidget(pybricksInfo);
+    pybricksLayout->addWidget(copyPybricksButton);
+    
+    sidebarLayout->addWidget(pybricksGroup);
+    
     keysGroup = new QGroupBox("Control Keys");
     keysGroup->setObjectName("group_box");
     auto* keysLayout = new QVBoxLayout(keysGroup);
@@ -233,14 +255,26 @@ void MainWindow::createMainContent() {
     resetSimButton->setObjectName("success_btn");
     resetSimButton->setMinimumHeight(30);
     
+    uploadMapButton = new QPushButton("Upload Map");
+    uploadMapButton->setObjectName("primary_btn");
+    uploadMapButton->setMinimumHeight(30);
+    uploadMapButton->setToolTip("Upload a map image to use as background in the simulator\nRight-click to clear the background");
+    uploadMapButton->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(uploadMapButton, &QPushButton::customContextMenuRequested, this, [this]() {
+        simulator->clearBackgroundImage();
+        logStatus("Background map cleared", "info");
+    });
+    
     simControls->addWidget(simInfo);
     simControls->addStretch();
+    simControls->addWidget(uploadMapButton);
     simControls->addWidget(resetSimButton);
     
     simulatorLayout->addLayout(simControls);
     
-    layout->addWidget(simulatorGroup);
+    layout->addWidget(simulatorGroup, 3);  // Give simulator most space when visible
     simulatorGroup->hide();
+    uploadMapButton->setVisible(false);
     
     recordingGroup = new QGroupBox("Recording Controls");
     recordingGroup->setObjectName("group_box");
@@ -271,7 +305,7 @@ void MainWindow::createMainContent() {
     recordStatus->setObjectName("info_text");
     recordLayout->addWidget(recordStatus);
     
-    layout->addWidget(recordingGroup);
+    layout->addWidget(recordingGroup, 0);  // Keep recording controls compact
     
     statusGroup = new QGroupBox("Robot Status");
     statusGroup->setObjectName("group_box");
@@ -279,11 +313,35 @@ void MainWindow::createMainContent() {
     
     statusDisplay = new QTextEdit();
     statusDisplay->setObjectName("status_display");
-    statusDisplay->setMaximumHeight(200);
+    statusDisplay->setMinimumHeight(120);
+    statusDisplay->setMaximumHeight(180);
     statusDisplay->setReadOnly(true);
     
     statusLayout->addWidget(statusDisplay);
-    layout->addWidget(statusGroup);
+    layout->addWidget(statusGroup, 0);  // Keep status area compact
+    
+    telemetryGroup = new QGroupBox("Robot Telemetry");
+    telemetryGroup->setObjectName("group_box");
+    auto* telemetryLayout = new QVBoxLayout(telemetryGroup);
+    telemetryLayout->setSpacing(8);
+    
+    positionLabel = new QLabel("Position: (0, 0) | Angle: 0°");
+    positionLabel->setObjectName("telemetry_text");
+    
+    speedLabel = new QLabel("Speed: 0.0 | Turn: 0.0 | Arms: 0.0, 0.0");
+    speedLabel->setObjectName("telemetry_text");
+    
+    connectionLabel = new QLabel("Connection: Disconnected | Lag: 0ms");
+    connectionLabel->setObjectName("telemetry_text");
+    
+    telemetryLayout->addWidget(positionLabel);
+    telemetryLayout->addWidget(speedLabel);
+    telemetryLayout->addWidget(connectionLabel);
+    
+    layout->addWidget(telemetryGroup, 0);  // Keep telemetry compact
+    
+    // Add stretch to prevent unwanted expansion
+    layout->addStretch(1);
 }
 
 void MainWindow::createStatusBar() {
@@ -429,6 +487,16 @@ void MainWindow::setupStyle() {
             color: rgb(200, 200, 200);
         }
         
+        #telemetry_text {
+            color: rgb(220, 220, 220);
+            font-family: 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+            font-size: 11px;
+            background-color: rgb(35, 35, 35);
+            padding: 4px 8px;
+            border-radius: 3px;
+            border: 1px solid rgb(70, 70, 70);
+        }
+        
         #status_display {
             background-color: rgb(35, 35, 35);
             border: 1px solid rgb(70, 70, 70);
@@ -505,7 +573,9 @@ void MainWindow::setupConnections() {
     connect(connectButton, &QPushButton::clicked, this, &MainWindow::connectHub);
     connect(developerCheck, &QCheckBox::clicked, this, &MainWindow::toggleDeveloperMode);
     connect(configButton, &QPushButton::clicked, this, &MainWindow::openConfigDialog);
+    connect(copyPybricksButton, &QPushButton::clicked, this, &MainWindow::copyPybricksCode);
     connect(resetSimButton, &QPushButton::clicked, this, &MainWindow::resetSimulator);
+    connect(uploadMapButton, &QPushButton::clicked, this, &MainWindow::uploadMap);
     connect(recordButton, &QPushButton::clicked, this, &MainWindow::toggleRecording);
     connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveCurrentRun);
     connect(playButton, &QPushButton::clicked, this, &MainWindow::playSelectedRun);
@@ -527,6 +597,10 @@ void MainWindow::setupConnections() {
             this, &MainWindow::onBleError);
     
 
+    
+    telemetryTimer->setInterval(100);  // Update telemetry every 100ms
+    connect(telemetryTimer.get(), &QTimer::timeout, this, &MainWindow::updateTelemetry);
+    telemetryTimer->start();
     
     playbackTimer->setInterval(20);
     connect(playbackTimer.get(), &QTimer::timeout, this, [this]() {
@@ -691,11 +765,13 @@ void MainWindow::toggleDeveloperMode() {
         hubStatus->setText("● Developer Mode");
         hubStatus->setObjectName("status_connected");
         simulatorGroup->show();
+        uploadMapButton->setVisible(true);
     } else {
         logStatus("Developer mode disabled", "info");
         hubStatus->setText(isConnected ? "● Hub Connected" : "● Hub Disconnected");
         hubStatus->setObjectName(isConnected ? "status_connected" : "status_disconnected");
         simulatorGroup->hide();
+        uploadMapButton->setVisible(false);
     }
     
     connectButton->setEnabled(!isDeveloperMode);
@@ -713,6 +789,156 @@ void MainWindow::openConfigDialog() {
         logStatus("Robot configuration updated", "info");
     }
     dialog->deleteLater();
+}
+
+void MainWindow::copyPybricksCode() {
+    const QString hubCode = R"(from pybricks.hubs import PrimeHub
+from pybricks.pupdevices import Motor
+from pybricks.parameters import Port, Color
+from pybricks.robotics import DriveBase
+from pybricks.tools import wait
+from usys import stdin, stdout
+from uselect import poll
+import ujson
+
+hub = PrimeHub()
+
+hub.display.icon([
+    [100, 100, 100, 100, 100],
+    [100, 0, 100, 0, 100], 
+    [100, 100, 100, 100, 100],
+    [100, 0, 0, 0, 100],
+    [100, 100, 100, 100, 100]
+])
+
+motors = {}
+drive_base = None
+
+left_motor_port = Port.A
+right_motor_port = Port.B
+arm1_motor_port = Port.C
+arm2_motor_port = Port.D
+
+try:
+    left_motor = Motor(left_motor_port)
+    right_motor = Motor(right_motor_port)
+    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=112)
+    
+    drive_base.settings(
+        straight_speed=500,
+        straight_acceleration=250,
+        turn_rate=200,
+        turn_acceleration=300
+    )
+    
+    hub.light.on(Color.GREEN)
+except:
+    hub.light.on(Color.YELLOW)
+
+try:
+    motors['arm1'] = Motor(arm1_motor_port)
+except:
+    pass
+
+try:
+    motors['arm2'] = Motor(arm2_motor_port)
+except:
+    pass
+
+keyboard = poll()
+keyboard.register(stdin)
+
+hub.display.icon([
+    [0, 100, 0, 100, 0],
+    [100, 100, 100, 100, 100],
+    [0, 100, 100, 100, 0],
+    [0, 0, 100, 0, 0],
+    [0, 0, 100, 0, 0]
+])
+
+while True:
+    stdout.buffer.write(b"rdy")
+    
+    while not keyboard.poll(10):
+        wait(1)
+    
+    try:
+        data = stdin.buffer.read()
+        if data:
+            command_str = data.decode('utf-8')
+            command = ujson.loads(command_str)
+            
+            cmd_type = command.get('type', '')
+            
+            if cmd_type == 'drive' and drive_base:
+                speed = command.get('speed', 0)
+                turn_rate = command.get('turn_rate', 0)
+                drive_base.drive(speed, turn_rate)
+                stdout.buffer.write(b"DRIVE_OK")
+                
+            elif cmd_type in ['arm1', 'arm2'] and cmd_type in motors:
+                motor = motors[cmd_type]
+                speed = command.get('speed', 0)
+                if speed == 0:
+                    motor.stop()
+                else:
+                    motor.run(speed)
+                stdout.buffer.write(b"ARM_OK")
+                
+            elif cmd_type == 'config':
+                try:
+                    axle_track = command.get('axle_track', 112)
+                    wheel_diameter = command.get('wheel_diameter', 56)
+                    if drive_base:
+                        drive_base = DriveBase(left_motor, right_motor, 
+                                             wheel_diameter=wheel_diameter, 
+                                             axle_track=axle_track)
+                        
+                        straight_speed = command.get('straight_speed', 500)
+                        straight_acceleration = command.get('straight_acceleration', 250)
+                        turn_rate = command.get('turn_rate', 200)
+                        turn_acceleration = command.get('turn_acceleration', 300)
+                        
+                        drive_base.settings(
+                            straight_speed=straight_speed,
+                            straight_acceleration=straight_acceleration,
+                            turn_rate=turn_rate,
+                            turn_acceleration=turn_acceleration
+                        )
+                        
+                    stdout.buffer.write(b"CONFIG_OK")
+                except:
+                    stdout.buffer.write(b"CONFIG_ERROR")
+            else:
+                stdout.buffer.write(b"UNKNOWN_CMD")
+                
+    except Exception as e:
+        stdout.buffer.write(b"ERROR")
+    
+    wait(10) 
+)";
+    
+    QClipboard* clipboard = QApplication::clipboard();
+    clipboard->setText(hubCode);
+    
+    logStatus("Pybricks hub code copied to clipboard!", "info");
+    copyPybricksButton->setText("Copied!");
+    
+    // Reset button text after 2 seconds
+    QTimer::singleShot(2000, this, [this]() {
+        copyPybricksButton->setText("Copy Hub Code");
+    });
+}
+
+void MainWindow::uploadMap() {
+    QString fileName = QFileDialog::getOpenFileName(this,
+        "Select Map Image", "",
+        "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)");
+    
+    if (!fileName.isEmpty()) {
+        simulator->setBackgroundImage(fileName);
+        logStatus("Map uploaded: " + QFileInfo(fileName).fileName(), "info");
+    }
 }
 
 void MainWindow::toggleRecording() {
@@ -878,6 +1104,34 @@ void MainWindow::toggleMaximize() {
         maximizeButton->setText("⧉");
         isMaximized = true;
     }
+}
+
+void MainWindow::updateTelemetry() {
+    // Position and orientation
+    QString posText = QString("Position: (%1, %2) | Angle: %3°")
+                     .arg(static_cast<int>(simulator->getRobotX()))
+                     .arg(static_cast<int>(simulator->getRobotY()))
+                     .arg(static_cast<int>(simulator->getRobotAngle()));
+    positionLabel->setText(posText);
+    
+    // Speed and movement data
+    QString speedText = QString("Speed: %1 | Turn: %2 | Arms: %3, %4")
+                       .arg(simulator->getActualSpeed(), 0, 'f', 1)
+                       .arg(simulator->getActualTurn(), 0, 'f', 1)
+                       .arg(simulator->getActualArm1Speed(), 0, 'f', 1)
+                       .arg(simulator->getActualArm2Speed(), 0, 'f', 1);
+    speedLabel->setText(speedText);
+    
+    // Connection status
+    QString connText;
+    if (isDeveloperMode) {
+        connText = "Connection: Developer Mode | Lag: 0ms";
+    } else if (isConnected) {
+        connText = "Connection: Hub Connected | Lag: ~30ms";
+    } else {
+        connText = "Connection: Disconnected | Lag: N/A";
+    }
+    connectionLabel->setText(connText);
 }
 
 void MainWindow::logStatus(const QString& message, const QString& level) {

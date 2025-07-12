@@ -4,6 +4,7 @@
 #include <QTimer>
 #include <QPainter>
 #include <QVariantHash>
+#include <QPixmap>
 #include <memory>
 
 class RobotSimulator : public QWidget {
@@ -15,6 +16,8 @@ public:
     
     void updateCommand(const QVariantHash& command);
     void resetSimulation();
+    void setBackgroundImage(const QString& imagePath);
+    void clearBackgroundImage();
     
     double getRobotX() const { return robotX; }
     double getRobotY() const { return robotY; }
@@ -41,6 +44,7 @@ private:
     void drawRobot(QPainter& painter);
     void drawArm(QPainter& painter, int baseX, int baseY, double angle, const QColor& color);
     double sCurveProfile(double error, double maxChange, double currentAccel, double maxAccel);
+    void calculateBackgroundScaling();
     
     double robotX;
     double robotY;
@@ -74,6 +78,11 @@ private:
     const double frictionCoeff = 0.05;
     const double motorLag = 0.03;
     const double dt = 0.02;
+    
+    QPixmap backgroundImage;
+    double backgroundScale = 1.0;
+    int backgroundOffsetX = 0;
+    int backgroundOffsetY = 0;
     
     std::unique_ptr<QTimer> timer;
 }; 

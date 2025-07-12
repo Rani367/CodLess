@@ -177,7 +177,15 @@ void RobotSimulator::paintEvent(QPaintEvent* event) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    painter.fillRect(rect(), QColor(45, 45, 45));
+    // Draw background image if available
+    if (!backgroundImage.isNull()) {
+        painter.drawPixmap(backgroundOffsetX, backgroundOffsetY, 
+                          backgroundImage.width() * backgroundScale,
+                          backgroundImage.height() * backgroundScale,
+                          backgroundImage);
+    } else {
+        painter.fillRect(rect(), QColor(45, 45, 45));
+    }
     
     painter.setPen(QPen(QColor(70, 70, 70), 1));
     for (int x = 0; x < width(); x += 50) {
@@ -261,4 +269,45 @@ void RobotSimulator::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
     robotX = std::clamp(robotX, 30.0, static_cast<double>(width() - 30));
     robotY = std::clamp(robotY, 30.0, static_cast<double>(height() - 30));
+    
+    // Recalculate background scaling when widget is resized
+    if (!backgroundImage.isNull()) {
+        calculateBackgroundScaling();
+    }
+}
+
+void RobotSimulator::setBackgroundImage(const QString& imagePath) {
+    backgroundImage.load(imagePath);
+    if (!backgroundImage.isNull()) {
+        calculateBackgroundScaling();
+        update();
+    }
+}
+
+void RobotSimulator::clearBackgroundImage() {
+    backgroundImage = QPixmap();
+    backgroundScale = 1.0;
+    backgroundOffsetX = 0;
+    backgroundOffsetY = 0;
+    update();
+}
+
+void RobotSimulator::calculateBackgroundScaling() {
+    if (backgroundImage.isNull()) return;
+    
+    int widgetWidth = width();
+    int widgetHeight = height();
+    int imageWidth = backgroundImage.width();
+    int imageHeight = backgroundImage.height();
+    
+    // Calculate scale to fit the image within the widget while maintaining aspect ratio
+    double scaleX = static_cast<double>(widgetWidth) / imageWidth;
+    double scaleY = static_cast<double>(widgetHeight) / imageHeight;
+    backgroundScale = std::min(scaleX, scaleY);
+    
+    // Calculate offsets to center the image
+    int scaledWidth = static_cast<int>(imageWidth * backgroundScale);
+    int scaledHeight = static_cast<int>(imageHeight * backgroundScale);
+    backgroundOffsetX = (widgetWidth - scaledWidth) / 2;
+    backgroundOffsetY = (widgetHeight - scaledHeight) / 2;
 } 

@@ -56,6 +56,8 @@ private slots:
     void toggleDeveloperMode();
     void resetSimulator();
     void openConfigDialog();
+    void copyPybricksCode();
+    void uploadMap();
     void toggleRecording();
     void saveCurrentRun();
     void playSelectedRun();
@@ -64,6 +66,7 @@ private slots:
     void onBleHubFound(const QString& hubName);
     void onBleError(const QString& error);
     void updateRunsList();
+    void updateTelemetry();
 
 private:
     void setupUi();
@@ -99,18 +102,23 @@ private:
     
     QGroupBox* connectionGroup;
     QGroupBox* configGroup;
+    QGroupBox* pybricksGroup;
     QGroupBox* keysGroup;
     QGroupBox* runsGroup;
     QGroupBox* simulatorGroup;
     QGroupBox* recordingGroup;
     QGroupBox* statusGroup;
+    QGroupBox* telemetryGroup;
     
     QPushButton* connectButton;
     QPushButton* disconnectButton;
     QCheckBox* developerCheck;
     QLabel* hubStatus;
     QPushButton* configButton;
+    QPushButton* copyPybricksButton;
+    QLabel* pybricksInfo;
     QPushButton* resetSimButton;
+    QPushButton* uploadMapButton;
     
     QLabel* keysText;
     QLineEdit* runNameInput;
@@ -124,6 +132,10 @@ private:
     
     QTextEdit* statusDisplay;
     
+    QLabel* positionLabel;
+    QLabel* speedLabel;
+    QLabel* connectionLabel;
+    
     QLabel* statusLabel;
     QLabel* connectionStatusLabel;
     
@@ -134,6 +146,7 @@ private:
     std::unique_ptr<QPropertyAnimation> opacityAnimation;
     std::unique_ptr<QTimer> keyUpdateTimer;
     std::unique_ptr<QTimer> playbackTimer;
+    std::unique_ptr<QTimer> telemetryTimer;
     std::unique_ptr<QElapsedTimer> recordingTimer;
     
     RobotConfig robotConfig;
