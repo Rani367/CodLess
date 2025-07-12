@@ -19,7 +19,6 @@ jobs:
         version: '6.5.3'
         target: 'desktop'
         arch: 'win64_msvc2022_64'
-        modules: 'qtcharts qtdatavisualization'
 
     - name: Setup MSVC
       uses: microsoft/setup-msbuild@v1.1
@@ -27,7 +26,7 @@ jobs:
     - name: Configure CMake
       run: |
         cd cpp
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
       run: |
@@ -61,12 +60,11 @@ jobs:
         version: '6.5.3'
         target: 'desktop'
         arch: 'clang_64'
-        modules: 'qtcharts qtdatavisualization'
 
     - name: Configure CMake
       run: |
         cd cpp
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
       run: |
