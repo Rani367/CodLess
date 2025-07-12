@@ -34,7 +34,7 @@ Our mission is to help FLL teams develop faster, test more efficiently, and comp
 1. Upload `hub_control.py` to your SPIKE Prime hub via code.pybricks.com
 2. Keep the Pybricks website open and connected to your hub
 3. Run the app and click "Connect to Pybricks Hub"
-4. Use WASD keys for movement, QE/RF for arms
+4. Use WASD keys for movement, QE/RF for arms, SPACE for emergency stop
 
 ### Developer Mode (Simulation)
 1. Enable Developer Mode in the app
