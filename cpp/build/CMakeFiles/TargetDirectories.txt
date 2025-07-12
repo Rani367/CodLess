@@ -1,0 +1,5 @@
+/Users/ranimac/Documents/NNBMP/cpp/build/CMakeFiles/CodLess.dir
+/Users/ranimac/Documents/NNBMP/cpp/build/CMakeFiles/edit_cache.dir
+/Users/ranimac/Documents/NNBMP/cpp/build/CMakeFiles/rebuild_cache.dir
+/Users/ranimac/Documents/NNBMP/cpp/build/CMakeFiles/CodLess_autogen_timestamp_deps.dir
+/Users/ranimac/Documents/NNBMP/cpp/build/CMakeFiles/CodLess_autogen.dir

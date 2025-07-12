@@ -1,0 +1,54 @@
+{
+    "commands": [
+        {
+            "command_type": "drive",
+            "parameters": {
+                "speed": 200,
+                "turn_rate": 0,
+                "type": "drive"
+            },
+            "timestamp": 1.038
+        },
+        {
+            "command_type": "drive",
+            "parameters": {
+                "speed": 200,
+                "turn_rate": -100,
+                "type": "drive"
+            },
+            "timestamp": 2.3
+        },
+        {
+            "command_type": "drive",
+            "parameters": {
+                "speed": 200,
+                "turn_rate": 0,
+                "type": "drive"
+            },
+            "timestamp": 2.802
+        },
+        {
+            "command_type": "drive",
+            "parameters": {
+                "speed": 0,
+                "turn_rate": 0,
+                "type": "drive"
+            },
+            "timestamp": 4.973
+        }
+    ],
+    "config": {
+        "arm1_motor_port": "C",
+        "arm2_motor_port": "D",
+        "axle_track": 112,
+        "left_motor_port": "A",
+        "right_motor_port": "B",
+        "straight_acceleration": 250,
+        "straight_speed": 500,
+        "turn_acceleration": 300,
+        "turn_rate": 200,
+        "wheel_diameter": 56
+    },
+    "name": "Run_1",
+    "timestamp": "2025-07-12T21:38:44"
+}
