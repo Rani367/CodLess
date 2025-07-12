@@ -17,7 +17,7 @@ import math
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
     from PySide6.QtCore import QTimer, QPropertyAnimation, QEasingCurve, Qt, QEvent
-    from PySide6.QtGui import QIcon, QPixmap, QFont, QPainter, QPen, QBrush, QColor
+    from PySide6.QtGui import QIcon, QPixmap, QFont, QPainter, QPen, QBrush, QColor, QFontDatabase
     from PySide6.QtWidgets import *
     PYSIDE_AVAILABLE = True
 except ImportError:
@@ -55,7 +55,8 @@ class RecordedCommand:
 class RobotSimulator(QWidget):
     def __init__(self):
         super().__init__()
-        self.setMinimumSize(400, 300)
+        self.setMinimumSize(300, 200)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setObjectName("robot_simulator")
         
         self.robot_x = 200
@@ -384,6 +385,11 @@ class FLLRoboticsGUI(QMainWindow):
     def setup_ui(self):
         self.setWindowTitle("FLL Robotics Control Center")
         self.setGeometry(120, 80, 1200, 800)
+        self.setMinimumSize(900, 600)
+        self.setMaximumSize(1920, 1280)
+        self.base_width = 1200
+        self.base_height = 800
+        self.aspect_ratio = self.base_width / self.base_height
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         
@@ -404,10 +410,15 @@ class FLLRoboticsGUI(QMainWindow):
         content_layout.setSpacing(0)
         
         self.sidebar = self.create_sidebar()
+        self.sidebar.setFixedWidth(250)
+        self.sidebar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         content_layout.addWidget(self.sidebar)
+        content_layout.setStretchFactor(self.sidebar, 0)
         
         self.main_content = self.create_main_content()
+        self.main_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         content_layout.addWidget(self.main_content)
+        content_layout.setStretchFactor(self.main_content, 1)
         
         main_layout.addWidget(content_widget)
         
@@ -422,7 +433,7 @@ class FLLRoboticsGUI(QMainWindow):
         layout = QHBoxLayout(title_bar)
         layout.setContentsMargins(15, 0, 15, 0)
         
-        title_label = QLabel("CodeLess - FLL Robotics Control Center")
+        title_label = QLabel("CodLess - FLL Robotics Control Center")
         title_label.setObjectName("title_label")
         title_label.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(title_label)
@@ -433,7 +444,7 @@ class FLLRoboticsGUI(QMainWindow):
         self.min_btn.setObjectName("window_btn")
         self.min_btn.setFixedSize(30, 30)
         
-        self.max_btn = QPushButton("[]")
+        self.max_btn = QPushButton("□")
         self.max_btn.setObjectName("window_btn")
         self.max_btn.setFixedSize(30, 30)
         
@@ -450,7 +461,6 @@ class FLLRoboticsGUI(QMainWindow):
         
     def create_sidebar(self):
         sidebar = QWidget()
-        sidebar.setFixedWidth(250)
         sidebar.setObjectName("sidebar")
         
         layout = QVBoxLayout(sidebar)
@@ -502,7 +512,10 @@ Arms (hold to move):
   Q - Arm 1 Up   E - Arm 1 Down
   R - Arm 2 Up   F - Arm 2 Down""")
         keys_text.setObjectName("info_text")
-        keys_text.setFont(QFont("Monaco", 9))
+        # Use cross-platform monospace font
+        monospace_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        monospace_font.setPointSize(9)
+        keys_text.setFont(monospace_font)
         
         keys_layout.addWidget(keys_text)
         layout.addWidget(keys_group)
@@ -766,7 +779,7 @@ Arms (hold to move):
             background-color: rgb(35, 35, 35);
             border: 1px solid rgb(70, 70, 70);
             color: rgb(255, 255, 255);
-            font-family: 'Consolas', monospace;
+            font-family: 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
         }
         
         #runs_list {
@@ -850,6 +863,27 @@ Arms (hold to move):
         
         self.update_runs_list()
     
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        
+        new_size = event.size()
+        new_width = new_size.width()
+        new_height = new_size.height()
+        
+        if new_width / new_height > self.aspect_ratio:
+            adjusted_width = int(new_height * self.aspect_ratio)
+            self.resize(adjusted_width, new_height)
+        else:
+            adjusted_height = int(new_width / self.aspect_ratio)
+            self.resize(new_width, adjusted_height)
+        
+        scale_factor = min(new_width / self.base_width, new_height / self.base_height)
+        sidebar_width = int(250 * scale_factor)
+        sidebar_width = max(200, min(300, sidebar_width))
+        
+        if hasattr(self, 'sidebar'):
+            self.sidebar.setFixedWidth(sidebar_width)
+    
     def setup_startup_animation(self):
         self.target_geom = self.geometry()
         
@@ -922,10 +956,10 @@ Arms (hold to move):
     def toggle_maximize(self):
         if self.isMaximized():
             self.showNormal()
-            self.max_btn.setText("[]")
+            self.max_btn.setText("□")
         else:
             self.showMaximized()
-            self.max_btn.setText("=[]")
+            self.max_btn.setText("◱")
             
     def log_status(self, message: str, level: str = "info"):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -1630,7 +1664,7 @@ def main():
         return
         
     app = QApplication(sys.argv)
-    app.setApplicationName("FLL Robotics Control Center")
+    app.setApplicationName("CodLess - FLL Robotics Control Center")
     
     window = FLLRoboticsGUI()
     window.show()
