@@ -273,21 +273,6 @@ void MainWindow::createMainContent() {
     
     layout->addWidget(recordingGroup);
     
-    manualGroup = new QGroupBox("Manual Controls");
-    manualGroup->setObjectName("group_box");
-    auto* manualLayout = new QVBoxLayout(manualGroup);
-    
-    manualInfo = new QLabel("Click in this window and use keyboard controls");
-    manualInfo->setObjectName("info_text");
-    manualLayout->addWidget(manualInfo);
-    
-    keyStatus = new QLabel("No keys pressed");
-    keyStatus->setObjectName("info_text");
-    keyStatus->setFont(QFont("Monaco", 10));
-    manualLayout->addWidget(keyStatus);
-    
-    layout->addWidget(manualGroup);
-    
     statusGroup = new QGroupBox("Robot Status");
     statusGroup->setObjectName("group_box");
     auto* statusLayout = new QVBoxLayout(statusGroup);
@@ -541,9 +526,7 @@ void MainWindow::setupConnections() {
     connect(bleController.get(), &BLEController::errorOccurred,
             this, &MainWindow::onBleError);
     
-    keyUpdateTimer->setInterval(50);
-    connect(keyUpdateTimer.get(), &QTimer::timeout, this, &MainWindow::updateKeyStatus);
-    keyUpdateTimer->start();
+
     
     playbackTimer->setInterval(20);
     connect(playbackTimer.get(), &QTimer::timeout, this, [this]() {
@@ -842,26 +825,7 @@ void MainWindow::deleteSelectedRun() {
     }
 }
 
-void MainWindow::updateKeyStatus() {
-    QStringList activeKeys;
-    
-    for (int key : pressedKeys) {
-        switch (key) {
-            case Qt::Key_W: activeKeys << "W"; break;
-            case Qt::Key_A: activeKeys << "A"; break;
-            case Qt::Key_S: activeKeys << "S"; break;
-            case Qt::Key_D: activeKeys << "D"; break;
-            case Qt::Key_Q: activeKeys << "Q"; break;
-            case Qt::Key_E: activeKeys << "E"; break;
-            case Qt::Key_R: activeKeys << "R"; break;
-            case Qt::Key_F: activeKeys << "F"; break;
-            case Qt::Key_Space: activeKeys << "SPACE"; break;
-        }
-    }
-    
-    QString keyText = activeKeys.isEmpty() ? "No keys pressed" : activeKeys.join(", ");
-    keyStatus->setText(keyText);
-}
+
 
 void MainWindow::onBleConnectionChanged(bool connected) {
     isConnected = connected;

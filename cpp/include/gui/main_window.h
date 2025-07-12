@@ -60,7 +60,6 @@ private slots:
     void saveCurrentRun();
     void playSelectedRun();
     void deleteSelectedRun();
-    void updateKeyStatus();
     void onBleConnectionChanged(bool connected);
     void onBleHubFound(const QString& hubName);
     void onBleError(const QString& error);
@@ -104,7 +103,6 @@ private:
     QGroupBox* runsGroup;
     QGroupBox* simulatorGroup;
     QGroupBox* recordingGroup;
-    QGroupBox* manualGroup;
     QGroupBox* statusGroup;
     
     QPushButton* connectButton;
@@ -124,8 +122,6 @@ private:
     QPushButton* deleteButton;
     QListWidget* runsList;
     
-    QLabel* manualInfo;
-    QLabel* keyStatus;
     QTextEdit* statusDisplay;
     
     QLabel* statusLabel;
