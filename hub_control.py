@@ -17,8 +17,7 @@ hub.display.icon([
     [100, 100, 100, 100, 100]
 ])
 
-print("FLL Robot Control Starting...")
-print("Keep this Pybricks website open for PC communication")
+
 
 motors = {}
 drive_base = None
@@ -94,13 +93,6 @@ while True:
                     motor.run(speed)
                 stdout.buffer.write(b"ARM_OK")
                 
-            elif cmd_type == 'stop_all':
-                if drive_base:
-                    drive_base.stop()
-                for motor in motors.values():
-                    motor.stop()
-                stdout.buffer.write(b"STOP_OK")
-                
             elif cmd_type == 'config':
                 try:
                     axle_track = command.get('axle_track', 112)
@@ -130,9 +122,5 @@ while True:
                 
     except Exception as e:
         stdout.buffer.write(b"ERROR")
-        if drive_base:
-            drive_base.stop()
-        for motor in motors.values():
-            motor.stop()
     
     wait(10) 
