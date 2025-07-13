@@ -177,11 +177,23 @@ void MainWindow::createSidebar() {
     connectButton = new QPushButton("Connect to Pybricks Hub");
     connectButton->setObjectName("primary_btn");
     connectButton->setMinimumHeight(40);
-    connectButton->setToolTip("1. Upload hub_control.py via code.pybricks.com\n2. Keep Pybricks website open\n3. Click to connect\n\nShortcut: Ctrl+C");
+    connectButton->setToolTip("1. Upload hub_control.py via code.pybricks.com\n2. Keep Pybricks website open\n3. Click to connect\n\n"
+#ifdef Q_OS_MAC
+                               "Shortcut: Cmd+Shift+C"
+#else
+                               "Shortcut: Ctrl+C"
+#endif
+                               );
     
     developerCheck = new QCheckBox("Developer Mode (Simulation)");
     developerCheck->setObjectName("checkbox");
-    developerCheck->setToolTip("Enable simulation mode for development\n\nShortcut: Ctrl+D");
+    developerCheck->setToolTip("Enable simulation mode for development\n\n"
+#ifdef Q_OS_MAC
+                               "Shortcut: Cmd+D"
+#else
+                               "Shortcut: Ctrl+D"
+#endif
+                               );
     
     hubStatus = new QLabel("● Hub Disconnected");
     hubStatus->setObjectName("status_disconnected");
@@ -199,7 +211,13 @@ void MainWindow::createSidebar() {
     configButton = new QPushButton("Configure Robot");
     configButton->setObjectName("success_btn");
     configButton->setMinimumHeight(35);
-    configButton->setToolTip("Configure robot settings and motor ports\n\nShortcut: Ctrl+P");
+    configButton->setToolTip("Configure robot settings and motor ports\n\n"
+#ifdef Q_OS_MAC
+                              "Shortcut: Cmd+,"
+#else
+                              "Shortcut: Ctrl+P"
+#endif
+                              );
     
     configLayout->addWidget(configButton);
     
@@ -247,7 +265,13 @@ void MainWindow::createSidebar() {
     playButton = new QPushButton("Play");
     playButton->setObjectName("success_btn");
     playButton->setEnabled(false);
-    playButton->setToolTip("Play selected recording\n\nShortcut: Ctrl+Space");
+    playButton->setToolTip("Play selected recording\n\n"
+#ifdef Q_OS_MAC
+                           "Shortcut: Cmd+Space"
+#else
+                           "Shortcut: Ctrl+Space"
+#endif
+                           );
     
     deleteButton = new QPushButton("Delete");
     deleteButton->setObjectName("danger_btn");
@@ -285,7 +309,13 @@ void MainWindow::createMainContent() {
     resetSimButton = new QPushButton("Reset Position");
     resetSimButton->setObjectName("success_btn");
     resetSimButton->setMinimumHeight(30);
-    resetSimButton->setToolTip("Reset robot simulator position\n\nShortcut: Ctrl+Shift+R");
+    resetSimButton->setToolTip("Reset robot simulator position\n\n"
+#ifdef Q_OS_MAC
+                               "Shortcut: Cmd+Shift+R"
+#else
+                               "Shortcut: Ctrl+Shift+R"
+#endif
+                               );
     
     uploadMapButton = new QPushButton("Upload Map");
     uploadMapButton->setObjectName("primary_btn");
@@ -323,13 +353,25 @@ void MainWindow::createMainContent() {
     recordButton = new QPushButton("Record Run");
     recordButton->setObjectName("danger_btn");
     recordButton->setMinimumHeight(50);
-    recordButton->setToolTip("Start/stop recording robot movements\n\nShortcut: Ctrl+R");
+    recordButton->setToolTip("Start/stop recording robot movements\n\n"
+#ifdef Q_OS_MAC
+                              "Shortcut: Cmd+R"
+#else
+                              "Shortcut: Ctrl+R"
+#endif
+                              );
     
     saveButton = new QPushButton("Save Run");
     saveButton->setObjectName("success_btn");
     saveButton->setMinimumHeight(50);
     saveButton->setEnabled(false);
-    saveButton->setToolTip("Save the current recording\n\nShortcut: Ctrl+S");
+    saveButton->setToolTip("Save the current recording\n\n"
+#ifdef Q_OS_MAC
+                           "Shortcut: Cmd+S"
+#else
+                           "Shortcut: Ctrl+S"
+#endif
+                           );
     
     recordButtonLayout->addWidget(recordButton);
     recordButtonLayout->addWidget(saveButton);
@@ -615,26 +657,31 @@ void MainWindow::setupConnections() {
     connect(playButton, &QPushButton::clicked, this, &MainWindow::playSelectedRun);
     connect(deleteButton, &QPushButton::clicked, this, &MainWindow::deleteSelectedRun);
     
-    // Add keyboard shortcuts for better UX
+    // Add keyboard shortcuts for better UX (using Cmd on Mac, Ctrl on other platforms)
+#ifdef Q_OS_MAC
+    auto* connectShortcut = new QShortcut(QKeySequence("Cmd+Shift+C"), this);
+    auto* configShortcut = new QShortcut(QKeySequence("Cmd+,"), this);  // Standard preferences shortcut on Mac
+    auto* recordShortcut = new QShortcut(QKeySequence("Cmd+R"), this);
+    auto* saveShortcut = new QShortcut(QKeySequence("Cmd+S"), this);
+    auto* playShortcut = new QShortcut(QKeySequence("Cmd+Space"), this);
+    auto* resetShortcut = new QShortcut(QKeySequence("Cmd+Shift+R"), this);
+    auto* devModeShortcut = new QShortcut(QKeySequence("Cmd+D"), this);
+#else
     auto* connectShortcut = new QShortcut(QKeySequence("Ctrl+C"), this);
-    connect(connectShortcut, &QShortcut::activated, this, &MainWindow::connectHub);
-    
     auto* configShortcut = new QShortcut(QKeySequence("Ctrl+P"), this);
-    connect(configShortcut, &QShortcut::activated, this, &MainWindow::openConfigDialog);
-    
     auto* recordShortcut = new QShortcut(QKeySequence("Ctrl+R"), this);
-    connect(recordShortcut, &QShortcut::activated, this, &MainWindow::toggleRecording);
-    
     auto* saveShortcut = new QShortcut(QKeySequence("Ctrl+S"), this);
-    connect(saveShortcut, &QShortcut::activated, this, &MainWindow::saveCurrentRun);
-    
     auto* playShortcut = new QShortcut(QKeySequence("Ctrl+Space"), this);
-    connect(playShortcut, &QShortcut::activated, this, &MainWindow::playSelectedRun);
-    
     auto* resetShortcut = new QShortcut(QKeySequence("Ctrl+Shift+R"), this);
-    connect(resetShortcut, &QShortcut::activated, this, &MainWindow::resetSimulator);
-    
     auto* devModeShortcut = new QShortcut(QKeySequence("Ctrl+D"), this);
+#endif
+    
+    connect(connectShortcut, &QShortcut::activated, this, &MainWindow::connectHub);
+    connect(configShortcut, &QShortcut::activated, this, &MainWindow::openConfigDialog);
+    connect(recordShortcut, &QShortcut::activated, this, &MainWindow::toggleRecording);
+    connect(saveShortcut, &QShortcut::activated, this, &MainWindow::saveCurrentRun);
+    connect(playShortcut, &QShortcut::activated, this, &MainWindow::playSelectedRun);
+    connect(resetShortcut, &QShortcut::activated, this, &MainWindow::resetSimulator);
     connect(devModeShortcut, &QShortcut::activated, this, [this]() {
         developerCheck->setChecked(!developerCheck->isChecked());
         toggleDeveloperMode();
