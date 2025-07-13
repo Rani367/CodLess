@@ -64,7 +64,7 @@ void CalibrationManager::startCalibration() {
     // Note: Developer mode warning is handled by the UI layer
     // to avoid multiple dialogs
     
-    qDebug() << "Starting robot calibration";
+
     
     resetCalibration();
     calibrationRunning = true;
@@ -82,7 +82,7 @@ void CalibrationManager::stopCalibration() {
         return;
     }
     
-    qDebug() << "Stopping calibration";
+
     
     calibrationRunning = false;
     stepTimer->stop();
@@ -116,7 +116,9 @@ void CalibrationManager::processCalibrationStep() {
     }
     
     stepElapsedTimer.start();
-    timeoutTimer->start(timeoutDuration);
+    // Use shorter timeout for developer mode since no real robot response is needed
+    int currentTimeout = isDeveloperMode ? 2000 : timeoutDuration;
+    timeoutTimer->start(currentTimeout);
     
     switch (currentStep) {
         case StepMotorResponseTime:
@@ -169,7 +171,7 @@ void CalibrationManager::processCalibrationStep() {
 }
 
 void CalibrationManager::calibrateMotorResponseTime() {
-    qDebug() << "Calibrating motor response time";
+
     
     if (isDeveloperMode) {
         // Use realistic but clearly simulated values
@@ -212,7 +214,7 @@ void CalibrationManager::calibrateMotorResponseTime() {
 }
 
 void CalibrationManager::calibrateStraightTracking() {
-    qDebug() << "Calibrating straight tracking";
+
     
     if (isDeveloperMode) {
         // Simulate straight tracking test
@@ -252,7 +254,7 @@ void CalibrationManager::calibrateStraightTracking() {
 }
 
 void CalibrationManager::calibrateTurnAccuracy() {
-    qDebug() << "Calibrating turn accuracy";
+
     
     if (isDeveloperMode) {
         // Simulate turn accuracy test
@@ -290,7 +292,7 @@ void CalibrationManager::calibrateTurnAccuracy() {
 }
 
 void CalibrationManager::calibrateGyroscope() {
-    qDebug() << "Calibrating gyroscope";
+
     
     if (isDeveloperMode) {
         // Simulate gyroscope calibration
@@ -321,7 +323,7 @@ void CalibrationManager::calibrateGyroscope() {
 }
 
 void CalibrationManager::calibrateMotorBalance() {
-    qDebug() << "Calibrating motor balance";
+
     
     if (isDeveloperMode) {
         // Simulate motor balance test
@@ -351,7 +353,7 @@ void CalibrationManager::calibrateMotorBalance() {
 }
 
 void CalibrationManager::finalizeCalibration() {
-    qDebug() << "Finalizing calibration";
+
     
     // Calculate overall quality score
     double totalConfidence = 0.0;
@@ -402,7 +404,7 @@ void CalibrationManager::sendCalibrationCommand(const QVariantHash& command) {
     }
     
     // Log the command
-    qDebug() << "Calibration command sent:" << command;
+
 }
 
 void CalibrationManager::completeCurrentStep(bool success, double measuredValue, const QString& description) {
@@ -450,7 +452,7 @@ void CalibrationManager::completeCurrentStep(bool success, double measuredValue,
     } else {
         currentRetry++;
         if (currentRetry < maxRetries) {
-            qDebug() << "Retrying calibration step" << currentStep << "attempt" << currentRetry;
+    
             stepTimer->start(1000); // Retry after 1 second
         } else {
             emit calibrationFailed(QString("Step failed after %1 attempts: %2").arg(maxRetries).arg(description));
@@ -495,14 +497,13 @@ void CalibrationManager::handleRobotResponse(const QVariantHash& response) {
     }
     
     collectedData.append(response);
-    qDebug() << "Calibration response received:" << response;
+
     
     // Process response based on current step
     // This would be expanded based on actual robot response format
 }
 
 void CalibrationManager::onCalibrationTimeout() {
-    qWarning() << "Calibration step timed out:" << currentStep;
     completeCurrentStep(false, 0.0, "Step timed out");
 }
 
