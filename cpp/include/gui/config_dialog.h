@@ -14,9 +14,17 @@
 #include <QGroupBox>
 #include <QTabWidget>
 #include <QDialogButtonBox>
+#include <QProgressBar>
+#include <QTextEdit>
+#include <QScrollArea>
+#include <QGridLayout>
 #include <memory>
 
 #include "core/robot_config.h"
+
+class CalibrationManager;
+class BLEController;
+class RobotSimulator;
 
 class ConfigDialog : public QDialog {
     Q_OBJECT
@@ -26,6 +34,11 @@ public:
     ~ConfigDialog() override;
     
     RobotConfig getConfig() const;
+    
+    // Calibration setup
+    void setBLEController(BLEController* controller);
+    void setRobotSimulator(RobotSimulator* simulator);
+    void setDeveloperMode(bool enabled);
 
 private slots:
     void onConfigChanged();
@@ -37,11 +50,22 @@ private slots:
     void toggleAdvancedOptions(bool checked);
     void resetToDefaults();
     void validateInputs();
+    
+    // Calibration slots
+    void startCalibration();
+    void stopCalibration();
+    void clearCalibrationData();
+    void onCalibrationStarted();
+    void onCalibrationStepChanged(int step, const QString& description);
+    void onCalibrationProgress(int percentage);
+    void onCalibrationCompleted(const RobotConfig& config);
+    void onCalibrationFailed(const QString& reason);
 
 private:
     void setupBasicTab();
     void setupAdvancedTab();
     void setupMotorsTab();
+    void setupCalibrationTab();
     void setupConnections();
     void loadConfig();
     void saveConfig();
@@ -50,10 +74,19 @@ private:
     void loadConfigValues();
     void connectSignals();
     
+    // Calibration methods
+    void updateCalibrationStatus();
+    void updateCalibrationResults();
+    void enableCalibrationControls(bool enabled);
+    void showCalibrationResultsDialog(const QString& message);
+    void showCalibrationFailedDialog(const QString& reason);
+    void showCalibrationInfoDialog(const QString& title, const QString& message);
+    
     QTabWidget *tabWidget;
     QWidget *basicTab;
     QWidget *motorsTab;
     QWidget *advancedTab;
+    QWidget *calibrationTab;
     QPushButton *okButton;
     QPushButton *cancelButton;
     QPushButton *resetButton;
@@ -78,6 +111,21 @@ private:
     QDoubleSpinBox *maxTurnAccelSpinBox;
     QDoubleSpinBox *maxArmAccelSpinBox;
     
+    // Calibration tab widgets
+    QLabel *calibrationStatusLabel;
+    QLabel *calibrationDateLabel;
+    QLabel *calibrationQualityLabel;
+    QPushButton *startCalibrationButton;
+    QPushButton *stopCalibrationButton;
+    QPushButton *clearCalibrationButton;
+    QProgressBar *calibrationProgressBar;
+    QLabel *calibrationStepLabel;
+    QTextEdit *calibrationResultsText;
+    QScrollArea *calibrationScrollArea;
+    QGroupBox *calibrationStatusGroup;
+    QGroupBox *calibrationControlGroup;
+    QGroupBox *calibrationResultsGroup;
+    
     // Motors tab widgets
     QLineEdit *leftMotorPortLineEdit;
     QLineEdit *rightMotorPortLineEdit;
@@ -98,6 +146,12 @@ private:
     QCheckBox* advancedCheckBox;
     
     QDialogButtonBox* buttonBox;
+    
+    // Calibration system
+    CalibrationManager* calibrationManager;
+    BLEController* bleController = nullptr;
+    RobotSimulator* robotSimulator = nullptr;
+    bool isDeveloperMode = false;
     
     static constexpr double MIN_AXLE_TRACK = 50.0;
     static constexpr double MAX_AXLE_TRACK = 300.0;

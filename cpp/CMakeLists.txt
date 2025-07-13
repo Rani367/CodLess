@@ -33,6 +33,7 @@ set(SOURCES
     src/gui/main_window.cpp
     src/gui/config_dialog.cpp
     src/utils/json_utils.cpp
+    src/utils/calibration_manager.cpp
 )
 
 set(HEADERS
@@ -43,6 +44,7 @@ set(HEADERS
     include/gui/main_window.h
     include/gui/config_dialog.h
     include/utils/json_utils.h
+    include/utils/calibration_manager.h
 )
 
 qt_add_executable(CodLess

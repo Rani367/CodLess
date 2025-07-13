@@ -11,8 +11,8 @@
 
 RobotSimulator::RobotSimulator(QWidget* parent)
     : QWidget(parent)
-    , robotX(200.0)
-    , robotY(150.0)
+    , robotX(0.0)  // Will be set properly in resetSimulation()
+    , robotY(0.0)  // Will be set properly in resetSimulation()
     , robotAngle(0.0)
     , arm1Angle(0.0)
     , arm2Angle(0.0)
@@ -58,8 +58,9 @@ void RobotSimulator::updateCommand(const QVariantHash& command) {
 }
 
 void RobotSimulator::resetSimulation() {
-    robotX = std::max(30.0, std::min(static_cast<double>(width() - 30), width() / 2.0));
-    robotY = std::max(30.0, std::min(static_cast<double>(height() - 30), height() / 2.0));
+    // Center the robot in the simulator
+    robotX = width() / 2.0;
+    robotY = height() / 2.0;
     robotAngle = 0.0;
     arm1Angle = 0.0;
     arm2Angle = 0.0;

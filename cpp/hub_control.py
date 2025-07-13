@@ -6,6 +6,7 @@ from pybricks.tools import wait
 from usys import stdin, stdout
 from uselect import poll
 import ujson
+import time
 
 hub = PrimeHub()
 
@@ -115,6 +116,69 @@ while True:
                     stdout.buffer.write(b"CONFIG_OK")
                 except:
                     stdout.buffer.write(b"CONFIG_ERROR")
+                    
+            elif cmd_type == 'calibrate':
+                try:
+                    calibration_type = command.get('calibration_type', '')
+                    
+                    if calibration_type == 'gyro_reading':
+                        # Get gyroscope heading
+                        gyro_value = hub.imu.heading()
+                        stdout.buffer.write(f"GYRO:{gyro_value}".encode())
+                    
+                    elif calibration_type == 'motor_position':
+                        # Get motor positions
+                        if drive_base:
+                            left_pos = left_motor.angle()
+                            right_pos = right_motor.angle()
+                            stdout.buffer.write(f"MOTORS:{left_pos},{right_pos}".encode())
+                        else:
+                            stdout.buffer.write(b"MOTORS_NOT_AVAILABLE")
+                    
+                    elif calibration_type == 'motor_balance':
+                        # Run motors for balance test
+                        if drive_base:
+                            # Reset motor positions
+                            left_motor.reset_angle(0)
+                            right_motor.reset_angle(0)
+                            
+                            # Run both motors at same speed for 1 second
+                            left_motor.run(200)
+                            right_motor.run(200)
+                            wait(1000)
+                            
+                            # Stop and read positions
+                            left_motor.stop()
+                            right_motor.stop()
+                            
+                            left_pos = left_motor.angle()
+                            right_pos = right_motor.angle()
+                            
+                            stdout.buffer.write(f"BALANCE:{left_pos},{right_pos}".encode())
+                        else:
+                            stdout.buffer.write(b"BALANCE_NOT_AVAILABLE")
+                    
+                    elif calibration_type == 'response_time':
+                        # Test motor response time
+                        if drive_base:
+                            # Record timestamp, start motor, stop motor
+                            start_time = time.ticks_ms()
+                            left_motor.run(200)
+                            wait(100)
+                            left_motor.stop()
+                            end_time = time.ticks_ms()
+                            
+                            response_time = time.ticks_diff(end_time, start_time)
+                            stdout.buffer.write(f"RESPONSE_TIME:{response_time}".encode())
+                        else:
+                            stdout.buffer.write(b"RESPONSE_TIME_NOT_AVAILABLE")
+                    
+                    else:
+                        stdout.buffer.write(b"UNKNOWN_CALIBRATION_TYPE")
+                        
+                except Exception as e:
+                    stdout.buffer.write(b"CALIBRATION_ERROR")
+                    
             else:
                 stdout.buffer.write(b"UNKNOWN_CMD")
                 

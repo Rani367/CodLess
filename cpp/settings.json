@@ -11,5 +11,23 @@
         "width": 1200,
         "x": 120,
         "y": 80
+    },
+    "robot_config": {
+        "axle_track": 120.0,
+        "wheel_diameter": 62.0,
+        "straight_speed": 600.0,
+        "straight_acceleration": 300.0,
+        "turn_rate": 250.0,
+        "turn_acceleration": 350.0,
+        "left_motor_port": "A",
+        "right_motor_port": "B",
+        "arm1_motor_port": "C",
+        "arm2_motor_port": "D",
+        "max_drive_speed": 800.0,
+        "max_turn_speed": 400.0,
+        "max_arm_speed": 300.0,
+        "max_drive_accel": 500.0,
+        "max_turn_accel": 600.0,
+        "max_arm_accel": 400.0
     }
 }

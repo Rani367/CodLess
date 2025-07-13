@@ -56,9 +56,7 @@ MainWindow::MainWindow(QWidget* parent)
     setupExitAnimation();
     setupAutoSave();
     
-    // Set initial developer mode state (before loading settings)
-    toggleDeveloperMode();
-    
+    // Load settings first, which will set developer mode state
     loadSettings();
     
     bleController->setLogCallback([this](const QString& msg, const QString& level) {
@@ -983,12 +981,23 @@ void MainWindow::openConfigDialog() {
     // Use stack allocation to avoid memory management issues
     ConfigDialog dialog(this, robotConfig);
     
+    // Setup calibration system
+    dialog.setBLEController(bleController.get());
+    dialog.setRobotSimulator(simulator.get());
+    dialog.setDeveloperMode(isDeveloperMode);
+    
     int result = dialog.exec();
     
     if (result == QDialog::Accepted) {
         RobotConfig newConfig = dialog.getConfig();
         robotConfig = newConfig;
         logStatus("Robot configuration updated", "info");
+        
+        // If calibration data was updated, log it
+        if (newConfig.hasValidCalibration()) {
+            logStatus(QString("Robot calibration active - Quality: %1%")
+                     .arg(newConfig.calibrationQuality, 0, 'f', 1), "info");
+        }
     }
     
     // No manual deletion needed - stack object will be destroyed automatically
@@ -1429,10 +1438,52 @@ void MainWindow::processKeyCommand(const QString& key, bool isPressed) {
 }
 
 void MainWindow::executeCommand(const QVariantHash& command) {
+    QVariantHash compensatedCommand = command;
+    
+    // Apply calibration compensation if calibrated
+    if (robotConfig.hasValidCalibration()) {
+        QString cmdType = command["type"].toString();
+        
+        if (cmdType == "drive") {
+            // Apply motor speed compensation
+            double speed = command["speed"].toDouble();
+            double turnRate = command["turn_rate"].toDouble();
+            
+            // Apply speed factors for motor balance
+            if (speed > 0) {
+                // When moving forward, apply left/right motor compensation
+                double leftSpeed = speed * robotConfig.leftMotorSpeedFactor;
+                double rightSpeed = speed * robotConfig.rightMotorSpeedFactor;
+                // Use average for overall speed, but the individual compensation
+                // would be applied at the motor level
+                compensatedCommand["speed"] = (leftSpeed + rightSpeed) / 2.0;
+            } else if (speed < 0) {
+                // When moving backward, apply similar compensation
+                double leftSpeed = speed * robotConfig.leftMotorSpeedFactor;
+                double rightSpeed = speed * robotConfig.rightMotorSpeedFactor;
+                compensatedCommand["speed"] = (leftSpeed + rightSpeed) / 2.0;
+            }
+            
+            // Apply turn accuracy compensation
+            if (turnRate != 0) {
+                compensatedCommand["turn_rate"] = turnRate * robotConfig.turnAccuracyFactor;
+            }
+            
+            // Apply straight drift correction
+            if (speed != 0 && turnRate == 0) {
+                // Add slight turn to counteract drift
+                compensatedCommand["turn_rate"] = robotConfig.straightDriftCorrection;
+            }
+        }
+        
+        // Apply motor delay compensation would be handled by the hub
+        // or could be implemented as a delay in command sending
+    }
+    
     if (isDeveloperMode) {
-        simulator->updateCommand(command);
+        simulator->updateCommand(compensatedCommand);
     } else if (isConnected) {
-        bleController->sendCommand(command);
+        bleController->sendCommand(compensatedCommand);
     }
     
     if (isRecording) {
@@ -1440,6 +1491,7 @@ void MainWindow::executeCommand(const QVariantHash& command) {
         saveRecordingState();
         
         double timestamp = recordingTimer->elapsed() / 1000.0;
+        // Record the original command, not the compensated one
         currentRecording.emplace_back(timestamp, command["type"].toString(), command);
     }
 }
@@ -1604,8 +1656,28 @@ void MainWindow::loadSettings() {
         // Restore developer mode
         if (settings.contains("developer_mode")) {
             bool devMode = settings["developer_mode"].toBool();
+            
+            // Temporarily block signals to prevent toggleDeveloperMode from being called
+            developerCheck->blockSignals(true);
             developerCheck->setChecked(devMode);
-            toggleDeveloperMode();
+            developerCheck->blockSignals(false);
+            
+            isDeveloperMode = devMode; // Set the state directly
+            if (devMode) {
+                logStatus("Developer mode enabled - using simulator only", "info");
+                hubStatus->setText("● Developer Mode");
+                hubStatus->setObjectName("status_connected");
+                simulatorGroup->show();
+                uploadMapButton->setVisible(true);
+                simulator->resetSimulation();
+            } else {
+                logStatus("Developer mode disabled", "info");
+                hubStatus->setText("● Hub Disconnected");
+                hubStatus->setObjectName("status_disconnected");
+                simulatorGroup->hide();
+                uploadMapButton->setVisible(false);
+            }
+            connectButton->setEnabled(!devMode);
         }
         
         // Restore last run name
@@ -1622,6 +1694,15 @@ void MainWindow::loadSettings() {
             }
             if (sizeList.size() == 2) {
                 contentSplitter->setSizes(sizeList);
+            }
+        }
+        
+        // Restore robot configuration (including calibration data)
+        if (settings.contains("robot_config")) {
+            robotConfig.fromJson(settings["robot_config"].toObject());
+            if (robotConfig.hasValidCalibration()) {
+                logStatus(QString("Loaded calibration data - Quality: %1%")
+                         .arg(robotConfig.calibrationQuality, 0, 'f', 1), "info");
             }
         }
         
@@ -1642,8 +1723,8 @@ void MainWindow::saveSettings() {
     geo["height"] = geometry().height();
     settings["window_geometry"] = geo;
     
-    // Save developer mode
-    settings["developer_mode"] = developerCheck->isChecked();
+    // Don't save developer mode - always start with it disabled
+    // settings["developer_mode"] = developerCheck->isChecked();
     
     // Save last run name
     settings["last_run_name"] = runNameInput->text();
@@ -1654,6 +1735,9 @@ void MainWindow::saveSettings() {
         sizes.append(size);
     }
     settings["splitter_sizes"] = sizes;
+    
+    // Save robot configuration (including calibration data)
+    settings["robot_config"] = robotConfig.toJson();
     
     // Save timestamp
     settings["saved_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
