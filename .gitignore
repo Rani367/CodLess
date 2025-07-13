@@ -1,0 +1,56 @@
+# Build directories
+build/
+cmake-build-*/
+**/build/
+**/cmake-build-*/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Qt build files
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+
+# C++ build files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# Application bundles
+*.app
+*.exe
+
+# Temporary files
+*.tmp
+*.temp
+*.log 
