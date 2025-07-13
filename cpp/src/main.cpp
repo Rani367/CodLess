@@ -1,5 +1,4 @@
 #include <QApplication>
-#include <QSplashScreen>
 #include <QSystemTrayIcon>
 #include <QCommandLineParser>
 #include <QStyleFactory>
@@ -9,11 +8,6 @@
 #include <QScreen>
 #include <QMessageBox>
 #include <QLoggingCategory>
-#include <QPixmap>
-#include <QPainter>
-#include <QFont>
-#include <QColor>
-#include <QRect>
 #include <QDebug>
 #include <memory>
 #include <exception>
@@ -56,32 +50,10 @@ int main(int argc, char *argv[]) {
         qDebug() << "Debug mode enabled";
     }
     
-    // Create and show splash screen
-    QPixmap splashPixmap(400, 300);
-    splashPixmap.fill(QColor(45, 45, 48));
-    
-    QPainter painter(&splashPixmap);
-    painter.setPen(QColor(255, 255, 255));
-    painter.setFont(QFont("Arial", 24, QFont::Bold));
-    painter.drawText(splashPixmap.rect(), Qt::AlignCenter, "CodLess\nRobot Control Platform");
-    
-    // Use smart pointer to manage splash screen memory automatically
-    std::unique_ptr<QSplashScreen> splash = std::make_unique<QSplashScreen>(splashPixmap);
-    splash->show();
-    
-    app.processEvents();
-    
-    // Give splash screen time to display
-    QThread::msleep(1000);
-    
     // Create main window
     std::unique_ptr<MainWindow> window = std::make_unique<MainWindow>();
     
     window->show();
-    
-    // Hide splash screen - smart pointer will automatically clean up
-    splash->finish(window.get());
-    splash.reset();  // Explicitly clean up splash screen
     
     // Exception handling
     try {
