@@ -177,10 +177,11 @@ void MainWindow::createSidebar() {
     connectButton = new QPushButton("Connect to Pybricks Hub");
     connectButton->setObjectName("primary_btn");
     connectButton->setMinimumHeight(40);
-    connectButton->setToolTip("1. Upload hub_control.py via code.pybricks.com\n2. Keep Pybricks website open\n3. Click to connect");
+    connectButton->setToolTip("1. Upload hub_control.py via code.pybricks.com\n2. Keep Pybricks website open\n3. Click to connect\n\nShortcut: Ctrl+C");
     
     developerCheck = new QCheckBox("Developer Mode (Simulation)");
     developerCheck->setObjectName("checkbox");
+    developerCheck->setToolTip("Enable simulation mode for development\n\nShortcut: Ctrl+D");
     
     hubStatus = new QLabel("● Hub Disconnected");
     hubStatus->setObjectName("status_disconnected");
@@ -198,6 +199,7 @@ void MainWindow::createSidebar() {
     configButton = new QPushButton("Configure Robot");
     configButton->setObjectName("success_btn");
     configButton->setMinimumHeight(35);
+    configButton->setToolTip("Configure robot settings and motor ports\n\nShortcut: Ctrl+P");
     
     configLayout->addWidget(configButton);
     
@@ -245,10 +247,12 @@ void MainWindow::createSidebar() {
     playButton = new QPushButton("Play");
     playButton->setObjectName("success_btn");
     playButton->setEnabled(false);
+    playButton->setToolTip("Play selected recording\n\nShortcut: Ctrl+Space");
     
     deleteButton = new QPushButton("Delete");
     deleteButton->setObjectName("danger_btn");
     deleteButton->setEnabled(false);
+    deleteButton->setToolTip("Delete selected recording\n\nShortcut: Delete key");
     
     runsButtonLayout->addWidget(playButton);
     runsButtonLayout->addWidget(deleteButton);
@@ -281,11 +285,12 @@ void MainWindow::createMainContent() {
     resetSimButton = new QPushButton("Reset Position");
     resetSimButton->setObjectName("success_btn");
     resetSimButton->setMinimumHeight(30);
+    resetSimButton->setToolTip("Reset robot simulator position\n\nShortcut: Ctrl+Shift+R");
     
     uploadMapButton = new QPushButton("Upload Map");
     uploadMapButton->setObjectName("primary_btn");
     uploadMapButton->setMinimumHeight(30);
-    uploadMapButton->setToolTip("Upload a map image to use as background in the simulator\nRight-click to clear the background");
+    uploadMapButton->setToolTip("Upload a map image to use as background in the simulator\nRight-click to clear the background\n\nShortcut: Ctrl+Shift+R (Reset)");
     uploadMapButton->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(uploadMapButton, &QPushButton::customContextMenuRequested, this, [this]() {
         simulator->clearBackgroundImage();
@@ -318,11 +323,13 @@ void MainWindow::createMainContent() {
     recordButton = new QPushButton("Record Run");
     recordButton->setObjectName("danger_btn");
     recordButton->setMinimumHeight(50);
+    recordButton->setToolTip("Start/stop recording robot movements\n\nShortcut: Ctrl+R");
     
     saveButton = new QPushButton("Save Run");
     saveButton->setObjectName("success_btn");
     saveButton->setMinimumHeight(50);
     saveButton->setEnabled(false);
+    saveButton->setToolTip("Save the current recording\n\nShortcut: Ctrl+S");
     
     recordButtonLayout->addWidget(recordButton);
     recordButtonLayout->addWidget(saveButton);
@@ -607,6 +614,34 @@ void MainWindow::setupConnections() {
     connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveCurrentRun);
     connect(playButton, &QPushButton::clicked, this, &MainWindow::playSelectedRun);
     connect(deleteButton, &QPushButton::clicked, this, &MainWindow::deleteSelectedRun);
+    
+    // Add keyboard shortcuts for better UX
+    auto* connectShortcut = new QShortcut(QKeySequence("Ctrl+C"), this);
+    connect(connectShortcut, &QShortcut::activated, this, &MainWindow::connectHub);
+    
+    auto* configShortcut = new QShortcut(QKeySequence("Ctrl+P"), this);
+    connect(configShortcut, &QShortcut::activated, this, &MainWindow::openConfigDialog);
+    
+    auto* recordShortcut = new QShortcut(QKeySequence("Ctrl+R"), this);
+    connect(recordShortcut, &QShortcut::activated, this, &MainWindow::toggleRecording);
+    
+    auto* saveShortcut = new QShortcut(QKeySequence("Ctrl+S"), this);
+    connect(saveShortcut, &QShortcut::activated, this, &MainWindow::saveCurrentRun);
+    
+    auto* playShortcut = new QShortcut(QKeySequence("Ctrl+Space"), this);
+    connect(playShortcut, &QShortcut::activated, this, &MainWindow::playSelectedRun);
+    
+    auto* resetShortcut = new QShortcut(QKeySequence("Ctrl+Shift+R"), this);
+    connect(resetShortcut, &QShortcut::activated, this, &MainWindow::resetSimulator);
+    
+    auto* devModeShortcut = new QShortcut(QKeySequence("Ctrl+D"), this);
+    connect(devModeShortcut, &QShortcut::activated, this, [this]() {
+        developerCheck->setChecked(!developerCheck->isChecked());
+        toggleDeveloperMode();
+    });
+    
+    auto* deleteShortcut = new QShortcut(QKeySequence("Delete"), this);
+    connect(deleteShortcut, &QShortcut::activated, this, &MainWindow::deleteSelectedRun);
     
     connect(runsList, &QListWidget::itemSelectionChanged, this, [this]() {
         bool hasSelection = !runsList->selectedItems().isEmpty();

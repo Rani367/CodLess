@@ -24,6 +24,7 @@
 #include <QScrollArea>
 #include <QFrame>
 #include <QSplitter>
+#include <QShortcut>
 #include <QDebug>
 #include <memory>
 #include <unordered_set>
