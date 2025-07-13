@@ -1,0 +1,340 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  QT_VERSION: '6.5.0'
+  CMAKE_VERSION: '3.25.0'
+  BUILD_TYPE: Release
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            qt_arch: gcc_64
+            cmake_generator: "Unix Makefiles"
+          - os: windows-latest
+            qt_arch: win64_msvc2022_64
+            cmake_generator: "Visual Studio 17 2022"
+          - os: macos-latest
+            qt_arch: clang_64
+            cmake_generator: "Unix Makefiles"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        arch: ${{ matrix.qt_arch }}
+        modules: 'qtcharts qtnetworkauth'
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake git
+        sudo apt-get install -y qt6-base-dev qt6-bluetooth-dev qt6-serialport-dev
+        sudo apt-get install -y libbluetooth-dev libgl1-mesa-dev
+        sudo apt-get install -y xvfb x11-utils libxkbcommon-x11-0
+        sudo apt-get install -y lcov gcovr
+
+    - name: Install Windows dependencies
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        choco install ninja
+
+    - name: Install macOS dependencies
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake ninja
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DBUILD_TESTING=ON -G "${{ matrix.cmake_generator }}"
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config ${{ env.BUILD_TYPE }} --parallel
+
+    - name: Run Tests (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd build
+        xvfb-run -a ctest --output-on-failure --parallel 4
+      env:
+        QT_QPA_PLATFORM: offscreen
+
+    - name: Run Tests (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd build
+        ctest --output-on-failure --parallel 4 -C ${{ env.BUILD_TYPE }}
+
+    - name: Run Tests (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd build
+        ctest --output-on-failure --parallel 4
+      env:
+        QT_QPA_PLATFORM: offscreen
+
+    - name: Generate Coverage Report (Linux)
+      if: matrix.os == 'ubuntu-latest' && env.BUILD_TYPE == 'Debug'
+      run: |
+        cd build
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info
+        lcov --list coverage.info
+
+    - name: Upload Coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && env.BUILD_TYPE == 'Debug'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./build/coverage.info
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}
+        path: build/Testing/
+
+  build-packages:
+    name: Build Packages
+    needs: test
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'push' && (contains(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            qt_arch: gcc_64
+            package_name: CodLess-Linux-x64
+          - os: windows-latest
+            qt_arch: win64_msvc2022_64
+            package_name: CodLess-Windows-x64
+          - os: macos-latest
+            qt_arch: clang_64
+            package_name: CodLess-macOS-x64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        arch: ${{ matrix.qt_arch }}
+        modules: 'qtcharts qtnetworkauth'
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake git
+        sudo apt-get install -y qt6-base-dev qt6-bluetooth-dev qt6-serialport-dev
+        sudo apt-get install -y libbluetooth-dev libgl1-mesa-dev
+        sudo apt-get install -y linuxdeploy linuxdeploy-plugin-qt
+
+    - name: Install Windows dependencies
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        choco install ninja
+
+    - name: Install macOS dependencies
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake ninja create-dmg
+
+    - name: Configure and Build
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+        cmake --build . --config ${{ env.BUILD_TYPE }} --parallel
+
+    - name: Package Linux AppImage
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd build
+        make install DESTDIR=AppDir
+        linuxdeploy --appdir AppDir --plugin qt --output appimage
+        mv CodLess-*.AppImage ${{ matrix.package_name }}.AppImage
+
+    - name: Package Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd build
+        mkdir package
+        cp ${{ env.BUILD_TYPE }}/CodLess.exe package/
+        windeployqt --qmldir ../src --compiler-runtime package/CodLess.exe
+        7z a ${{ matrix.package_name }}.zip package/*
+
+    - name: Package macOS DMG
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd build
+        macdeployqt CodLess.app -dmg
+        mv CodLess.dmg ${{ matrix.package_name }}.dmg
+
+    - name: Upload Package Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.package_name }}
+        path: |
+          build/${{ matrix.package_name }}.*
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        arch: gcc_64
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake git
+        sudo apt-get install -y qt6-base-dev qt6-bluetooth-dev qt6-serialport-dev
+        sudo apt-get install -y cppcheck clang-tidy iwyu
+
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=all --xml --xml-version=2 src/ include/ 2> cppcheck-results.xml
+
+    - name: Run clang-tidy
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        cd ..
+        clang-tidy -p build src/*.cpp src/*/*.cpp --format-style=file > clang-tidy-results.txt
+
+    - name: Upload Code Quality Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-quality-results
+        path: |
+          cppcheck-results.xml
+          clang-tidy-results.txt
+
+  documentation:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || contains(github.ref, 'refs/tags/')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Doxygen
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+
+    - name: Generate Documentation
+      run: |
+        doxygen Doxyfile
+
+    - name: Deploy Documentation
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.ref == 'refs/heads/main'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/html
+
+  release:
+    name: Create Release
+    needs: [test, build-packages, security-scan, code-quality]
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'refs/tags/v')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: artifacts/*/*
+        generate_release_notes: true
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notification:
+    name: Send Notifications
+    needs: [test, build-packages, security-scan, code-quality]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Notify Success
+      if: ${{ contains(needs.*.result, 'success') && !contains(needs.*.result, 'failure') }}
+      run: |
+        echo "✅ All CI/CD jobs completed successfully!"
+        echo "Build Status: SUCCESS"
+        echo "Commit: ${{ github.sha }}"
+        echo "Branch: ${{ github.ref }}"
+
+    - name: Notify Failure
+      if: ${{ contains(needs.*.result, 'failure') }}
+      run: |
+        echo "❌ CI/CD pipeline failed!"
+        echo "Build Status: FAILURE"
+        echo "Commit: ${{ github.sha }}"
+        echo "Branch: ${{ github.ref }}"
+        exit 1 

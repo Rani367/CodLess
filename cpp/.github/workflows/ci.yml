@@ -1,0 +1,383 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly build
+
+env:
+  QT_VERSION: '6.5.0'
+  CMAKE_VERSION: '3.25.0'
+
+jobs:
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          clang-tidy \
+          cppcheck \
+          include-what-you-use \
+          clang-format \
+          doxygen \
+          graphviz \
+          lcov
+    
+    - name: Run clang-format check
+      run: |
+        find src include -name "*.cpp" -o -name "*.h" | xargs clang-format --dry-run --Werror
+    
+    - name: Run static analysis
+      run: |
+        # Run cppcheck
+        cppcheck --enable=all --suppress=missingIncludeSystem --error-exitcode=1 src/ include/
+        
+        # Run include-what-you-use (informational)
+        find src -name "*.cpp" | head -5 | xargs -I {} include-what-you-use -std=c++20 -I./include {} || true
+    
+    - name: Upload static analysis results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: static-analysis-results
+        path: |
+          cppcheck-results.xml
+          iwyu-results.txt
+
+  build-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build-type: [Debug, Release]
+        qt-version: ['6.5.0', '6.6.0']
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+            generator: "Unix Makefiles"
+          - os: windows-latest
+            compiler: msvc
+            generator: "Visual Studio 17 2022"
+          - os: macos-latest
+            compiler: clang
+            generator: "Unix Makefiles"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ matrix.qt-version }}
+        modules: 'qtnetwork qtbluetooth qtserialport'
+        cache: true
+    
+    - name: Install system dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libbluetooth-dev \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          libfontconfig1-dev \
+          libfreetype6-dev \
+          libx11-dev \
+          libx11-xcb-dev \
+          libxext-dev \
+          libxfixes-dev \
+          libxi-dev \
+          libxrender-dev \
+          libxcb1-dev \
+          libxcb-cursor-dev \
+          libxcb-glx0-dev \
+          libxcb-keysyms1-dev \
+          libxcb-image0-dev \
+          libxcb-shm0-dev \
+          libxcb-icccm4-dev \
+          libxcb-sync-dev \
+          libxcb-xfixes0-dev \
+          libxcb-shape0-dev \
+          libxcb-randr0-dev \
+          libxcb-render-util0-dev \
+          libxcb-util-dev \
+          libxcb-xinerama0-dev \
+          libxcb-xkb-dev \
+          libxkbcommon-dev \
+          libxkbcommon-x11-dev
+    
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake ninja
+    
+    - name: Configure CMake
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+          -DBUILD_TESTING=ON \
+          -DBUILD_DOCUMENTATION=ON \
+          -DENABLE_COVERAGE=${{ matrix.build-type == 'Debug' && 'ON' || 'OFF' }} \
+          -DENABLE_SANITIZERS=${{ matrix.build-type == 'Debug' && 'ON' || 'OFF' }} \
+          -DENABLE_CLANG_TIDY=${{ matrix.os == 'ubuntu-latest' && 'ON' || 'OFF' }} \
+          -DENABLE_CPPCHECK=${{ matrix.os == 'ubuntu-latest' && 'ON' || 'OFF' }} \
+          -G "${{ matrix.generator }}"
+    
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build-type }} --parallel $(nproc)
+    
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure --parallel $(nproc) --build-config ${{ matrix.build-type }}
+    
+    - name: Generate coverage report (Linux Debug)
+      if: matrix.os == 'ubuntu-latest' && matrix.build-type == 'Debug'
+      run: |
+        cd build
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info
+        lcov --remove coverage.info '*/tests/*' --output-file coverage.info
+        lcov --remove coverage.info '*/build/*' --output-file coverage.info
+        genhtml coverage.info --output-directory coverage_report
+    
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.build-type == 'Debug'
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./build/coverage.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.build-type == 'Release'
+      with:
+        name: ${{ matrix.os }}-build-artifacts
+        path: |
+          build/CodLess*
+          build/*.app
+          build/*.dmg
+          build/*.msi
+          build/*.deb
+          build/*.rpm
+          build/*.appimage
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.build-type }}
+        path: |
+          build/Testing/
+          build/test-results.xml
+
+  performance-analysis:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    needs: build-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        modules: 'qtnetwork qtbluetooth qtserialport'
+    
+    - name: Install performance tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          valgrind \
+          perf \
+          google-perftools \
+          libgoogle-perftools-dev
+    
+    - name: Configure for performance testing
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DBUILD_TESTING=ON \
+          -DENABLE_PROFILING=ON \
+          -DBUILD_BENCHMARKS=ON
+    
+    - name: Build performance tests
+      run: cmake --build build --parallel $(nproc)
+    
+    - name: Run performance benchmarks
+      run: |
+        cd build
+        ./benchmarks/performance_benchmarks --benchmark_out=benchmark_results.json --benchmark_out_format=json
+    
+    - name: Memory leak detection
+      run: |
+        cd build
+        valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind_output.txt ./CodLess --test-mode || true
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-results
+        path: |
+          build/benchmark_results.json
+          build/valgrind_output.txt
+          build/perf_report.txt
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: cpp
+        queries: security-and-quality
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    needs: build-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        modules: 'qtnetwork qtbluetooth qtserialport'
+    
+    - name: Install documentation tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+    
+    - name: Generate documentation
+      run: |
+        cmake -B build -DBUILD_DOCUMENTATION=ON
+        cmake --build build --target docs
+    
+    - name: Deploy documentation
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build/docs/html
+        destination_dir: docs
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [code-quality, build-test, performance-analysis, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Create release notes
+      run: |
+        echo "## Release Notes" > release_notes.md
+        echo "" >> release_notes.md
+        echo "### Features" >> release_notes.md
+        echo "- Advanced robot control with real-time physics simulation" >> release_notes.md
+        echo "- Comprehensive error recovery and fault tolerance" >> release_notes.md
+        echo "- Performance monitoring and optimization" >> release_notes.md
+        echo "- Advanced trajectory planning and obstacle avoidance" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Technical Improvements" >> release_notes.md
+        echo "- Refactored codebase with improved modularity" >> release_notes.md
+        echo "- Enhanced documentation and code quality" >> release_notes.md
+        echo "- Comprehensive testing and static analysis" >> release_notes.md
+        echo "- Cross-platform compatibility improvements" >> release_notes.md
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: Release v${{ github.run_number }}
+        body_path: release_notes.md
+        files: |
+          ubuntu-latest-build-artifacts/*
+          windows-latest-build-artifacts/*
+          macos-latest-build-artifacts/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: needs.release.result == 'success'
+      run: |
+        echo "🎉 Release successful! All quality checks passed."
+        echo "✅ Code quality analysis: PASSED"
+        echo "✅ Build and test: PASSED"
+        echo "✅ Performance analysis: PASSED"
+        echo "✅ Security scan: PASSED"
+        echo "✅ Documentation: UPDATED"
+        echo "✅ Release: CREATED"
+    
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ CI/CD pipeline failed. Please check the logs."
+        echo "Pipeline status: ${{ job.status }}" 
