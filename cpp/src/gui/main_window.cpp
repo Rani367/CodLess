@@ -24,6 +24,7 @@
 #include <QClipboard>
 #include <QFileInfo>
 #include <QGridLayout>
+#include <QProcess>
 #include <algorithm>
 #include <chrono>
 #include <QDebug> // Added for qDebug
@@ -35,6 +36,7 @@ MainWindow::MainWindow(QWidget* parent)
     , keyUpdateTimer(std::make_unique<QTimer>(this))
     , playbackTimer(std::make_unique<QTimer>(this))
     , telemetryTimer(std::make_unique<QTimer>(this))
+    , autoSaveTimer(std::make_unique<QTimer>(this))
     , recordingTimer(std::make_unique<QElapsedTimer>())
     , robotConfig()
     , currentRecording()
@@ -52,6 +54,12 @@ MainWindow::MainWindow(QWidget* parent)
     setupConnections();
     setupStartupAnimation();
     setupExitAnimation();
+    setupAutoSave();
+    
+    // Set initial developer mode state (before loading settings)
+    toggleDeveloperMode();
+    
+    loadSettings();
     
     bleController->setLogCallback([this](const QString& msg, const QString& level) {
         logStatus(msg, level);
@@ -77,6 +85,9 @@ MainWindow::~MainWindow() {
     }
     if (keyUpdateTimer && keyUpdateTimer->isActive()) {
         keyUpdateTimer->stop();
+    }
+    if (autoSaveTimer && autoSaveTimer->isActive()) {
+        autoSaveTimer->stop();
     }
     
     // Stop any ongoing animations
@@ -187,6 +198,7 @@ void MainWindow::createSidebar() {
     
     developerCheck = new QCheckBox("Developer Mode (Simulation)");
     developerCheck->setObjectName("checkbox");
+    developerCheck->setChecked(false); // Start unchecked by default
     developerCheck->setToolTip("Enable simulation mode for development\n\n"
 #ifdef Q_OS_MAC
                                "Shortcut: Cmd+D"
@@ -349,7 +361,7 @@ void MainWindow::createMainContent() {
     nameLayout->addWidget(runNameInput);
     recordLayout->addLayout(nameLayout);
     
-    auto* recordButtonLayout = new QHBoxLayout();
+        auto* recordButtonLayout = new QHBoxLayout();
     recordButton = new QPushButton("Record Run");
     recordButton->setObjectName("danger_btn");
     recordButton->setMinimumHeight(50);
@@ -367,11 +379,11 @@ void MainWindow::createMainContent() {
     saveButton->setEnabled(false);
     saveButton->setToolTip("Save the current recording\n\n"
 #ifdef Q_OS_MAC
-                           "Shortcut: Cmd+S"
+                            "Shortcut: Cmd+S"
 #else
-                           "Shortcut: Ctrl+S"
+                            "Shortcut: Ctrl+S"
 #endif
-                           );
+                            );
     
     recordButtonLayout->addWidget(recordButton);
     recordButtonLayout->addWidget(saveButton);
@@ -410,9 +422,13 @@ void MainWindow::createMainContent() {
     connectionLabel = new QLabel("Connection: Disconnected | Lag: 0ms");
     connectionLabel->setObjectName("telemetry_text");
     
+    performanceLabel = new QLabel("Performance: FPS: 0 | Memory: 0 MB");
+    performanceLabel->setObjectName("telemetry_text");
+    
     telemetryLayout->addWidget(positionLabel);
     telemetryLayout->addWidget(speedLabel);
     telemetryLayout->addWidget(connectionLabel);
+    telemetryLayout->addWidget(performanceLabel);
     
     layout->addWidget(telemetryGroup, 0);  // Keep telemetry compact
     
@@ -690,6 +706,17 @@ void MainWindow::setupConnections() {
     auto* deleteShortcut = new QShortcut(QKeySequence("Delete"), this);
     connect(deleteShortcut, &QShortcut::activated, this, &MainWindow::deleteSelectedRun);
     
+    // Add undo/redo shortcuts
+#ifdef Q_OS_MAC
+    auto* undoShortcut = new QShortcut(QKeySequence("Cmd+Z"), this);
+    auto* redoShortcut = new QShortcut(QKeySequence("Cmd+Shift+Z"), this);
+#else
+    auto* undoShortcut = new QShortcut(QKeySequence("Ctrl+Z"), this);
+    auto* redoShortcut = new QShortcut(QKeySequence("Ctrl+Y"), this);
+#endif
+    connect(undoShortcut, &QShortcut::activated, this, &MainWindow::undoLastAction);
+    connect(redoShortcut, &QShortcut::activated, this, &MainWindow::redoLastAction);
+    
     connect(runsList, &QListWidget::itemSelectionChanged, this, [this]() {
         bool hasSelection = !runsList->selectedItems().isEmpty();
         playButton->setEnabled(hasSelection);
@@ -775,6 +802,48 @@ void MainWindow::setupExitAnimation() {
     connect(exitAnimation.get(), &QPropertyAnimation::finished, this, &MainWindow::forceClose);
 }
 
+void MainWindow::setupAutoSave() {
+    autoSaveTimer->setInterval(30000); // Auto-save every 30 seconds
+    connect(autoSaveTimer.get(), &QTimer::timeout, this, &MainWindow::performAutoSave);
+    autoSaveTimer->start();
+}
+
+void MainWindow::performAutoSave() {
+    if (isRecording && !currentRecording.empty()) {
+        // Create auto-save with timestamp
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+        QString autoSaveName = QString("AutoSave_%1").arg(timestamp);
+        
+        // Save the recording data
+        QJsonObject runData;
+        runData["name"] = autoSaveName;
+        runData["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+        runData["duration"] = recordingTimer->elapsed() / 1000.0;
+        runData["isAutoSave"] = true;
+        
+        QJsonArray commandsArray;
+        for (const auto& cmd : currentRecording) {
+            QJsonObject cmdObj;
+            cmdObj["timestamp"] = cmd.timestamp;
+            cmdObj["command"] = QJsonObject::fromVariantHash(cmd.parameters);
+            commandsArray.append(cmdObj);
+        }
+        runData["commands"] = commandsArray;
+        
+        // Save to auto-save file
+        QJsonObject allRuns = loadSavedRuns();
+        allRuns[autoSaveName] = runData;
+        
+        QJsonDocument doc(allRuns);
+        QFile file("saved_runs/saved_runs.json");
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(doc.toJson());
+            file.close();
+            logStatus(QString("Auto-saved: %1").arg(autoSaveName), "info");
+        }
+    }
+}
+
 void MainWindow::keyPressEvent(QKeyEvent* event) {
     if (event->isAutoRepeat()) {
         return;
@@ -845,6 +914,9 @@ void MainWindow::closeEvent(QCloseEvent* event) {
         event->accept();
         return;
     }
+    
+    // Save settings before closing
+    saveSettings();
     
     event->ignore();
     startExitAnimation();
@@ -1246,6 +1318,9 @@ void MainWindow::toggleMaximize() {
 }
 
 void MainWindow::updateTelemetry() {
+    static int frameCount = 0;
+    static qint64 lastTime = QDateTime::currentMSecsSinceEpoch();
+    
     // Position and orientation
     QString posText = QString("Position: (%1, %2) | Angle: %3°")
                      .arg(static_cast<int>(simulator->getRobotX()))
@@ -1271,6 +1346,23 @@ void MainWindow::updateTelemetry() {
         connText = "Connection: Disconnected | Lag: N/A";
     }
     connectionLabel->setText(connText);
+    
+    // Performance monitoring (update every second)
+    frameCount++;
+    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+    if (currentTime - lastTime >= 1000) {
+        double fps = frameCount * 1000.0 / (currentTime - lastTime);
+        
+        // Simple memory estimation based on current recordings
+        double memoryMB = (currentRecording.size() * 0.001) + 15.0; // Base app memory ~15MB
+        
+        performanceLabel->setText(QString("Performance: FPS: %1 | Memory: ~%2 MB")
+                                 .arg(fps, 0, 'f', 1)
+                                 .arg(memoryMB, 0, 'f', 1));
+        
+        frameCount = 0;
+        lastTime = currentTime;
+    }
 }
 
 void MainWindow::logStatus(const QString& message, const QString& level) {
@@ -1291,6 +1383,7 @@ void MainWindow::logStatus(const QString& message, const QString& level) {
 }
 
 void MainWindow::processKeyCommand(const QString& key, bool isPressed) {
+    Q_UNUSED(isPressed)  // Parameter reserved for future use
     QVariantHash command;
     
     if (key == "W" || key == "A" || key == "S" || key == "D" || key == "SPACE") {
@@ -1343,6 +1436,9 @@ void MainWindow::executeCommand(const QVariantHash& command) {
     }
     
     if (isRecording) {
+        // Save state before adding new command for undo functionality
+        saveRecordingState();
+        
         double timestamp = recordingTimer->elapsed() / 1000.0;
         currentRecording.emplace_back(timestamp, command["type"].toString(), command);
     }
@@ -1450,4 +1546,125 @@ void MainWindow::startExitAnimation() {
 void MainWindow::forceClose() {
     isClosing = true;
     QApplication::quit();
+} 
+
+void MainWindow::saveRecordingState() {
+    if (isRecording) {
+        undoHistory.push_back(currentRecording);
+        redoHistory.clear(); // Clear redo history when new action is performed
+        
+        // Limit history size to prevent memory bloat
+        const size_t MAX_HISTORY = 20;
+        if (undoHistory.size() > MAX_HISTORY) {
+            undoHistory.erase(undoHistory.begin());
+        }
+    }
+}
+
+void MainWindow::undoLastAction() {
+    if (!undoHistory.empty() && isRecording) {
+        // Save current state to redo history
+        redoHistory.push_back(currentRecording);
+        
+        // Restore previous state
+        currentRecording = undoHistory.back();
+        undoHistory.pop_back();
+        
+        logStatus("Undo: Restored previous recording state", "info");
+    }
+}
+
+void MainWindow::redoLastAction() {
+    if (!redoHistory.empty() && isRecording) {
+        // Save current state to undo history
+        undoHistory.push_back(currentRecording);
+        
+        // Restore next state
+        currentRecording = redoHistory.back();
+        redoHistory.pop_back();
+        
+        logStatus("Redo: Restored next recording state", "info");
+    }
+}
+
+void MainWindow::loadSettings() {
+    QFile file("settings.json");
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        QJsonObject settings = doc.object();
+        file.close();
+        
+        // Restore window geometry
+        if (settings.contains("window_geometry")) {
+            QJsonObject geo = settings["window_geometry"].toObject();
+            setGeometry(geo["x"].toInt(), geo["y"].toInt(), 
+                       geo["width"].toInt(), geo["height"].toInt());
+        }
+        
+        // Restore developer mode
+        if (settings.contains("developer_mode")) {
+            bool devMode = settings["developer_mode"].toBool();
+            developerCheck->setChecked(devMode);
+            toggleDeveloperMode();
+        }
+        
+        // Restore last run name
+        if (settings.contains("last_run_name")) {
+            runNameInput->setText(settings["last_run_name"].toString());
+        }
+        
+        // Restore splitter sizes
+        if (settings.contains("splitter_sizes")) {
+            QJsonArray sizes = settings["splitter_sizes"].toArray();
+            QList<int> sizeList;
+            for (const auto& size : sizes) {
+                sizeList.append(size.toInt());
+            }
+            if (sizeList.size() == 2) {
+                contentSplitter->setSizes(sizeList);
+            }
+        }
+        
+        logStatus("Settings loaded successfully", "info");
+    } else {
+        logStatus("No previous settings found, using defaults", "info");
+    }
+}
+
+void MainWindow::saveSettings() {
+    QJsonObject settings;
+    
+    // Save window geometry
+    QJsonObject geo;
+    geo["x"] = geometry().x();
+    geo["y"] = geometry().y();
+    geo["width"] = geometry().width();
+    geo["height"] = geometry().height();
+    settings["window_geometry"] = geo;
+    
+    // Save developer mode
+    settings["developer_mode"] = developerCheck->isChecked();
+    
+    // Save last run name
+    settings["last_run_name"] = runNameInput->text();
+    
+    // Save splitter sizes
+    QJsonArray sizes;
+    for (int size : contentSplitter->sizes()) {
+        sizes.append(size);
+    }
+    settings["splitter_sizes"] = sizes;
+    
+    // Save timestamp
+    settings["saved_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    
+    QJsonDocument doc(settings);
+    QFile file("settings.json");
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(doc.toJson());
+        file.close();
+        logStatus("Settings saved successfully", "info");
+    } else {
+        logStatus("Failed to save settings", "warning");
+    }
 } 

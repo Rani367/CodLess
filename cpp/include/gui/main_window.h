@@ -68,6 +68,11 @@ private slots:
     void onBleError(const QString& error);
     void updateRunsList();
     void updateTelemetry();
+    void undoLastAction();
+    void redoLastAction();
+    void saveRecordingState();
+    void loadSettings();
+    void saveSettings();
 
 private:
     void setupUi();
@@ -75,6 +80,8 @@ private:
     void setupConnections();
     void setupStartupAnimation();
     void setupExitAnimation();
+    void setupAutoSave();
+    void performAutoSave();
     void createTitleBar();
     void createSidebar();
     void createMainContent();
@@ -136,6 +143,7 @@ private:
     QLabel* positionLabel;
     QLabel* speedLabel;
     QLabel* connectionLabel;
+    QLabel* performanceLabel;
     
     QLabel* statusLabel;
     QLabel* connectionStatusLabel;
@@ -148,10 +156,13 @@ private:
     std::unique_ptr<QTimer> keyUpdateTimer;
     std::unique_ptr<QTimer> playbackTimer;
     std::unique_ptr<QTimer> telemetryTimer;
+    std::unique_ptr<QTimer> autoSaveTimer;
     std::unique_ptr<QElapsedTimer> recordingTimer;
     
     RobotConfig robotConfig;
     std::vector<RecordedCommand> currentRecording;
+    std::vector<std::vector<RecordedCommand>> undoHistory;
+    std::vector<std::vector<RecordedCommand>> redoHistory;
     bool isRecording = false;
     bool isDeveloperMode = false;
     bool isConnected = false;

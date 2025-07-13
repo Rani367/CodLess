@@ -118,6 +118,7 @@ void RobotSimulator::applyRealisticMotorPhysics() {
 }
 
 double RobotSimulator::sCurveProfile(double error, double maxChange, double currentAccel, double maxAccel) {
+    Q_UNUSED(maxChange)  // Parameter reserved for future advanced motion profiling
     double jerkLimit = maxAccel * 8.0;
     double targetAccel = std::clamp(error * 15.0, -maxAccel, maxAccel);
     double accelError = targetAccel - currentAccel;
@@ -174,6 +175,7 @@ void RobotSimulator::updateArmPositions() {
 }
 
 void RobotSimulator::paintEvent(QPaintEvent* event) {
+    Q_UNUSED(event)  // Full widget repaint is intentional
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
