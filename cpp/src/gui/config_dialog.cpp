@@ -30,7 +30,8 @@ ConfigDialog::ConfigDialog(QWidget* parent, const RobotConfig& config)
     
     setWindowOpacity(0.0);
     
-    QPropertyAnimation* fadeIn = new QPropertyAnimation(this, "windowOpacity");
+    // Use smart pointer to manage animation memory and set proper parent
+    auto* fadeIn = new QPropertyAnimation(this, "windowOpacity", this);
     fadeIn->setDuration(200);
     fadeIn->setStartValue(0.0);
     fadeIn->setEndValue(1.0);
@@ -74,10 +75,6 @@ void ConfigDialog::setupUi() {
     resetButton = new QPushButton("Reset to Defaults");
     resetButton->setObjectName("resetButton");
     buttonBox->addButton(resetButton, QDialogButtonBox::ResetRole);
-    
-    previewButton = new QPushButton("Preview Changes");
-    previewButton->setObjectName("previewButton");
-    buttonBox->addButton(previewButton, QDialogButtonBox::ActionRole);
     
     mainLayout->addWidget(titleLabel);
     mainLayout->addWidget(tabWidget);
@@ -187,12 +184,7 @@ void ConfigDialog::setupAdvancedTab() {
     infoLabel->setObjectName("configDescription");
     infoLabel->setWordWrap(true);
     
-    previewLabel = new QLabel("Configuration Preview:\nNo changes made");
-    previewLabel->setObjectName("configPreview");
-    previewLabel->setWordWrap(true);
-    
     infoLayout->addWidget(infoLabel);
-    infoLayout->addWidget(previewLabel);
     
     layout->addWidget(turnGroup);
     layout->addWidget(infoGroup);
@@ -324,15 +316,7 @@ void ConfigDialog::setupDialogStyle() {
             margin-left: 10px;
         }
         
-        QLabel#configPreview {
-            color: #cccccc;
-            font-size: 10px;
-            font-family: 'Monaco', 'Menlo', 'Liberation Mono', 'Courier New', monospace;
-            background-color: #1e1e1e;
-            border: 1px solid #4a4a4a;
-            border-radius: 3px;
-            padding: 10px;
-        }
+
         
         QDoubleSpinBox#configSpinBox {
             background-color: #1e1e1e;
@@ -430,15 +414,7 @@ void ConfigDialog::setupDialogStyle() {
             border-color: #e74c3c;
         }
         
-        QPushButton#previewButton {
-            background-color: #0e639c;
-            border-color: #0e639c;
-        }
-        
-        QPushButton#previewButton:hover {
-            background-color: #1177bb;
-            border-color: #1177bb;
-        }
+
     )");
 }
 
@@ -486,13 +462,8 @@ void ConfigDialog::connectSignals() {
     connect(buttonBox, &QDialogButtonBox::accepted, this, &ConfigDialog::onAccepted);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &ConfigDialog::onRejected);
     connect(resetButton, &QPushButton::clicked, this, &ConfigDialog::resetToDefaults);
-    connect(previewButton, &QPushButton::clicked, this, &ConfigDialog::validateInputs);
+
     connect(advancedCheckBox, &QCheckBox::toggled, this, &ConfigDialog::toggleAdvancedOptions);
-    
-    connect(axleTrackSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &ConfigDialog::validateInputs);
-    connect(wheelDiameterSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &ConfigDialog::validateInputs);
 }
 
 void ConfigDialog::onAccepted() {
@@ -559,48 +530,12 @@ void ConfigDialog::resetToDefaults() {
 }
 
 void ConfigDialog::validateInputs() {
-    // Safety checks to prevent crashes
-    if (!axleTrackSpinBox || !wheelDiameterSpinBox || !straightSpeedSpinBox || 
-        !straightAccelSpinBox || !turnRateSpinBox || !turnAccelSpinBox) {
-        return;
-    }
-    
-    if (!leftMotorCombo || !rightMotorCombo || !arm1MotorCombo || !arm2MotorCombo) {
-        return;
-    }
-    
-    if (!previewLabel) {
-        return;
-    }
-
-    QString preview = QString("Configuration Preview:\n"
-                            "Axle Track: %1 mm\n"
-                            "Wheel Diameter: %2 mm\n"
-                            "Straight Speed: %3 mm/s\n"
-                            "Straight Accel: %4 mm/s²\n"
-                            "Turn Rate: %5 °/s\n"
-                            "Turn Accel: %6 °/s²\n"
-                            "Motors: L=%7, R=%8, A1=%9, A2=%10")
-                    .arg(axleTrackSpinBox->value(), 0, 'f', 1)
-                    .arg(wheelDiameterSpinBox->value(), 0, 'f', 1)
-                    .arg(straightSpeedSpinBox->value(), 0, 'f', 0)
-                    .arg(straightAccelSpinBox->value(), 0, 'f', 0)
-                    .arg(turnRateSpinBox->value(), 0, 'f', 0)
-                    .arg(turnAccelSpinBox->value(), 0, 'f', 0)
-                    .arg(leftMotorCombo->currentText())
-                    .arg(rightMotorCombo->currentText())
-                    .arg(arm1MotorCombo->currentText())
-                    .arg(arm2MotorCombo->currentText());
-    
-    previewLabel->setText(preview);
+    // This method is kept for potential future validation needs
+    // but the preview functionality has been removed
 }
 
 void ConfigDialog::onConfigChanged() {
-    validateInputs();
-}
-
-void ConfigDialog::onPreviewRequested() {
-    validateInputs();
+    // Config change handling removed since preview is no longer needed
 }
 
 void ConfigDialog::onResetRequested() {

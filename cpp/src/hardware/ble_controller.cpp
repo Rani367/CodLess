@@ -22,6 +22,20 @@ BLEController::~BLEController() {
     if (connectionState != ConnectionState::Disconnected) {
         disconnectFromHub();
     }
+    
+    // Ensure all signals are properly disconnected
+    if (discoveryAgent) {
+        discoveryAgent->stop();
+        disconnect(discoveryAgent.get(), nullptr, this, nullptr);
+    }
+    
+    if (controller) {
+        disconnect(controller.get(), nullptr, this, nullptr);
+    }
+    
+    if (service) {
+        disconnect(service.get(), nullptr, this, nullptr);
+    }
 }
 
 void BLEController::setLogCallback(std::function<void(const QString&, const QString&)> callback) {
@@ -83,7 +97,18 @@ void BLEController::disconnectFromHub() {
     
     logMessage("Disconnecting from hub...", "info");
     
+    // Clear the command characteristic
+    commandCharacteristic = QLowEnergyCharacteristic();
+    
+    // Disconnect from service
+    if (service) {
+        disconnect(service.get(), nullptr, this, nullptr);
+        service.reset();
+    }
+    
+    // Disconnect from controller
     if (controller) {
+        disconnect(controller.get(), nullptr, this, nullptr);
         controller->disconnectFromDevice();
     }
     
@@ -92,21 +117,32 @@ void BLEController::disconnectFromHub() {
 }
 
 void BLEController::sendCommand(const QVariantHash& command) {
-    if (connectionState != ConnectionState::Connected || !service || !commandCharacteristic.isValid()) {
-        logMessage("Not connected to hub or service not ready", "error");
+    if (connectionState != ConnectionState::Connected) {
+        logMessage("Not connected to hub", "error");
+        return;
+    }
+    
+    if (!service) {
+        logMessage("Service not available", "error");
+        return;
+    }
+    
+    if (!commandCharacteristic.isValid()) {
+        logMessage("Command characteristic not valid", "error");
         return;
     }
     
     QJsonObject jsonCmd;
     for (auto it = command.begin(); it != command.end(); ++it) {
         const QVariant& value = it.value();
-        if (value.typeId() == QMetaType::QString) {
+        // Use userType() for Qt5/Qt6 compatibility instead of typeId()
+        if (value.userType() == QMetaType::QString) {
             jsonCmd[it.key()] = value.toString();
-        } else if (value.typeId() == QMetaType::Int) {
+        } else if (value.userType() == QMetaType::Int) {
             jsonCmd[it.key()] = value.toInt();
-        } else if (value.typeId() == QMetaType::Double) {
+        } else if (value.userType() == QMetaType::Double) {
             jsonCmd[it.key()] = value.toDouble();
-        } else if (value.typeId() == QMetaType::Bool) {
+        } else if (value.userType() == QMetaType::Bool) {
             jsonCmd[it.key()] = value.toBool();
         }
     }
@@ -231,7 +267,10 @@ void BLEController::onServiceDiscoveryFinished() {
 
 void BLEController::onServiceStateChanged(QLowEnergyService::ServiceState state) {
     auto service = qobject_cast<QLowEnergyService*>(sender());
-    if (!service) return;
+    if (!service) {
+        logMessage("Error: Invalid service in state change callback", "error");
+        return;
+    }
     
     logMessage(QString("Service state changed: %1").arg(static_cast<int>(state)));
     
@@ -249,6 +288,8 @@ void BLEController::onServiceStateChanged(QLowEnergyService::ServiceState state)
                         auto descriptor = characteristic.descriptor(QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
                         if (descriptor.isValid()) {
                             service->writeDescriptor(descriptor, QByteArray::fromHex("0100"));
+                        } else {
+                            logMessage("Warning: Notification descriptor not found", "warning");
                         }
                     }
                     
@@ -304,7 +345,19 @@ void BLEController::logMessage(const QString& message, const QString& level) {
 }
 
 void BLEController::connectToService() {
+    if (!controller) {
+        logMessage("Error: No controller available for service connection", "error");
+        emit errorOccurred("No controller available");
+        return;
+    }
+    
     auto services = controller->services();
+    
+    if (services.isEmpty()) {
+        logMessage("Error: No services discovered", "error");
+        emit errorOccurred("No services discovered");
+        return;
+    }
     
     for (const auto& serviceUuid : services) {
         service = std::unique_ptr<QLowEnergyService>(controller->createServiceObject(serviceUuid));

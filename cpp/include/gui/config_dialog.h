@@ -29,7 +29,6 @@ public:
 
 private slots:
     void onConfigChanged();
-    void onPreviewRequested();
     void onResetRequested();
     void onOkClicked();
     void onCancelClicked();
@@ -44,7 +43,6 @@ private:
     void setupAdvancedTab();
     void setupMotorsTab();
     void setupConnections();
-    void updatePreview();
     void loadConfig();
     void saveConfig();
     void setupUi();
@@ -58,7 +56,6 @@ private:
     QWidget *advancedTab;
     QPushButton *okButton;
     QPushButton *cancelButton;
-    QPushButton *previewButton;
     QPushButton *resetButton;
     
     // Basic tab widgets
@@ -97,7 +94,6 @@ private:
     
     QLabel* axleTrackLabel;
     QLabel* wheelDiameterLabel;
-    QLabel* previewLabel;
     
     QCheckBox* advancedCheckBox;
     

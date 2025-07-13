@@ -67,7 +67,34 @@ MainWindow::MainWindow(QWidget* parent)
     setFocus();
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow() {
+    // Ensure all timers are stopped before destruction
+    if (playbackTimer && playbackTimer->isActive()) {
+        playbackTimer->stop();
+    }
+    if (telemetryTimer && telemetryTimer->isActive()) {
+        telemetryTimer->stop();
+    }
+    if (keyUpdateTimer && keyUpdateTimer->isActive()) {
+        keyUpdateTimer->stop();
+    }
+    
+    // Stop any ongoing animations
+    if (exitAnimation && exitAnimation->state() == QAbstractAnimation::Running) {
+        exitAnimation->stop();
+    }
+    if (opacityAnimation && opacityAnimation->state() == QAbstractAnimation::Running) {
+        opacityAnimation->stop();
+    }
+    if (startupAnimation && startupAnimation->state() == QAbstractAnimation::Running) {
+        startupAnimation->stop();
+    }
+    
+    // Ensure BLE controller is properly disconnected
+    if (bleController && bleController->isConnected()) {
+        bleController->disconnectFromHub();
+    }
+}
 
 void MainWindow::setupUi() {
     centralWidget = new QWidget(this);
@@ -604,11 +631,25 @@ void MainWindow::setupConnections() {
     
     playbackTimer->setInterval(20);
     connect(playbackTimer.get(), &QTimer::timeout, this, [this]() {
+        // Add safety checks to prevent crashes during shutdown
+        if (!playbackTimer || isClosing) {
+            return;
+        }
+        
         if (!isPlayingBack || playbackCommands.empty()) {
+            playbackTimer->stop();
             return;
         }
         
         double currentTime = (QDateTime::currentMSecsSinceEpoch() / 1000.0) - playbackStartTime;
+        
+        // Safety check for playback index bounds
+        if (playbackIndex < 0 || playbackIndex >= static_cast<int>(playbackCommands.size())) {
+            isPlayingBack = false;
+            playbackTimer->stop();
+            logStatus("Playback stopped due to index error", "warning");
+            return;
+        }
         
         while (playbackIndex < static_cast<int>(playbackCommands.size()) &&
                playbackCommands[playbackIndex].timestamp <= currentTime) {
@@ -998,20 +1039,28 @@ void MainWindow::saveCurrentRun() {
     
     QDir savedRunsDir("saved_runs");
     if (!savedRunsDir.exists()) {
-        savedRunsDir.mkpath(".");
+        if (!savedRunsDir.mkpath(".")) {
+            logStatus("Failed to create saved_runs directory", "error");
+            return;
+        }
     }
     
     QFile file(QString("saved_runs/%1").arg(filename));
     if (file.open(QIODevice::WriteOnly)) {
-        file.write(doc.toJson());
+        qint64 bytesWritten = file.write(doc.toJson());
         file.close();
-        logStatus("Run saved: " + filename, "info");
-        updateRunsList();
-        saveButton->setEnabled(false);
-        currentRecording.clear();
-        recordStatus->setText("Not Recording");
+        
+        if (bytesWritten > 0) {
+            logStatus("Run saved: " + filename, "info");
+            updateRunsList();
+            saveButton->setEnabled(false);
+            currentRecording.clear();
+            recordStatus->setText("Not Recording");
+        } else {
+            logStatus("Failed to write run data", "error");
+        }
     } else {
-        logStatus("Failed to save run", "error");
+        logStatus("Failed to save run: " + file.errorString(), "error");
     }
 }
 
@@ -1172,7 +1221,10 @@ void MainWindow::processKeyCommand(const QString& key, bool isPressed) {
         if (pressedKeys.count(Qt::Key_S)) speed -= 200;
         if (pressedKeys.count(Qt::Key_A)) turnRate -= 100;
         if (pressedKeys.count(Qt::Key_D)) turnRate += 100;
-        if (pressedKeys.count(Qt::Key_Space)) speed = 0;
+        if (pressedKeys.count(Qt::Key_Space)) {
+            speed = 0;
+            turnRate = 0;  // Also reset turn rate when space is pressed
+        }
         
         command["speed"] = speed;
         command["turn_rate"] = turnRate;

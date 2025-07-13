@@ -15,13 +15,14 @@ QJsonObject RecordedCommand::toJson() const {
     QJsonObject params;
     for (auto it = parameters.begin(); it != parameters.end(); ++it) {
         const QVariant& value = it.value();
-        if (value.typeId() == QMetaType::QString) {
+        // Use userType() for Qt5/Qt6 compatibility instead of typeId()
+        if (value.userType() == QMetaType::QString) {
             params[it.key()] = value.toString();
-        } else if (value.typeId() == QMetaType::Int) {
+        } else if (value.userType() == QMetaType::Int) {
             params[it.key()] = value.toInt();
-        } else if (value.typeId() == QMetaType::Double) {
+        } else if (value.userType() == QMetaType::Double) {
             params[it.key()] = value.toDouble();
-        } else if (value.typeId() == QMetaType::Bool) {
+        } else if (value.userType() == QMetaType::Bool) {
             params[it.key()] = value.toBool();
         }
     }

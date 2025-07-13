@@ -57,7 +57,6 @@ int main(int argc, char *argv[]) {
     }
     
     // Create and show splash screen
-    QSplashScreen* splash = nullptr;
     QPixmap splashPixmap(400, 300);
     splashPixmap.fill(QColor(45, 45, 48));
     
@@ -66,7 +65,8 @@ int main(int argc, char *argv[]) {
     painter.setFont(QFont("Arial", 24, QFont::Bold));
     painter.drawText(splashPixmap.rect(), Qt::AlignCenter, "CodLess\nRobot Control Platform");
     
-    splash = new QSplashScreen(splashPixmap);
+    // Use smart pointer to manage splash screen memory automatically
+    std::unique_ptr<QSplashScreen> splash = std::make_unique<QSplashScreen>(splashPixmap);
     splash->show();
     
     app.processEvents();
@@ -79,9 +79,9 @@ int main(int argc, char *argv[]) {
     
     window->show();
     
-    // Hide splash screen
+    // Hide splash screen - smart pointer will automatically clean up
     splash->finish(window.get());
-    delete splash;
+    splash.reset();  // Explicitly clean up splash screen
     
     // Exception handling
     try {

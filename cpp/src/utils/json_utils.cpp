@@ -61,7 +61,8 @@ QJsonObject JsonUtils::variantHashToJsonObject(const QVariantHash& hash) {
     for (auto it = hash.begin(); it != hash.end(); ++it) {
         const QVariant& value = it.value();
         
-        switch (value.typeId()) {
+        // Use userType() for Qt5/Qt6 compatibility instead of typeId()
+        switch (value.userType()) {
             case QMetaType::QString:
                 obj[it.key()] = value.toString();
                 break;
@@ -81,7 +82,7 @@ QJsonObject JsonUtils::variantHashToJsonObject(const QVariantHash& hash) {
                 QJsonArray array;
                 QVariantList list = value.toList();
                 for (const QVariant& item : list) {
-                    if (item.typeId() == QMetaType::QVariantHash) {
+                    if (item.userType() == QMetaType::QVariantHash) {
                         array.append(variantHashToJsonObject(item.toHash()));
                     } else {
                         array.append(QJsonValue::fromVariant(item));
