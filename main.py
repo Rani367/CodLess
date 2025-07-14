@@ -1,9 +1,55 @@
 #!/usr/bin/env python3
+# type: ignore
 
 import os
-os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
-
 import sys
+import shutil
+import glob
+
+# Prevent Python from writing bytecode files
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+sys.dont_write_bytecode = True
+
+def clean_cache():
+    """Remove all Python cache files and directories"""
+    patterns = [
+        "__pycache__",
+        "*.pyc",
+        "*.pyo",
+        "*.pyd"
+    ]
+    
+    removed_count = 0
+    
+    for pattern in patterns:
+        if pattern == "__pycache__":
+            # Find all __pycache__ directories
+            for root, dirs, files in os.walk("."):
+                if "__pycache__" in dirs:
+                    cache_dir = os.path.join(root, "__pycache__")
+                    try:
+                        shutil.rmtree(cache_dir)
+                        print(f"Removed: {cache_dir}")
+                        removed_count += 1
+                    except Exception as e:
+                        print(f"Error removing {cache_dir}: {e}")
+        else:
+            # Find all matching files
+            for file_path in glob.glob(pattern, recursive=True):
+                try:
+                    os.remove(file_path)
+                    print(f"Removed: {file_path}")
+                    removed_count += 1
+                except Exception as e:
+                    print(f"Error removing {file_path}: {e}")
+    
+    if removed_count == 0:
+        print("No cache files found to clean.")
+    else:
+        print(f"Cleaned {removed_count} cache files/directories.")
+
+# Clean cache on startup
+clean_cache()
 import asyncio
 import threading
 import time
@@ -16,9 +62,19 @@ import math
 
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
-    from PySide6.QtCore import QTimer, QPropertyAnimation, QEasingCurve, Qt, QEvent
+    from PySide6.QtCore import QTimer, QPropertyAnimation, QEasingCurve, Qt, QEvent, QObject, Signal
     from PySide6.QtGui import QIcon, QPixmap, QFont, QPainter, QPen, QBrush, QColor, QFontDatabase
-    from PySide6.QtWidgets import *
+    from PySide6.QtWidgets import (
+        QWidget, QMainWindow, QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+        QPushButton, QCheckBox, QGroupBox, QLineEdit, QTextEdit, QListWidget,
+        QComboBox, QProgressBar, QSizePolicy, QApplication, QMessageBox, QTabWidget
+    )
+    
+    # Import Qt enums and constants to fix type checking
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QPainter, QFont, QFontDatabase
+    from PySide6.QtWidgets import QSizePolicy
+    
     PYSIDE_AVAILABLE = True
 except ImportError:
     PYSIDE_AVAILABLE = False
@@ -52,11 +108,250 @@ class RecordedCommand:
     command_type: str
     parameters: Dict
 
+@dataclass
+class CalibrationResult:
+    success: bool = False
+    step_name: str = ""
+    measured_value: float = 0.0
+    units: str = ""
+    description: str = ""
+    confidence: float = 0.0
+
+class CalibrationManager(QObject):
+    calibration_started = Signal()
+    calibration_step_changed = Signal(int, str)
+    calibration_progress = Signal(int)
+    calibration_step_completed = Signal(object)
+    calibration_completed = Signal(object)
+    calibration_failed = Signal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.ble_controller = None
+        self.robot_simulator = None
+        self.is_developer_mode = False
+        self.calibration_running = False
+        self.current_step = 0
+        self.step_timer = QTimer()
+        self.step_timer.timeout.connect(self.process_calibration_step)
+        self.timeout_timer = QTimer()
+        self.timeout_timer.timeout.connect(self.on_calibration_timeout)
+        self.calibration_results = []
+        
+    def on_calibration_timeout(self):
+        if self.calibration_running:
+            self.calibration_failed.emit("Calibration step timed out")
+            self.calibration_running = False
+        self.calibrated_config = RobotConfig()
+        self.max_retries = 3
+        self.current_retry = 0
+        self.timeout_duration = 10000  # 10 seconds per step
+        
+    def set_ble_controller(self, controller):
+        self.ble_controller = controller
+        
+    def set_robot_simulator(self, simulator):
+        self.robot_simulator = simulator
+        
+    def set_developer_mode(self, enabled):
+        self.is_developer_mode = enabled
+        
+    def can_calibrate(self):
+        return (self.ble_controller and self.ble_controller.connected) or self.is_developer_mode
+        
+    def start_calibration(self):
+        if self.calibration_running:
+            print("Calibration already in progress")
+            return
+            
+        if not self.can_calibrate():
+            print("Cannot start calibration: no robot connected and not in developer mode")
+            self.calibration_failed.emit("Cannot perform calibration.\n\n"
+                                       "Please connect to a robot or enable developer mode.")
+            return
+            
+        self.reset_calibration()
+        self.calibration_running = True
+        self.current_step = 0
+        
+        self.calibration_started.emit()
+        self.calibration_progress.emit(0)
+        
+        self.step_timer.start(1000)  # Start first step after 1 second
+        
+    def stop_calibration(self):
+        if not self.calibration_running:
+            return
+            
+        self.calibration_running = False
+        self.step_timer.stop()
+        self.timeout_timer.stop()
+        
+        self.calibration_failed.emit("Calibration cancelled by user")
+        
+    def reset_calibration(self):
+        self.current_step = 0
+        self.current_retry = 0
+        self.calibration_results.clear()
+        
+    def process_calibration_step(self):
+        if not self.calibration_running:
+            return
+            
+        self.current_step += 1
+        
+        if self.current_step == 1:
+            self.calibration_step_changed.emit(self.current_step, "Testing motor response time...")
+            self.calibration_progress.emit(10)
+            self.calibrate_motor_response_time()
+        elif self.current_step == 2:
+            self.calibration_step_changed.emit(self.current_step, "Testing straight line tracking...")
+            self.calibration_progress.emit(30)
+            self.calibrate_straight_tracking()
+        elif self.current_step == 3:
+            self.calibration_step_changed.emit(self.current_step, "Testing turn accuracy...")
+            self.calibration_progress.emit(50)
+            self.calibrate_turn_accuracy()
+        elif self.current_step == 4:
+            self.calibration_step_changed.emit(self.current_step, "Calibrating gyroscope...")
+            self.calibration_progress.emit(70)
+            self.calibrate_gyroscope()
+        elif self.current_step == 5:
+            self.calibration_step_changed.emit(self.current_step, "Testing motor balance...")
+            self.calibration_progress.emit(85)
+            self.calibrate_motor_balance()
+        elif self.current_step == 6:
+            self.calibration_step_changed.emit(self.current_step, "Finalizing calibration...")
+            self.calibration_progress.emit(95)
+            self.finalize_calibration()
+        elif self.current_step == 7:
+            self.calibration_progress.emit(100)
+            self.calibration_completed.emit(self.calibrated_config)
+            self.calibration_running = False
+        else:
+            self.calibration_failed.emit("Unknown calibration step")
+            self.calibration_running = False
+            
+    def calibrate_motor_response_time(self):
+        if self.is_developer_mode:
+            # Simulate motor response time calibration
+            time.sleep(2)
+            result = CalibrationResult(
+                success=True,
+                step_name="Motor Response Time",
+                measured_value=0.15,
+                units="seconds",
+                description="Motor response time measured at 150ms",
+                confidence=0.85
+            )
+            self.complete_current_step(True, 0.15, "Motor response time: 150ms")
+        else:
+            # Real calibration would send commands to robot
+            command = {
+                "type": "calibration",
+                "calibration_type": "motor_response",
+                "speed": 200
+            }
+            self.send_calibration_command(command)
+            
+    def calibrate_straight_tracking(self):
+        if self.is_developer_mode:
+            time.sleep(2)
+            self.complete_current_step(True, 0.98, "Straight tracking accuracy: 98%")
+        else:
+            command = {
+                "type": "calibration",
+                "calibration_type": "straight_tracking",
+                "distance": 500
+            }
+            self.send_calibration_command(command)
+            
+    def calibrate_turn_accuracy(self):
+        if self.is_developer_mode:
+            time.sleep(2)
+            self.complete_current_step(True, 0.95, "Turn accuracy: 95%")
+        else:
+            command = {
+                "type": "calibration",
+                "calibration_type": "turn_accuracy",
+                "angle": 90
+            }
+            self.send_calibration_command(command)
+            
+    def calibrate_gyroscope(self):
+        if self.is_developer_mode:
+            time.sleep(2)
+            self.complete_current_step(True, 0.0, "Gyroscope calibrated")
+        else:
+            command = {
+                "type": "calibration",
+                "calibration_type": "gyro_reading"
+            }
+            self.send_calibration_command(command)
+            
+    def calibrate_motor_balance(self):
+        if self.is_developer_mode:
+            time.sleep(2)
+            self.complete_current_step(True, 0.92, "Motor balance: 92%")
+        else:
+            command = {
+                "type": "calibration",
+                "calibration_type": "motor_balance"
+            }
+            self.send_calibration_command(command)
+            
+    def finalize_calibration(self):
+        # Calculate overall quality score
+        quality_score = 0.0
+        valid_results = [r for r in self.calibration_results if r.success]
+        
+        if valid_results:
+            quality_score = sum(r.confidence for r in valid_results) / len(valid_results) * 100
+            
+        if quality_score < 75.0:
+            self.calibration_failed.emit(f"Calibration quality too low: {quality_score:.1f}%")
+            return
+            
+        # Update calibrated config
+        self.calibrated_config = RobotConfig()
+        
+        final_result = CalibrationResult(
+            success=True,
+            step_name="Calibration Complete",
+            measured_value=quality_score,
+            units="%",
+            description=f"Overall calibration quality: {quality_score:.1f}%",
+            confidence=quality_score / 100.0
+        )
+        self.calibration_results.append(final_result)
+        self.calibration_step_completed.emit(final_result)
+        
+    def send_calibration_command(self, command):
+        if self.ble_controller and self.ble_controller.connected:
+            asyncio.create_task(self.ble_controller.send_command(command))
+        else:
+            self.complete_current_step(False, 0.0, "No robot connected - cannot perform real calibration")
+            
+    def complete_current_step(self, success, measured_value, description):
+        result = CalibrationResult(
+            success=success,
+            step_name=f"Step {self.current_step}",
+            measured_value=measured_value,
+            description=description,
+            confidence=0.8 if success else 0.0
+        )
+        
+        self.calibration_results.append(result)
+        self.calibration_step_completed.emit(result)
+        
+        # Move to next step after a delay
+        QTimer.singleShot(2000, self.process_calibration_step)
+
 class RobotSimulator(QWidget):
     def __init__(self):
         super().__init__()
         self.setMinimumSize(300, 200)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # type: ignore
         self.setObjectName("robot_simulator")
         
         self.robot_x = 200
@@ -193,7 +488,7 @@ class RobotSimulator(QWidget):
         
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing)  # type: ignore
         
         painter.fillRect(self.rect(), QColor(45, 45, 45))
         
@@ -390,8 +685,8 @@ class FLLRoboticsGUI(QMainWindow):
         self.base_width = 1200
         self.base_height = 800
         self.aspect_ratio = self.base_width / self.base_height
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowFlags(Qt.FramelessWindowHint)  # type: ignore
+        self.setAttribute(Qt.WA_TranslucentBackground)  # type: ignore
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -411,12 +706,12 @@ class FLLRoboticsGUI(QMainWindow):
         
         self.sidebar = self.create_sidebar()
         self.sidebar.setFixedWidth(250)
-        self.sidebar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.sidebar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)  # type: ignore
         content_layout.addWidget(self.sidebar)
         content_layout.setStretchFactor(self.sidebar, 0)
         
         self.main_content = self.create_main_content()
-        self.main_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.main_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # type: ignore
         content_layout.addWidget(self.main_content)
         content_layout.setStretchFactor(self.main_content, 1)
         
@@ -435,7 +730,7 @@ class FLLRoboticsGUI(QMainWindow):
         
         title_label = QLabel("CodLess - FLL Robotics Control Center")
         title_label.setObjectName("title_label")
-        title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        title_label.setFont(QFont("Arial", 12, QFont.Bold))  # type: ignore
         layout.addWidget(title_label)
         
         layout.addStretch()
@@ -500,6 +795,25 @@ class FLLRoboticsGUI(QMainWindow):
         
         layout.addWidget(config_group)
         
+        # Copy Pybricks Code Group
+        pybricks_group = QGroupBox("Copy Pybricks Code")
+        pybricks_group.setObjectName("group_box")
+        pybricks_layout = QVBoxLayout(pybricks_group)
+        
+        pybricks_info = QLabel("Click to copy the hub control code\nto your clipboard, then paste it into\ncode.pybricks.com")
+        pybricks_info.setObjectName("info_text")
+        pybricks_info.setWordWrap(True)
+        
+        self.copy_pybricks_btn = QPushButton("Copy Hub Code")
+        self.copy_pybricks_btn.setObjectName("primary_btn")
+        self.copy_pybricks_btn.setMinimumHeight(35)
+        self.copy_pybricks_btn.setToolTip("Copy the Python code to upload to your SPIKE Prime hub")
+        
+        pybricks_layout.addWidget(pybricks_info)
+        pybricks_layout.addWidget(self.copy_pybricks_btn)
+        
+        layout.addWidget(pybricks_group)
+        
         keys_group = QGroupBox("Control Keys")
         keys_group.setObjectName("group_box")
         keys_layout = QVBoxLayout(keys_group)
@@ -513,7 +827,7 @@ Arms (hold to move):
   R - Arm 2 Up   F - Arm 2 Down""")
         keys_text.setObjectName("info_text")
         # Use cross-platform monospace font
-        monospace_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        monospace_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)  # type: ignore
         monospace_font.setPointSize(9)
         keys_text.setFont(monospace_font)
         
@@ -603,20 +917,6 @@ Arms (hold to move):
         record_layout.addWidget(self.record_status)
         
         layout.addWidget(record_group)
-        manual_group = QGroupBox("Manual Controls")
-        manual_group.setObjectName("group_box")
-        manual_layout = QVBoxLayout(manual_group)
-        
-        manual_info = QLabel("Click in this window and use keyboard controls")
-        manual_info.setObjectName("info_text")
-        manual_layout.addWidget(manual_info)
-        
-        self.key_status = QLabel("No keys pressed")
-        self.key_status.setObjectName("info_text")
-        self.key_status.setFont(QFont("Monaco", 10))
-        manual_layout.addWidget(self.key_status)
-        
-        layout.addWidget(manual_group)
         status_group = QGroupBox("Robot Status")
         status_group.setObjectName("group_box")
         status_layout = QVBoxLayout(status_group)
@@ -854,12 +1154,13 @@ Arms (hold to move):
         self.close_btn.clicked.connect(self.start_exit_animation)
         self.connect_btn.clicked.connect(self.connect_hub)
         self.config_btn.clicked.connect(self.open_config_dialog)
+        self.copy_pybricks_btn.clicked.connect(self.copy_pybricks_code)
         self.record_btn.clicked.connect(self.toggle_recording)
         self.save_btn.clicked.connect(self.save_current_run)
         self.play_btn.clicked.connect(self.play_selected_run)
         self.delete_btn.clicked.connect(self.delete_selected_run)
         self.developer_check.toggled.connect(self.toggle_developer_mode)
-        self.setFocusPolicy(Qt.StrongFocus)
+        self.setFocusPolicy(Qt.StrongFocus)  # type: ignore
         
         self.update_runs_list()
     
@@ -889,7 +1190,7 @@ Arms (hold to move):
         
         self.startup_anim = QPropertyAnimation(self, b"geometry")
         self.startup_anim.setDuration(850)  
-        self.startup_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self.startup_anim.setEasingCurve(QEasingCurve.OutCubic)  # type: ignore
         
         rect = self.target_geom
         w = int(rect.width() * 0.5)
@@ -925,24 +1226,14 @@ Arms (hold to move):
         if key not in self.pressed_keys:
             self.pressed_keys.add(key)
             self.process_key_command(key, True)
-            self.update_key_status()
             
     def keyReleaseEvent(self, event):
         key = event.text().lower()
         if key in self.pressed_keys:
             self.pressed_keys.remove(key)
             self.process_key_command(key, False)
-            self.update_key_status()
             
-    def update_key_status(self):
-        if not self.pressed_keys:
-            self.key_status.setText("No keys pressed")
-        else:
-            sorted_keys = sorted([k.upper() for k in self.pressed_keys if k.isalpha()])
-            if sorted_keys:
-                self.key_status.setText(f"Holding: {' + '.join(sorted_keys)}")
-            else:
-                self.key_status.setText("No keys pressed")
+
             
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -1071,6 +1362,12 @@ Arms (hold to move):
             
     def open_config_dialog(self):
         dialog = ConfigDialog(self, self.config)
+        
+        # Set up calibration manager with current state
+        dialog.calibration_manager.set_ble_controller(self.ble_controller)
+        dialog.calibration_manager.set_robot_simulator(self.robot_simulator)
+        dialog.calibration_manager.set_developer_mode(self.developer_check.isChecked())
+        
         if dialog.exec() == QDialog.Accepted:
             self.config = dialog.get_config()
             self.log_status("Robot configuration updated", "success")
@@ -1316,6 +1613,141 @@ Arms (hold to move):
                 self.log_status(f"Deleted run: {run_name}", "success")
             except Exception as e:
                 self.log_status(f"Error deleting run: {str(e)}", "error")
+    
+    def copy_pybricks_code(self):
+        hub_code = '''from pybricks.hubs import PrimeHub
+from pybricks.pupdevices import Motor
+from pybricks.parameters import Port, Color
+from pybricks.robotics import DriveBase
+from pybricks.tools import wait
+from usys import stdin, stdout
+from uselect import poll
+import ujson
+
+hub = PrimeHub()
+
+hub.display.icon([
+    [100, 100, 100, 100, 100],
+    [100, 0, 100, 0, 100], 
+    [100, 100, 100, 100, 100],
+    [100, 0, 0, 0, 100],
+    [100, 100, 100, 100, 100]
+])
+
+motors = {}
+drive_base = None
+
+left_motor_port = Port.A
+right_motor_port = Port.B
+arm1_motor_port = Port.C
+arm2_motor_port = Port.D
+
+try:
+    left_motor = Motor(left_motor_port)
+    right_motor = Motor(right_motor_port)
+    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=112)
+    
+    drive_base.settings(
+        straight_speed=500,
+        straight_acceleration=250,
+        turn_rate=200,
+        turn_acceleration=300
+    )
+    
+    hub.light.on(Color.GREEN)
+except:
+    hub.light.on(Color.YELLOW)
+
+try:
+    motors['arm1'] = Motor(arm1_motor_port)
+except:
+    pass
+
+try:
+    motors['arm2'] = Motor(arm2_motor_port)
+except:
+    pass
+
+keyboard = poll()
+keyboard.register(stdin)
+
+hub.display.icon([
+    [0, 100, 0, 100, 0],
+    [100, 100, 100, 100, 100],
+    [0, 100, 100, 100, 0],
+    [0, 0, 100, 0, 0],
+    [0, 0, 100, 0, 0]
+])
+
+while True:
+    stdout.buffer.write(b"rdy")
+    
+    while not keyboard.poll(10):
+        wait(1)
+    
+    try:
+        data = stdin.buffer.read()
+        if data:
+            command_str = data.decode('utf-8')
+            command = ujson.loads(command_str)
+            
+            cmd_type = command.get('type', '')
+            
+            if cmd_type == 'drive' and drive_base:
+                speed = command.get('speed', 0)
+                turn_rate = command.get('turn_rate', 0)
+                drive_base.drive(speed, turn_rate)
+                stdout.buffer.write(b"DRIVE_OK")
+                
+            elif cmd_type in ['arm1', 'arm2'] and cmd_type in motors:
+                motor = motors[cmd_type]
+                speed = command.get('speed', 0)
+                if speed == 0:
+                    motor.stop()
+                else:
+                    motor.run(speed)
+                stdout.buffer.write(b"ARM_OK")
+                
+            elif cmd_type == 'config':
+                try:
+                    axle_track = command.get('axle_track', 112)
+                    wheel_diameter = command.get('wheel_diameter', 56)
+                    if drive_base:
+                        drive_base = DriveBase(left_motor, right_motor, 
+                                             wheel_diameter=wheel_diameter, 
+                                             axle_track=axle_track)
+                        
+                        straight_speed = command.get('straight_speed', 500)
+                        straight_acceleration = command.get('straight_acceleration', 250)
+                        turn_rate = command.get('turn_rate', 200)
+                        turn_acceleration = command.get('turn_acceleration', 300)
+                        
+                        drive_base.settings(
+                            straight_speed=straight_speed,
+                            straight_acceleration=straight_acceleration,
+                            turn_rate=turn_rate,
+                            turn_acceleration=turn_acceleration
+                        )
+                        
+                    stdout.buffer.write(b"CONFIG_OK")
+                except:
+                    stdout.buffer.write(b"CONFIG_ERROR")
+            else:
+                stdout.buffer.write(b"UNKNOWN_CMD")
+                
+    except Exception as e:
+        stdout.buffer.write(b"ERROR")
+    
+    wait(10)'''
+        
+        clipboard = QApplication.clipboard()
+        clipboard.setText(hub_code)
+        
+        self.log_status("Pybricks hub code copied to clipboard!", "info")
+        self.copy_pybricks_btn.setText("Copied!")
+        
+        # Reset button text after 2 seconds
+        QTimer.singleShot(2000, lambda: self.copy_pybricks_btn.setText("Copy Hub Code"))
                 
     def closeEvent(self, event):
         if self.is_closing:
@@ -1363,7 +1795,7 @@ class ConfigDialog(QDialog):
         
     def setup_ui(self):
         self.setWindowTitle("Robot Configuration")
-        self.setFixedSize(460, 520)
+        self.setFixedSize(500, 600)  # More reasonable size for tabbed interface
         self.setModal(True)
         
         self.setup_dialog_style()
@@ -1371,9 +1803,45 @@ class ConfigDialog(QDialog):
         layout = QVBoxLayout(self)
         
         title = QLabel("Robot Configuration")
-        title.setFont(QFont("Arial", 16, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Arial", 16, QFont.Bold))  # type: ignore
+        title.setAlignment(Qt.AlignCenter)  # type: ignore
         layout.addWidget(title)
+        
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setObjectName("tab_widget")
+        
+        # Create tabs
+        self.create_drive_tab()
+        self.create_motion_tab()
+        self.create_ports_tab()
+        self.create_calibration_tab()
+        
+        layout.addWidget(self.tab_widget)
+        
+        # Initialize calibration manager
+        self.calibration_manager = CalibrationManager(self)
+        self.setup_calibration_connections()
+        
+        # Bottom buttons
+        button_layout = QHBoxLayout()
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setObjectName("danger_btn")
+        cancel_btn.clicked.connect(self.reject)
+        
+        save_btn = QPushButton("Save")
+        save_btn.setObjectName("success_btn")
+        save_btn.clicked.connect(self.accept)
+        
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(save_btn)
+        layout.addLayout(button_layout)
+        
+    def create_drive_tab(self):
+        """Create the Drive Configuration tab"""
+        drive_tab = QWidget()
+        layout = QVBoxLayout(drive_tab)
+        layout.setSpacing(15)
         
         drive_group = QGroupBox("Drive Configuration")
         drive_group.setObjectName("group_box")
@@ -1402,15 +1870,19 @@ class ConfigDialog(QDialog):
         drive_layout.addWidget(info_label2)
         
         layout.addWidget(drive_group)
+        layout.addStretch()
         
-        self.advanced_checkbox = QCheckBox("Advanced Options (Speed/Acceleration Settings)")
-        self.advanced_checkbox.setObjectName("checkbox")
-        self.advanced_checkbox.toggled.connect(self.toggle_advanced_options)
-        layout.addWidget(self.advanced_checkbox)
+        self.tab_widget.addTab(drive_tab, "Drive")
         
-        self.motion_group = QGroupBox("Motion Settings (Acceleration/Deceleration)")
-        self.motion_group.setObjectName("group_box")
-        motion_layout = QVBoxLayout(self.motion_group)
+    def create_motion_tab(self):
+        """Create the Motion Settings tab"""
+        motion_tab = QWidget()
+        layout = QVBoxLayout(motion_tab)
+        layout.setSpacing(15)
+        
+        motion_group = QGroupBox("Motion Settings")
+        motion_group.setObjectName("group_box")
+        motion_layout = QVBoxLayout(motion_group)
         
         straight_speed_layout = QHBoxLayout()
         straight_speed_layout.addWidget(QLabel("Max Straight Speed (mm/s):"))
@@ -1456,8 +1928,16 @@ class ConfigDialog(QDialog):
         info_label6.setObjectName("info_text")
         motion_layout.addWidget(info_label6)
         
-        self.motion_group.hide()
-        layout.addWidget(self.motion_group)
+        layout.addWidget(motion_group)
+        layout.addStretch()
+        
+        self.tab_widget.addTab(motion_tab, "Motion")
+        
+    def create_ports_tab(self):
+        """Create the Motor Ports tab"""
+        ports_tab = QWidget()
+        layout = QVBoxLayout(ports_tab)
+        layout.setSpacing(15)
         
         ports_group = QGroupBox("Motor Ports")
         ports_group.setObjectName("group_box")
@@ -1498,27 +1978,154 @@ class ConfigDialog(QDialog):
         ports_layout.addLayout(arm2_layout)
         
         layout.addWidget(ports_group)
+        layout.addStretch()
+        
+        self.tab_widget.addTab(ports_tab, "Ports")
+        
+    def create_calibration_tab(self):
+        """Create the Calibration tab"""
+        calibration_tab = QWidget()
+        layout = QVBoxLayout(calibration_tab)
+        layout.setSpacing(15)
+        
+        # Calibration Status
+        calibration_status_group = QGroupBox("Calibration Status")
+        calibration_status_group.setObjectName("configGroup")
+        status_layout = QVBoxLayout(calibration_status_group)
+        
+        self.calibration_status_label = QLabel("Ready to calibrate")
+        self.calibration_status_label.setObjectName("configDescription")
+        status_layout.addWidget(self.calibration_status_label)
+        
+        layout.addWidget(calibration_status_group)
+        
+        # Calibration Controls
+        calibration_control_group = QGroupBox("Calibration Controls")
+        calibration_control_group.setObjectName("configGroup")
+        control_layout = QVBoxLayout(calibration_control_group)
+        control_layout.setSpacing(15)
         
         button_layout = QHBoxLayout()
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setObjectName("danger_btn")
-        cancel_btn.clicked.connect(self.reject)
         
-        save_btn = QPushButton("Save")
-        save_btn.setObjectName("success_btn")
-        save_btn.clicked.connect(self.accept)
+        self.start_calibration_btn = QPushButton("Start Calibration")
+        self.start_calibration_btn.setObjectName("primaryButton")
+        self.start_calibration_btn.setMinimumHeight(35)
         
-        button_layout.addWidget(cancel_btn)
-        button_layout.addWidget(save_btn)
-        layout.addLayout(button_layout)
+        self.stop_calibration_btn = QPushButton("Stop")
+        self.stop_calibration_btn.setObjectName("secondaryButton")
+        self.stop_calibration_btn.setMinimumHeight(35)
+        self.stop_calibration_btn.setEnabled(False)
+        
+        self.clear_calibration_btn = QPushButton("Clear Data")
+        self.clear_calibration_btn.setObjectName("dangerButton")
+        self.clear_calibration_btn.setMinimumHeight(35)
+        
+        button_layout.addWidget(self.start_calibration_btn)
+        button_layout.addWidget(self.stop_calibration_btn)
+        button_layout.addWidget(self.clear_calibration_btn)
+        button_layout.addStretch()
+        
+        self.calibration_progress_bar = QProgressBar()
+        self.calibration_progress_bar.setObjectName("calibrationProgress")
+        self.calibration_progress_bar.setVisible(False)
+        self.calibration_progress_bar.setMinimumHeight(25)
+        
+        self.calibration_step_label = QLabel("Ready to calibrate")
+        self.calibration_step_label.setObjectName("configDescription")
+        
+        control_layout.addLayout(button_layout)
+        control_layout.addWidget(self.calibration_progress_bar)
+        control_layout.addWidget(self.calibration_step_label)
+        
+        layout.addWidget(calibration_control_group)
+        
+        # Calibration Results
+        calibration_results_group = QGroupBox("Calibration Results")
+        calibration_results_group.setObjectName("configGroup")
+        results_layout = QVBoxLayout(calibration_results_group)
+        results_layout.setSpacing(10)
+        
+        self.calibration_results_text = QTextEdit()
+        self.calibration_results_text.setObjectName("calibrationResults")
+        self.calibration_results_text.setReadOnly(True)
+        self.calibration_results_text.setMinimumHeight(150)
+        self.calibration_results_text.setMaximumHeight(200)
+        self.calibration_results_text.setPlainText("No calibration data available")
+        
+        results_layout.addWidget(self.calibration_results_text)
+        
+        layout.addWidget(calibration_results_group)
+        
+        self.tab_widget.addTab(calibration_tab, "Calibration")
     
-    def toggle_advanced_options(self, checked):
-        if checked:
-            self.motion_group.show()
-            self.setFixedSize(460, 760)
-        else:
-            self.motion_group.hide()
-            self.setFixedSize(460, 520)
+    def setup_calibration_connections(self):
+        self.start_calibration_btn.clicked.connect(self.start_calibration)
+        self.stop_calibration_btn.clicked.connect(self.stop_calibration)
+        self.clear_calibration_btn.clicked.connect(self.clear_calibration_data)
+        
+        # Connect calibration manager signals
+        self.calibration_manager.calibration_started.connect(self.on_calibration_started)
+        self.calibration_manager.calibration_step_changed.connect(self.on_calibration_step_changed)
+        self.calibration_manager.calibration_progress.connect(self.on_calibration_progress)
+        self.calibration_manager.calibration_step_completed.connect(self.on_calibration_step_completed)
+        self.calibration_manager.calibration_completed.connect(self.on_calibration_completed)
+        self.calibration_manager.calibration_failed.connect(self.on_calibration_failed)
+        
+    def start_calibration(self):
+        self.calibration_manager.start_calibration()
+        
+    def stop_calibration(self):
+        self.calibration_manager.stop_calibration()
+        
+    def clear_calibration_data(self):
+        self.calibration_results_text.setPlainText("No calibration data available")
+        self.calibration_status_label.setText("Ready to calibrate")
+        self.calibration_step_label.setText("Ready to calibrate")
+        self.calibration_progress_bar.setVisible(False)
+        
+    def on_calibration_started(self):
+        self.start_calibration_btn.setEnabled(False)
+        self.stop_calibration_btn.setEnabled(True)
+        self.clear_calibration_btn.setEnabled(False)
+        self.calibration_progress_bar.setVisible(True)
+        self.calibration_progress_bar.setValue(0)
+        self.calibration_status_label.setText("Calibration in progress...")
+        
+    def on_calibration_step_changed(self, step, description):
+        self.calibration_step_label.setText(description)
+        
+    def on_calibration_progress(self, percentage):
+        self.calibration_progress_bar.setValue(percentage)
+        
+    def on_calibration_step_completed(self, result):
+        current_text = self.calibration_results_text.toPlainText()
+        if current_text == "No calibration data available":
+            current_text = ""
+            
+        status = "✓" if result.success else "✗"
+        new_line = f"{status} {result.step_name}: {result.description}\n"
+        self.calibration_results_text.setPlainText(current_text + new_line)
+        
+    def on_calibration_completed(self, config):
+        self.start_calibration_btn.setEnabled(True)
+        self.stop_calibration_btn.setEnabled(False)
+        self.clear_calibration_btn.setEnabled(True)
+        self.calibration_progress_bar.setVisible(False)
+        self.calibration_status_label.setText("Calibration completed successfully!")
+        self.calibration_step_label.setText("Calibration complete")
+        
+        # Update the config with calibrated values
+        self.config = config
+        
+    def on_calibration_failed(self, reason):
+        self.start_calibration_btn.setEnabled(True)
+        self.stop_calibration_btn.setEnabled(False)
+        self.clear_calibration_btn.setEnabled(True)
+        self.calibration_progress_bar.setVisible(False)
+        self.calibration_status_label.setText(f"Calibration failed: {reason}")
+        self.calibration_step_label.setText("Calibration failed")
+        
+
     
     def setup_dialog_style(self):
         style = """
@@ -1637,6 +2244,123 @@ class ConfigDialog(QDialog):
         
         QLabel {
             color: rgb(255, 255, 255);
+        }
+        
+        #primaryButton {
+            border: 2px solid rgb(0, 143, 170);
+            border-radius: 5px;
+            color: rgb(255, 255, 255);
+            background-color: rgb(0, 143, 170);
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        
+        #primaryButton:hover {
+            background-color: rgb(0, 123, 150);
+        }
+        
+        #secondaryButton {
+            border: 2px solid rgb(108, 117, 125);
+            border-radius: 5px;
+            color: rgb(255, 255, 255);
+            background-color: rgb(108, 117, 125);
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        
+        #secondaryButton:hover {
+            background-color: rgb(88, 97, 105);
+        }
+        
+        #dangerButton {
+            border: 2px solid rgb(220, 53, 69);
+            border-radius: 5px;
+            color: rgb(255, 255, 255);
+            background-color: rgb(220, 53, 69);
+            font-weight: bold;
+            padding: 8px 16px;
+        }
+        
+        #dangerButton:hover {
+            background-color: rgb(200, 35, 51);
+        }
+        
+        #tab_widget {
+            background-color: rgb(45, 45, 45);
+            color: rgb(255, 255, 255);
+        }
+        
+        #tab_widget::pane {
+            border: 1px solid rgb(70, 70, 70);
+            background-color: rgb(45, 45, 45);
+        }
+        
+        #tab_widget::tab-bar {
+            alignment: left;
+        }
+        
+        #tab_widget::tab {
+            background-color: rgb(60, 60, 60);
+            color: rgb(255, 255, 255);
+            padding: 8px 16px;
+            margin-right: 2px;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+        
+        #tab_widget::tab:selected {
+            background-color: rgb(0, 143, 170);
+            color: rgb(255, 255, 255);
+        }
+        
+        #tab_widget::tab:hover {
+            background-color: rgb(80, 80, 80);
+        }
+        
+        #configGroup {
+            font-size: 12px;
+            font-weight: bold;
+            color: rgb(255, 255, 255);
+            border: 1px solid rgb(70, 70, 70);
+            border-radius: 5px;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+        
+        #configGroup::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 0 5px;
+            color: rgb(204, 204, 204);
+        }
+        
+        #configDescription {
+            color: rgb(176, 176, 176);
+            font-size: 10px;
+            font-style: italic;
+            margin-left: 10px;
+        }
+        
+        #calibrationProgress {
+            border: 1px solid rgb(70, 70, 70);
+            border-radius: 3px;
+            background-color: rgb(60, 60, 60);
+            color: rgb(255, 255, 255);
+            text-align: center;
+        }
+        
+        #calibrationProgress::chunk {
+            background-color: rgb(0, 143, 170);
+            border-radius: 2px;
+        }
+        
+        #calibrationResults {
+            background-color: rgb(60, 60, 60);
+            border: 1px solid rgb(70, 70, 70);
+            border-radius: 3px;
+            color: rgb(255, 255, 255);
+            font-family: monospace;
+            font-size: 10px;
         }
         """
         
