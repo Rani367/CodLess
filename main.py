@@ -14,9 +14,9 @@ def clean_cache():
     """Remove all Python cache files and directories"""
     patterns = [
         "__pycache__",
-        "*.pyc",
-        "*.pyo",
-        "*.pyd"
+        "**/*.pyc",
+        "**/*.pyo",
+        "**/*.pyd"
     ]
     
     removed_count = 0
@@ -1548,11 +1548,11 @@ Arms (hold to move):
         try:
             for filename in os.listdir("saved_runs"):
                 if filename.endswith(".json"):
-                    with open(f"saved_runs/{filename}", 'r') as f:
+                    with open(os.path.join("saved_runs", filename), 'r') as f:
                         run_data = json.load(f)
                         runs[run_data['name']] = run_data
         except Exception as e:
-            pass
+            print(f"Error loading saved runs: {e}")
             
         return runs
         
