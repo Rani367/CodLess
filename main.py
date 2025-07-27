@@ -14,19 +14,17 @@ import glob
 # Check for required dependencies
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
-
     PYSIDE_AVAILABLE = True
 except ImportError:
-    print("❌ PySide6 not available. Install with: pip install PySide6")
+    print("PySide6 not available. Install with: pip install PySide6")
     PYSIDE_AVAILABLE = False
     sys.exit(1)
 
 try:
     import bleak
-
     BLE_AVAILABLE = True
 except ImportError:
-    print("❌ bleak not available. Install with: pip install bleak")
+    print("bleak not available. Install with: pip install bleak")
     BLE_AVAILABLE = False
     sys.exit(1)
 
@@ -36,14 +34,12 @@ sys.dont_write_bytecode = True
 
 
 def clean_cache():
-    """Remove all Python cache files and directories"""
+    """Remove Python cache files and __pycache__ directories."""
     patterns = ["__pycache__", "*.pyc", "*.pyo", "*.pyd"]
-
     removed_count = 0
 
     for pattern in patterns:
         if pattern == "__pycache__":
-            # Find all __pycache__ directories
             for root, dirs, files in os.walk("."):
                 if "__pycache__" in dirs:
                     cache_dir = os.path.join(root, "__pycache__")
@@ -54,7 +50,6 @@ def clean_cache():
                     except Exception as e:
                         print(f"Error removing {cache_dir}: {e}")
         else:
-            # Find all matching files
             for file_path in glob.glob(pattern, recursive=True):
                 try:
                     os.remove(file_path)
@@ -69,7 +64,6 @@ def clean_cache():
         print(f"Cleaned {removed_count} cache files/directories.")
 
 
-# Clean cache on startup
 clean_cache()
 
 # Standard library imports
@@ -123,22 +117,20 @@ from PySide6.QtWidgets import (
     QTabWidget,
 )
 
-# Bleak imports
 from bleak import BleakScanner, BleakClient
 
-# Constants
+# Bluetooth and application constants
 PYBRICKS_COMMAND_EVENT_CHAR_UUID = "c5f50002-8280-46da-89f4-6d8051e4aeef"
 HUB_NAME_PREFIX = "Pybricks"
 SAVED_RUNS_DIR = "saved_runs"
-DEFAULT_TIMEOUT = 10000  # 10 seconds
-CALIBRATION_TIMEOUT = 10000  # 10 seconds per step
+DEFAULT_TIMEOUT = 10000
+CALIBRATION_TIMEOUT = 10000
 
 
 @dataclass
 class RobotConfig:
-    """Configuration for robot hardware and motion parameters."""
-
-    # Hardware configuration (user-set, not affected by calibration)
+    """Robot hardware configuration and motion parameters."""
+    # Hardware configuration
     axle_track: float = 112.0
     wheel_diameter: float = 56.0
     left_motor_port: str = "A"
@@ -146,13 +138,13 @@ class RobotConfig:
     arm1_motor_port: str = "C"
     arm2_motor_port: str = "D"
 
-    # Motion parameters (user-set, not affected by calibration)
+    # Motion parameters
     straight_speed: float = 500.0
     straight_acceleration: float = 250.0
     turn_rate: float = 200.0
     turn_acceleration: float = 300.0
 
-    # Calibration compensation parameters (set by calibration)
+    # Calibration compensation values
     motor_delay: float = 0.0
     motor_delay_confidence: float = 0.0
     straight_tracking_bias: float = 0.0
@@ -167,8 +159,7 @@ class RobotConfig:
 
 @dataclass
 class RecordedCommand:
-    """A recorded robot command with timestamp and parameters."""
-
+    """Recorded robot command with timestamp."""
     timestamp: float
     command_type: str
     parameters: Dict
@@ -176,8 +167,7 @@ class RecordedCommand:
 
 @dataclass
 class CalibrationResult:
-    """Result of a calibration step with measurement data."""
-
+    """Calibration step result with measurement data."""
     success: bool = False
     step_name: str = ""
     measured_value: float = 0.0
@@ -187,8 +177,7 @@ class CalibrationResult:
 
 
 class CalibrationManager(QObject):
-    """Manages robot calibration process with step-by-step testing."""
-
+    """Manages robot calibration process."""
     calibration_started = Signal()
     calibration_step_changed = Signal(int, str)
     calibration_progress = Signal(int)
@@ -321,10 +310,8 @@ class CalibrationManager(QObject):
 
     def calibrate_motor_response_time(self):
         if self.is_developer_mode:
-            # Simulate motor response time calibration with realistic values
             time.sleep(2)
-            # Simulate measuring actual motor delay (typically 50-200ms)
-            motor_delay = 0.12 + (time.time() % 0.1)  # Vary between 120-220ms
+            motor_delay = 0.12 + (time.time() % 0.1)  # Simulate 120-220ms delay
             result = CalibrationResult(
                 success=True,
                 step_name="Motor Response Time",
@@ -337,7 +324,6 @@ class CalibrationManager(QObject):
                 True, motor_delay, f"Motor response time: {motor_delay*1000:.0f}ms"
             )
         else:
-            # Real calibration would send commands to robot and measure response time
             command = {
                 "type": "calibration",
                 "calibration_type": "motor_response",
@@ -348,9 +334,7 @@ class CalibrationManager(QObject):
     def calibrate_straight_tracking(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring straight tracking bias (deviation from perfect straight)
-            # Perfect would be 1.0, typical values are 0.95-1.05 (5% deviation)
-            tracking_bias = 0.97 + (time.time() % 0.06)  # Vary between 0.97-1.03
+            tracking_bias = 0.97 + (time.time() % 0.06)  # Simulate 97-103% accuracy
             self.complete_current_step(
                 True,
                 tracking_bias,
@@ -367,9 +351,7 @@ class CalibrationManager(QObject):
     def calibrate_turn_accuracy(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring turn bias (deviation from perfect turn)
-            # Perfect would be 1.0, typical values are 0.90-1.10 (10% deviation)
-            turn_bias = 0.94 + (time.time() % 0.12)  # Vary between 0.94-1.06
+            turn_bias = 0.94 + (time.time() % 0.12)  # Simulate 94-106% accuracy
             self.complete_current_step(
                 True, turn_bias, f"Turn bias: {(turn_bias-1.0)*100:+.1f}%"
             )
@@ -384,9 +366,7 @@ class CalibrationManager(QObject):
     def calibrate_gyroscope(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring gyro drift rate (degrees per second)
-            # Typical values are 0.1-2.0 degrees/second drift
-            gyro_drift = 0.5 + (time.time() % 1.5)  # Vary between 0.5-2.0 deg/s
+            gyro_drift = 0.5 + (time.time() % 1.5)  # Simulate 0.5-2.0 deg/s drift
             self.complete_current_step(
                 True, gyro_drift, f"Gyro drift rate: {gyro_drift:.1f}°/s"
             )
@@ -397,9 +377,7 @@ class CalibrationManager(QObject):
     def calibrate_motor_balance(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring motor balance difference
-            # Perfect would be 1.0, typical values are 0.85-1.15 (15% difference)
-            balance_diff = 0.92 + (time.time() % 0.16)  # Vary between 0.92-1.08
+            balance_diff = 0.92 + (time.time() % 0.16)  # Simulate 92-108% balance
             self.complete_current_step(
                 True,
                 balance_diff,
@@ -425,10 +403,9 @@ class CalibrationManager(QObject):
             )
             return
 
-        # Start with default config and apply calibration adjustments
+        # Apply calibration results
         self.calibrated_config = RobotConfig()
 
-        # Apply calibration results to compensate for imperfections
         for result in valid_results:
             if not result.success:
                 continue
@@ -437,35 +414,25 @@ class CalibrationManager(QObject):
             measured_value = result.measured_value
 
             if "Motor Response Time" in result.step_name:
-                # Store motor delay for compensation in commands
-                # This will be used to send commands slightly ahead of time
                 self.calibrated_config.motor_delay = measured_value
                 self.calibrated_config.motor_delay_confidence = confidence_factor
 
             elif "Straight Tracking" in result.step_name:
-                # Measure and store tracking bias for compensation
-                # This will be used to adjust turn commands to compensate for drift
-                tracking_bias = measured_value - 1.0  # Deviation from perfect straight
+                tracking_bias = measured_value - 1.0
                 self.calibrated_config.straight_tracking_bias = tracking_bias
                 self.calibrated_config.straight_tracking_confidence = confidence_factor
 
             elif "Turn Accuracy" in result.step_name:
-                # Measure and store turn bias for compensation
-                # This will be used to adjust turn commands to compensate for bias
-                turn_bias = measured_value - 1.0  # Deviation from perfect turn
+                turn_bias = measured_value - 1.0
                 self.calibrated_config.turn_bias = turn_bias
                 self.calibrated_config.turn_confidence = confidence_factor
 
             elif "Motor Balance" in result.step_name:
-                # Measure and store motor balance difference for compensation
-                # This will be used to adjust individual motor speeds
-                balance_difference = measured_value - 1.0  # Difference between motors
+                balance_difference = measured_value - 1.0
                 self.calibrated_config.motor_balance_difference = balance_difference
                 self.calibrated_config.motor_balance_confidence = confidence_factor
 
             elif "Gyroscope" in result.step_name:
-                # Store gyro calibration data for drift compensation
-                # This will be used to compensate for gyro drift over time
                 self.calibrated_config.gyro_drift_rate = measured_value
                 self.calibrated_config.gyro_confidence = confidence_factor
 
@@ -474,7 +441,7 @@ class CalibrationManager(QObject):
             step_name="Calibration Complete",
             measured_value=quality_score,
             units="%",
-            description=f"Overall calibration quality: {quality_score:.1f}% - Imperfections compensated for 100% accuracy",
+            description=f"Overall calibration quality: {quality_score:.1f}%",
             confidence=quality_score / 100.0,
         )
         self.calibration_results.append(final_result)
@@ -510,7 +477,7 @@ class RobotSimulator(QWidget):
     def __init__(self):
         super().__init__()
         self.setMinimumSize(300, 200)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # type: ignore
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setObjectName("robot_simulator")
 
         self.robot_x = 200
@@ -655,10 +622,11 @@ class RobotSimulator(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)  # type: ignore
+        painter.setRenderHint(QPainter.Antialiasing)
 
         painter.fillRect(self.rect(), QColor(45, 45, 45))
 
+        # Draw grid
         painter.setPen(QPen(QColor(70, 70, 70), 1))
         for x in range(0, self.width(), 50):
             painter.drawLine(x, 0, x, self.height())
@@ -666,12 +634,13 @@ class RobotSimulator(QWidget):
             painter.drawLine(0, y, self.width(), y)
 
         self.draw_robot(painter)
+        
+        # Draw status text
         painter.setPen(QPen(QColor(255, 255, 255), 1))
         painter.setFont(QFont("Arial", 10))
 
         status_text = f"Position: ({int(self.robot_x)}, {int(self.robot_y)})"
         status_text += f" | Angle: {int(self.robot_angle)}°"
-
         painter.drawText(10, 20, status_text)
 
         physics_text = f"Speed: {self.actual_spd:.1f} | Turn: {self.actual_turn:.1f}"
@@ -736,12 +705,12 @@ class BLEController:
         self.ready_event = None
 
     async def scan_for_hub(self):
-        self.log_callback("🔍 Scanning for Pybricks hub...")
+        self.log_callback("Scanning for Pybricks hub...")
         devices = await BleakScanner.discover()
 
         for device in devices:
             if device.name and HUB_NAME_PREFIX in device.name:
-                self.log_callback(f"✅ Found hub: {device.name}")
+                self.log_callback(f"Found hub: {device.name}")
                 return device
 
         return None
@@ -752,12 +721,12 @@ class BLEController:
 
             self.device = await self.scan_for_hub()
             if not self.device:
-                self.log_callback("❌ No Pybricks hub found")
+                self.log_callback("No Pybricks hub found")
                 return False
 
             def handle_disconnect(_):
                 self.connected = False
-                self.log_callback("⚠️ Hub disconnected")
+                self.log_callback("Hub disconnected")
 
             def handle_rx(_, data: bytearray):
                 if data[0] == 0x01:
@@ -775,11 +744,11 @@ class BLEController:
             await self.client.start_notify(PYBRICKS_COMMAND_EVENT_CHAR_UUID, handle_rx)
 
             self.connected = True
-            self.log_callback(f"🎉 Connected to {self.device.name}!")
+            self.log_callback(f"Connected to {self.device.name}")
             return True
 
         except Exception as e:
-            self.log_callback(f"❌ Connection failed: {str(e)}")
+            self.log_callback(f"Connection failed: {str(e)}")
             return False
 
     async def send_command(self, command):
@@ -803,7 +772,7 @@ class BLEController:
             return True
 
         except Exception as e:
-            self.log_callback(f"❌ Send error: {str(e)}")
+            self.log_callback(f"Send error: {str(e)}")
             return False
 
     async def disconnect(self):
@@ -827,14 +796,8 @@ class FLLRoboticsGUI(QMainWindow):
         self.current_run_name = "Run 1"
         self.pressed_keys = set()
         self.saved_runs = self.load_saved_runs()
-        
-        # Key press tracking for exact duration recording
-        self.key_press_times = {}  # Track when each key was pressed
-        
-        # Initialize calibration manager
+        self.key_press_times = {}
         self.calibration_manager = CalibrationManager(self)
-
-        # Calibration requirement
         self.is_calibrated = False
 
         self.setup_ui()
@@ -848,7 +811,6 @@ class FLLRoboticsGUI(QMainWindow):
         self.setup_startup_animation()
         self.setup_exit_animation()
 
-        # Show calibration requirement message
         self.log_status(
             "Please calibrate the robot before using any controls.", "warning"
         )
@@ -862,8 +824,8 @@ class FLLRoboticsGUI(QMainWindow):
         self.base_width = 1200
         self.base_height = 900
         self.aspect_ratio = self.base_width / self.base_height
-        self.setWindowFlags(Qt.FramelessWindowHint)  # type: ignore
-        self.setAttribute(Qt.WA_TranslucentBackground)  # type: ignore
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -883,12 +845,12 @@ class FLLRoboticsGUI(QMainWindow):
 
         self.sidebar = self.create_sidebar()
         self.sidebar.setFixedWidth(250)
-        self.sidebar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)  # type: ignore
+        self.sidebar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         content_layout.addWidget(self.sidebar)
         content_layout.setStretchFactor(self.sidebar, 0)
 
         self.main_content = self.create_main_content()
-        self.main_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # type: ignore
+        self.main_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         content_layout.addWidget(self.main_content)
         content_layout.setStretchFactor(self.main_content, 1)
 
@@ -907,7 +869,7 @@ class FLLRoboticsGUI(QMainWindow):
 
         title_label = QLabel("CodLess - FLL Robotics Control Center")
         title_label.setObjectName("title_label")
-        title_label.setFont(QFont("Arial", 12, QFont.Bold))  # type: ignore
+        title_label.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(title_label)
 
         layout.addStretch()
@@ -1033,8 +995,7 @@ Arms (hold to move):
   R - Arm 2 Up   F - Arm 2 Down"""
         )
         keys_text.setObjectName("info_text")
-        # Use cross-platform monospace font
-        monospace_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)  # type: ignore
+        monospace_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         monospace_font.setPointSize(9)
         keys_text.setFont(monospace_font)
 
@@ -1099,7 +1060,8 @@ Arms (hold to move):
 
         layout.addWidget(self.simulator_group)
         self.simulator_group.hide()
-        # Remove the Recording Controls group box - just keep the controls
+        
+        # Recording controls
         name_layout = QHBoxLayout()
         name_layout.addWidget(QLabel("Run Name:"))
         self.run_name_input = QLineEdit("Run 1")
@@ -1120,7 +1082,8 @@ Arms (hold to move):
         record_btn_layout.addWidget(self.record_btn)
         record_btn_layout.addWidget(self.save_btn)
         layout.addLayout(record_btn_layout)
-        # Remove the entire Robot Status group box - just keep the status display
+        
+        # Status display
         self.status_display = QTextEdit()
         self.status_display.setObjectName("status_display")
         self.status_display.setMaximumHeight(400)
@@ -1451,9 +1414,9 @@ Arms (hold to move):
         self.play_btn.clicked.connect(self.play_selected_run)
         self.delete_btn.clicked.connect(self.delete_selected_run)
         self.developer_check.toggled.connect(self.toggle_developer_mode)
-        self.setFocusPolicy(Qt.StrongFocus)  # type: ignore
+        self.setFocusPolicy(Qt.StrongFocus)
 
-        # Connect calibration manager signals
+        # Connect calibration signals
         self.calibration_manager.calibration_started.connect(self.on_calibration_started)
         self.calibration_manager.calibration_step_changed.connect(self.on_calibration_step_changed)
         self.calibration_manager.calibration_progress.connect(self.on_calibration_progress)
@@ -1579,18 +1542,12 @@ Arms (hold to move):
 
     def disable_controls_until_calibration(self):
         """Disable all robot controls until calibration is completed."""
-        # Disable recording controls
         self.record_btn.setEnabled(False)
         self.save_btn.setEnabled(False)
-
-        # Disable playback controls
         self.play_btn.setEnabled(False)
         self.delete_btn.setEnabled(False)
-
-        # Disable simulator reset
         self.reset_sim_btn.setEnabled(False)
 
-        # Update button tooltips to indicate calibration requirement
         self.record_btn.setToolTip("Calibration required before recording")
         self.save_btn.setToolTip("Calibration required before saving")
         self.play_btn.setToolTip("Calibration required before playback")
@@ -1599,18 +1556,11 @@ Arms (hold to move):
 
     def enable_controls_after_calibration(self):
         """Enable all robot controls after successful calibration."""
-        # Enable recording controls
         self.record_btn.setEnabled(True)
-        # Save button will be enabled when recording stops
-
-        # Enable playback controls
         self.play_btn.setEnabled(True)
         self.delete_btn.setEnabled(True)
-
-        # Enable simulator reset
         self.reset_sim_btn.setEnabled(True)
 
-        # Restore original tooltips
         self.record_btn.setToolTip("Start/stop recording robot commands")
         self.save_btn.setToolTip("Save current recording")
         self.play_btn.setToolTip("Play selected run")
@@ -1633,7 +1583,7 @@ Arms (hold to move):
     def connect_hub(self):
         if not BLE_AVAILABLE and not self.developer_check.isChecked():
             self.log_status(
-                "❌ BLE not available. Install 'bleak' or enable Developer Mode.",
+                "BLE not available. Install 'bleak' or enable Developer Mode.",
                 "error",
             )
             return
@@ -1821,16 +1771,14 @@ Arms (hold to move):
             self.log_status(f"✗ {result.description}", "error")
 
     def process_key_command(self, key: str, is_pressed: bool):
-        # Check if robot is connected
         if (
             not (self.ble_controller and self.ble_controller.connected)
             and not self.developer_check.isChecked()
         ):
             return
 
-        # Check if robot is calibrated (skip in developer mode)
         if not self.is_calibrated and not self.developer_check.isChecked():
-            if is_pressed:  # Only show message on key press, not release
+            if is_pressed:
                 self.log_status(
                     "Please calibrate the robot before using controls.", "warning"
                 )
@@ -1893,7 +1841,7 @@ Arms (hold to move):
             self.log_status(f"Command error: {str(e)}", "error")
 
     def apply_calibration_compensation(self, cmd: Dict) -> Dict:
-        """Apply calibration compensations to make robot more accurate."""
+        """Apply calibration compensations to improve robot accuracy."""
         if not self.is_calibrated:
             return cmd
 
@@ -1904,27 +1852,20 @@ Arms (hold to move):
             speed = cmd.get("speed", 0)
             turn_rate = cmd.get("turn_rate", 0)
 
-            # Apply motor delay compensation (send command ahead of time)
-            if self.config.motor_delay > 0 and self.config.motor_delay_confidence > 0.5:
-                # This would be handled by the robot firmware, but we can log it
-                pass
-
-            # Apply straight tracking bias compensation
-            if abs(speed) > 0 and abs(turn_rate) == 0:  # Straight movement
+            # Apply straight tracking compensation
+            if abs(speed) > 0 and abs(turn_rate) == 0:
                 if (
                     self.config.straight_tracking_bias != 0
                     and self.config.straight_tracking_confidence > 0.5
                 ):
-                    # Compensate for drift by adding a small turn in the opposite direction
                     compensation_turn = (
                         -self.config.straight_tracking_bias * speed * 0.1
                     )
                     compensated_cmd["turn_rate"] = compensation_turn
 
             # Apply turn bias compensation
-            if abs(turn_rate) > 0:  # Turning movement
+            if abs(turn_rate) > 0:
                 if self.config.turn_bias != 0 and self.config.turn_confidence > 0.5:
-                    # Compensate for turn bias by adjusting turn rate
                     compensation_factor = 1.0 + self.config.turn_bias
                     compensated_cmd["turn_rate"] = turn_rate * compensation_factor
 
@@ -1933,8 +1874,6 @@ Arms (hold to move):
                 self.config.motor_balance_difference != 0
                 and self.config.motor_balance_confidence > 0.5
             ):
-                # This would be handled by adjusting individual motor speeds in the robot firmware
-                # For now, we can apply a small compensation to the turn rate
                 balance_compensation = (
                     self.config.motor_balance_difference * speed * 0.05
                 )
@@ -2011,7 +1950,6 @@ Arms (hold to move):
             self.record_btn.setText("Stop Recording")
             self.save_btn.setEnabled(False)
             
-            # Reset robot position in developer mode when starting recording
             if self.developer_check.isChecked():
                 self.reset_simulator()
                 self.log_status("Robot position reset for new recording", "info")
@@ -2027,7 +1965,7 @@ Arms (hold to move):
             )
             
     def record_key_press(self, key: str):
-        """Record the start of a key press with exact timestamp."""
+        """Record the start of a key press with timestamp."""
         if not self.is_recording:
             return
             
@@ -2035,7 +1973,7 @@ Arms (hold to move):
         self.key_press_times[key] = ts - self.recording_start_time
         
     def record_key_release(self, key: str):
-        """Record the end of a key press with exact duration."""
+        """Record the end of a key press with duration."""
         if not self.is_recording or key not in self.key_press_times:
             return
             
@@ -2043,11 +1981,9 @@ Arms (hold to move):
         release_time = time.time() - self.recording_start_time
         duration = release_time - press_time
         
-        # Create command based on key type
         cmd = None
         
         if key in ["w", "a", "s", "d"]:
-            # For drive keys, record the movement duration
             spd = 0
             turn = 0
             
@@ -2068,7 +2004,6 @@ Arms (hold to move):
             }
             
         elif key in ["q", "e", "r", "f"]:
-            # For arm keys, record the movement duration
             spd = 200
             if key == "q":
                 cmd = {"type": "arm1", "speed": spd, "duration": duration}
@@ -2079,7 +2014,6 @@ Arms (hold to move):
             elif key == "f":
                 cmd = {"type": "arm2", "speed": -spd, "duration": duration}
         
-        # Only record if we have a valid command
         if cmd is not None:
             recorded_cmd = RecordedCommand(
                 timestamp=press_time,
@@ -2088,7 +2022,6 @@ Arms (hold to move):
             )
             self.recorded_commands.append(recorded_cmd)
         
-        # Remove from tracking
         del self.key_press_times[key]
         
 
@@ -2189,17 +2122,12 @@ Arms (hold to move):
             while time.time() < target_time:
                 time.sleep(0.001)
 
-            # Execute the command and keep it running for the duration
             if "duration" in cmd.parameters:
                 duration = cmd.parameters["duration"]
                 
-                # Start the movement
                 self.execute_command(cmd.parameters)
-                
-                # Keep moving for the duration
                 time.sleep(duration)
                 
-                # Stop the movement
                 stop_cmd = cmd.parameters.copy()
                 if cmd.parameters["type"] == "drive":
                     stop_cmd["speed"] = 0
@@ -2208,7 +2136,6 @@ Arms (hold to move):
                     stop_cmd["speed"] = 0
                 self.execute_command(stop_cmd)
             else:
-                # Execute the command normally
                 self.execute_command(cmd.parameters)
 
         self.log_status("Playback completed", "success")
@@ -2372,7 +2299,6 @@ while True:
         self.log_status("Pybricks hub code copied to clipboard!", "info")
         self.copy_pybricks_btn.setText("Copied!")
 
-        # Reset button text after 2 seconds
         QTimer.singleShot(2000, lambda: self.copy_pybricks_btn.setText("Copy Hub Code"))
 
     def generate_competition_code(self):
@@ -2398,7 +2324,6 @@ while True:
         )
         self.competition_mode_btn.setText("Copied!")
 
-        # Reset button text after 3 seconds
         QTimer.singleShot(
             3000, lambda: self.competition_mode_btn.setText("Generate Competition Code")
         )
@@ -2407,8 +2332,7 @@ while True:
         self._show_competition_instructions()
 
     def _generate_competition_pybricks_code(self) -> str:
-        """Generate the actual Pybricks competition code with all saved runs."""
-        # Start with the basic imports and setup
+        """Generate Pybricks competition code with all saved runs."""
         code_lines = [
             "from pybricks.hubs import PrimeHub",
             "from pybricks.pupdevices import Motor",
@@ -2488,18 +2412,13 @@ while True:
             "# --- RUN FUNCTIONS ---",
         ]
 
-        # Generate run functions for each saved run
+        # Generate run functions
         run_functions = []
         runs_dict = []
 
         for i, (run_name, run_data) in enumerate(self.saved_runs.items(), 1):
-            # Create function name (sanitized)
             func_name = f"run_{i}"
-
-            # Generate function code
             func_lines = [f"def {func_name}():", f'    """{run_name}"""']
-
-            # Convert recorded commands to Pybricks code
             commands = [RecordedCommand(**cmd) for cmd in run_data["commands"]]
 
             for cmd in commands:
@@ -2512,26 +2431,19 @@ while True:
                     turn_rate = params.get("turn_rate", 0)
 
                     if speed != 0 or turn_rate != 0:
-                        # Start movement
                         func_lines.append(f"    drive_base.drive({speed}, {turn_rate})")
-                        # Wait for duration
                         if duration > 0:
                             func_lines.append(f"    wait({int(duration * 1000)})")
-                        # Stop movement
                         func_lines.append("    drive_base.stop()")
                     else:
-                        # Stop
                         func_lines.append("    drive_base.stop()")
 
                 elif cmd_type == "arm1":
                     speed = params.get("speed", 0)
                     if speed != 0:
-                        # Start arm movement
                         func_lines.append(f"    arm1_motor.run({speed})")
-                        # Wait for duration
                         if duration > 0:
                             func_lines.append(f"    wait({int(duration * 1000)})")
-                        # Stop arm
                         func_lines.append("    arm1_motor.stop()")
                     else:
                         func_lines.append("    arm1_motor.stop()")
@@ -2539,27 +2451,21 @@ while True:
                 elif cmd_type == "arm2":
                     speed = params.get("speed", 0)
                     if speed != 0:
-                        # Start arm movement
                         func_lines.append(f"    arm2_motor.run({speed})")
-                        # Wait for duration
                         if duration > 0:
                             func_lines.append(f"    wait({int(duration * 1000)})")
-                        # Stop arm
                         func_lines.append("    arm2_motor.stop()")
                     else:
                         func_lines.append("    arm2_motor.stop()")
 
-            # Add small wait at end of function
             func_lines.append("    wait(100)")
 
             run_functions.extend(func_lines)
             run_functions.append("")
             runs_dict.append(f"    {i}: {func_name},")
 
-        # Add the run functions to the code
         code_lines.extend(run_functions)
 
-        # Add the main execution section
         code_lines.extend(
             [
                 "# --- MAIN EXECUTION ---",
@@ -2586,23 +2492,23 @@ while True:
     def _show_competition_instructions(self):
         """Show instructions for using the competition code."""
         instructions = f"""
-🎯 COMPETITION MODE CODE GENERATED! 🎯
+COMPETITION MODE CODE GENERATED!
 
-✅ Code copied to clipboard with {len(self.saved_runs)} runs
+Code copied to clipboard with {len(self.saved_runs)} runs
 
-📋 NEXT STEPS:
+NEXT STEPS:
 1. Go to code.pybricks.com
 2. Paste the code into the editor
 3. Upload to your SPIKE Prime hub
 4. Run the program on the hub
 5. Use the hub menu to select your run
 
-🏆 COMPETITION READY!
+COMPETITION READY!
 • All your recorded runs are now autonomous
 • No computer connection needed during competition
 • Just select and run your pre-programmed sequences
 
-💡 TIP: Test each run before competition to ensure accuracy!
+TIP: Test each run before competition to ensure accuracy!
         """
 
         QMessageBox.information(
@@ -2649,7 +2555,7 @@ while True:
 
 
 class ConfigDialog(QDialog):
-    """Configuration dialog for robot settings and calibration."""
+    """Robot configuration and calibration dialog."""
 
     def __init__(self, parent, config: RobotConfig):
         super().__init__(parent)
@@ -2674,7 +2580,6 @@ class ConfigDialog(QDialog):
         self.tab_widget = QTabWidget()
         self.tab_widget.setObjectName("tab_widget")
 
-        # Create tabs
         self.create_drive_tab()
         self.create_motion_tab()
         self.create_ports_tab()
@@ -2682,11 +2587,9 @@ class ConfigDialog(QDialog):
 
         layout.addWidget(self.tab_widget)
 
-        # Initialize calibration manager
         self.calibration_manager = CalibrationManager(self)
         self.setup_calibration_connections()
 
-        # Bottom buttons
         button_layout = QHBoxLayout()
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setObjectName("danger_btn")
