@@ -14,7 +14,6 @@ import glob
 # Check for required dependencies
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
-
     PYSIDE_AVAILABLE = True
 except ImportError:
     print("❌ PySide6 not available. Install with: pip install PySide6")
@@ -23,7 +22,6 @@ except ImportError:
 
 try:
     import bleak
-
     BLE_AVAILABLE = True
 except ImportError:
     print("❌ bleak not available. Install with: pip install bleak")
@@ -36,14 +34,12 @@ sys.dont_write_bytecode = True
 
 
 def clean_cache():
-    """Remove all Python cache files and directories"""
+    """Remove Python cache files and __pycache__ directories."""
     patterns = ["__pycache__", "*.pyc", "*.pyo", "*.pyd"]
-
     removed_count = 0
 
     for pattern in patterns:
         if pattern == "__pycache__":
-            # Find all __pycache__ directories
             for root, dirs, files in os.walk("."):
                 if "__pycache__" in dirs:
                     cache_dir = os.path.join(root, "__pycache__")
@@ -54,7 +50,6 @@ def clean_cache():
                     except Exception as e:
                         print(f"Error removing {cache_dir}: {e}")
         else:
-            # Find all matching files
             for file_path in glob.glob(pattern, recursive=True):
                 try:
                     os.remove(file_path)
@@ -69,7 +64,6 @@ def clean_cache():
         print(f"Cleaned {removed_count} cache files/directories.")
 
 
-# Clean cache on startup
 clean_cache()
 
 # Standard library imports
@@ -123,22 +117,20 @@ from PySide6.QtWidgets import (
     QTabWidget,
 )
 
-# Bleak imports
 from bleak import BleakScanner, BleakClient
 
-# Constants
+# Bluetooth and application constants
 PYBRICKS_COMMAND_EVENT_CHAR_UUID = "c5f50002-8280-46da-89f4-6d8051e4aeef"
 HUB_NAME_PREFIX = "Pybricks"
 SAVED_RUNS_DIR = "saved_runs"
-DEFAULT_TIMEOUT = 10000  # 10 seconds
-CALIBRATION_TIMEOUT = 10000  # 10 seconds per step
+DEFAULT_TIMEOUT = 10000
+CALIBRATION_TIMEOUT = 10000
 
 
 @dataclass
 class RobotConfig:
-    """Configuration for robot hardware and motion parameters."""
-
-    # Hardware configuration (user-set, not affected by calibration)
+    """Robot hardware configuration and motion parameters."""
+    # Hardware configuration
     axle_track: float = 112.0
     wheel_diameter: float = 56.0
     left_motor_port: str = "A"
@@ -146,13 +138,13 @@ class RobotConfig:
     arm1_motor_port: str = "C"
     arm2_motor_port: str = "D"
 
-    # Motion parameters (user-set, not affected by calibration)
+    # Motion parameters
     straight_speed: float = 500.0
     straight_acceleration: float = 250.0
     turn_rate: float = 200.0
     turn_acceleration: float = 300.0
 
-    # Calibration compensation parameters (set by calibration)
+    # Calibration compensation values
     motor_delay: float = 0.0
     motor_delay_confidence: float = 0.0
     straight_tracking_bias: float = 0.0
@@ -167,8 +159,7 @@ class RobotConfig:
 
 @dataclass
 class RecordedCommand:
-    """A recorded robot command with timestamp and parameters."""
-
+    """Recorded robot command with timestamp."""
     timestamp: float
     command_type: str
     parameters: Dict
@@ -176,8 +167,7 @@ class RecordedCommand:
 
 @dataclass
 class CalibrationResult:
-    """Result of a calibration step with measurement data."""
-
+    """Calibration step result with measurement data."""
     success: bool = False
     step_name: str = ""
     measured_value: float = 0.0
@@ -187,8 +177,7 @@ class CalibrationResult:
 
 
 class CalibrationManager(QObject):
-    """Manages robot calibration process with step-by-step testing."""
-
+    """Manages robot calibration process."""
     calibration_started = Signal()
     calibration_step_changed = Signal(int, str)
     calibration_progress = Signal(int)
@@ -321,10 +310,8 @@ class CalibrationManager(QObject):
 
     def calibrate_motor_response_time(self):
         if self.is_developer_mode:
-            # Simulate motor response time calibration with realistic values
             time.sleep(2)
-            # Simulate measuring actual motor delay (typically 50-200ms)
-            motor_delay = 0.12 + (time.time() % 0.1)  # Vary between 120-220ms
+            motor_delay = 0.12 + (time.time() % 0.1)  # Simulate 120-220ms delay
             result = CalibrationResult(
                 success=True,
                 step_name="Motor Response Time",
@@ -337,7 +324,6 @@ class CalibrationManager(QObject):
                 True, motor_delay, f"Motor response time: {motor_delay*1000:.0f}ms"
             )
         else:
-            # Real calibration would send commands to robot and measure response time
             command = {
                 "type": "calibration",
                 "calibration_type": "motor_response",
@@ -348,9 +334,7 @@ class CalibrationManager(QObject):
     def calibrate_straight_tracking(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring straight tracking bias (deviation from perfect straight)
-            # Perfect would be 1.0, typical values are 0.95-1.05 (5% deviation)
-            tracking_bias = 0.97 + (time.time() % 0.06)  # Vary between 0.97-1.03
+            tracking_bias = 0.97 + (time.time() % 0.06)  # Simulate 97-103% accuracy
             self.complete_current_step(
                 True,
                 tracking_bias,
@@ -367,9 +351,7 @@ class CalibrationManager(QObject):
     def calibrate_turn_accuracy(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring turn bias (deviation from perfect turn)
-            # Perfect would be 1.0, typical values are 0.90-1.10 (10% deviation)
-            turn_bias = 0.94 + (time.time() % 0.12)  # Vary between 0.94-1.06
+            turn_bias = 0.94 + (time.time() % 0.12)  # Simulate 94-106% accuracy
             self.complete_current_step(
                 True, turn_bias, f"Turn bias: {(turn_bias-1.0)*100:+.1f}%"
             )
@@ -384,9 +366,7 @@ class CalibrationManager(QObject):
     def calibrate_gyroscope(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring gyro drift rate (degrees per second)
-            # Typical values are 0.1-2.0 degrees/second drift
-            gyro_drift = 0.5 + (time.time() % 1.5)  # Vary between 0.5-2.0 deg/s
+            gyro_drift = 0.5 + (time.time() % 1.5)  # Simulate 0.5-2.0 deg/s drift
             self.complete_current_step(
                 True, gyro_drift, f"Gyro drift rate: {gyro_drift:.1f}°/s"
             )
@@ -397,9 +377,7 @@ class CalibrationManager(QObject):
     def calibrate_motor_balance(self):
         if self.is_developer_mode:
             time.sleep(2)
-            # Simulate measuring motor balance difference
-            # Perfect would be 1.0, typical values are 0.85-1.15 (15% difference)
-            balance_diff = 0.92 + (time.time() % 0.16)  # Vary between 0.92-1.08
+            balance_diff = 0.92 + (time.time() % 0.16)  # Simulate 92-108% balance
             self.complete_current_step(
                 True,
                 balance_diff,
@@ -425,10 +403,9 @@ class CalibrationManager(QObject):
             )
             return
 
-        # Start with default config and apply calibration adjustments
+        # Apply calibration results
         self.calibrated_config = RobotConfig()
 
-        # Apply calibration results to compensate for imperfections
         for result in valid_results:
             if not result.success:
                 continue
@@ -437,35 +414,25 @@ class CalibrationManager(QObject):
             measured_value = result.measured_value
 
             if "Motor Response Time" in result.step_name:
-                # Store motor delay for compensation in commands
-                # This will be used to send commands slightly ahead of time
                 self.calibrated_config.motor_delay = measured_value
                 self.calibrated_config.motor_delay_confidence = confidence_factor
 
             elif "Straight Tracking" in result.step_name:
-                # Measure and store tracking bias for compensation
-                # This will be used to adjust turn commands to compensate for drift
-                tracking_bias = measured_value - 1.0  # Deviation from perfect straight
+                tracking_bias = measured_value - 1.0
                 self.calibrated_config.straight_tracking_bias = tracking_bias
                 self.calibrated_config.straight_tracking_confidence = confidence_factor
 
             elif "Turn Accuracy" in result.step_name:
-                # Measure and store turn bias for compensation
-                # This will be used to adjust turn commands to compensate for bias
-                turn_bias = measured_value - 1.0  # Deviation from perfect turn
+                turn_bias = measured_value - 1.0
                 self.calibrated_config.turn_bias = turn_bias
                 self.calibrated_config.turn_confidence = confidence_factor
 
             elif "Motor Balance" in result.step_name:
-                # Measure and store motor balance difference for compensation
-                # This will be used to adjust individual motor speeds
-                balance_difference = measured_value - 1.0  # Difference between motors
+                balance_difference = measured_value - 1.0
                 self.calibrated_config.motor_balance_difference = balance_difference
                 self.calibrated_config.motor_balance_confidence = confidence_factor
 
             elif "Gyroscope" in result.step_name:
-                # Store gyro calibration data for drift compensation
-                # This will be used to compensate for gyro drift over time
                 self.calibrated_config.gyro_drift_rate = measured_value
                 self.calibrated_config.gyro_confidence = confidence_factor
 
@@ -474,7 +441,7 @@ class CalibrationManager(QObject):
             step_name="Calibration Complete",
             measured_value=quality_score,
             units="%",
-            description=f"Overall calibration quality: {quality_score:.1f}% - Imperfections compensated for 100% accuracy",
+            description=f"Overall calibration quality: {quality_score:.1f}%",
             confidence=quality_score / 100.0,
         )
         self.calibration_results.append(final_result)
@@ -510,7 +477,7 @@ class RobotSimulator(QWidget):
     def __init__(self):
         super().__init__()
         self.setMinimumSize(300, 200)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # type: ignore
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setObjectName("robot_simulator")
 
         self.robot_x = 200
