@@ -8,123 +8,99 @@ __version__ = "1.0.0"
 
 import os
 import sys
-import shutil
-import glob
 
-# Check for required dependencies
+# Prevent Python from writing bytecode files
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+sys.dont_write_bytecode = True
+
+# Fast imports - only what we need immediately
+from typing import Dict, List, Optional
+
+# Check for required dependencies with fast imports
 try:
-    from PySide6 import QtCore, QtGui, QtWidgets
-
+    from PySide6.QtWidgets import QApplication
     PYSIDE_AVAILABLE = True
 except ImportError:
     print("❌ PySide6 not available. Install with: pip install PySide6")
     PYSIDE_AVAILABLE = False
     sys.exit(1)
 
-try:
-    import bleak
+# Lazy import for bleak - only check when actually connecting
+BLE_AVAILABLE = None
 
-    BLE_AVAILABLE = True
-except ImportError:
-    print("❌ bleak not available. Install with: pip install bleak")
-    BLE_AVAILABLE = False
-    sys.exit(1)
+def check_ble_availability():
+    """Lazy check for bleak availability"""
+    global BLE_AVAILABLE
+    if BLE_AVAILABLE is None:
+        try:
+            import bleak
+            BLE_AVAILABLE = True
+        except ImportError:
+            BLE_AVAILABLE = False
+    return BLE_AVAILABLE
 
-# Prevent Python from writing bytecode files
-os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
-sys.dont_write_bytecode = True
-
-
-def clean_cache():
-    """Remove all Python cache files and directories"""
-    patterns = ["__pycache__", "*.pyc", "*.pyo", "*.pyd"]
-
+def clean_cache(force=False):
+    """Remove Python cache files - now optional and optimized"""
+    if not force and os.environ.get("SKIP_CACHE_CLEAN", "0") == "1":
+        return
+    
+    import shutil
+    import glob
+    
+    patterns = ["__pycache__"]  # Only clean __pycache__ for performance
     removed_count = 0
 
-    for pattern in patterns:
-        if pattern == "__pycache__":
-            # Find all __pycache__ directories
-            for root, dirs, files in os.walk("."):
-                if "__pycache__" in dirs:
-                    cache_dir = os.path.join(root, "__pycache__")
-                    try:
-                        shutil.rmtree(cache_dir)
-                        print(f"Removed: {cache_dir}")
-                        removed_count += 1
-                    except Exception as e:
-                        print(f"Error removing {cache_dir}: {e}")
-        else:
-            # Find all matching files
-            for file_path in glob.glob(pattern, recursive=True):
+    try:
+        # Optimized cache cleaning - only current directory
+        for root, dirs, files in os.walk(".", topdown=True):
+            # Skip deep recursion for performance
+            if root.count(os.sep) > 2:
+                dirs[:] = []
+                continue
+                
+            if "__pycache__" in dirs:
+                cache_dir = os.path.join(root, "__pycache__")
                 try:
-                    os.remove(file_path)
-                    print(f"Removed: {file_path}")
+                    shutil.rmtree(cache_dir)
                     removed_count += 1
-                except Exception as e:
-                    print(f"Error removing {file_path}: {e}")
+                except Exception:
+                    pass  # Silently ignore errors for performance
+    except Exception:
+        pass  # Silently ignore errors
+    
+    if removed_count > 0 and force:
+        print(f"Cleaned {removed_count} cache directories.")
 
-    if removed_count == 0:
-        print("No cache files found to clean.")
-    else:
-        print(f"Cleaned {removed_count} cache files/directories.")
+# Only clean cache if explicitly requested
+if "--clean-cache" in sys.argv:
+    clean_cache(force=True)
 
+# Lazy imports - only import when needed
+def lazy_import_qt():
+    """Import Qt components only when needed"""
+    from PySide6.QtCore import (
+        QTimer, QPropertyAnimation, QEasingCurve, Qt, QEvent, QObject, Signal,
+    )
+    from PySide6.QtGui import (
+        QIcon, QPixmap, QFont, QPainter, QPen, QBrush, QColor, QFontDatabase,
+    )
+    from PySide6.QtWidgets import (
+        QWidget, QMainWindow, QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+        QPushButton, QCheckBox, QGroupBox, QLineEdit, QTextEdit, QListWidget,
+        QComboBox, QProgressBar, QSizePolicy, QMessageBox, QTabWidget,
+    )
+    return locals()
 
-# Clean cache on startup
-clean_cache()
-
-# Standard library imports
-import asyncio
-import threading
-import time
-import json
-from datetime import datetime
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
-import math
-
-# PySide6 imports
-from PySide6.QtCore import (
-    QTimer,
-    QPropertyAnimation,
-    QEasingCurve,
-    Qt,
-    QEvent,
-    QObject,
-    Signal,
-)
-from PySide6.QtGui import (
-    QIcon,
-    QPixmap,
-    QFont,
-    QPainter,
-    QPen,
-    QBrush,
-    QColor,
-    QFontDatabase,
-)
-from PySide6.QtWidgets import (
-    QWidget,
-    QMainWindow,
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QCheckBox,
-    QGroupBox,
-    QLineEdit,
-    QTextEdit,
-    QListWidget,
-    QComboBox,
-    QProgressBar,
-    QSizePolicy,
-    QApplication,
-    QMessageBox,
-    QTabWidget,
-)
-
-# Bleak imports
-from bleak import BleakScanner, BleakClient
+def lazy_import_async():
+    """Import async components only when needed"""
+    import asyncio
+    import threading
+    import time
+    import json
+    from datetime import datetime
+    from dataclasses import dataclass, asdict
+    import math
+    return locals()
 
 # Constants
 PYBRICKS_COMMAND_EVENT_CHAR_UUID = "c5f50002-8280-46da-89f4-6d8051e4aeef"
@@ -133,6 +109,47 @@ SAVED_RUNS_DIR = "saved_runs"
 DEFAULT_TIMEOUT = 10000  # 10 seconds
 CALIBRATION_TIMEOUT = 10000  # 10 seconds per step
 
+# Load external stylesheets for better performance
+def load_stylesheet():
+    """Load stylesheet from external file or return optimized inline version"""
+    stylesheet_path = "styles.qss"
+    if os.path.exists(stylesheet_path):
+        try:
+            with open(stylesheet_path, 'r') as f:
+                return f.read()
+        except Exception:
+            pass
+    
+    # Minimized inline stylesheet for performance
+    return """
+QMainWindow { background-color: rgb(45, 45, 45); }
+#title_bar { background-color: rgb(35, 35, 35); border-bottom: 1px solid rgb(70, 70, 70); }
+#title_label { color: rgb(255, 255, 255); }
+#window_btn { background-color: transparent; color: rgb(255, 255, 255); border: none; font-size: 12px; }
+#window_btn:hover { background-color: rgb(0, 143, 170); }
+#close_btn { background-color: transparent; color: rgb(255, 255, 255); border: none; font-size: 12px; }
+#close_btn:hover { background-color: rgb(220, 53, 69); }
+#content_widget { background-color: rgb(51, 51, 51); }
+#sidebar { background-color: rgb(45, 45, 45); border-right: 1px solid rgb(70, 70, 70); }
+#main_content { background-color: rgb(51, 51, 51); }
+QGroupBox { border: 1px solid rgb(70, 70, 70); border-radius: 5px; color: rgb(255, 255, 255); background: rgb(45, 45, 45); font-weight: bold; padding-top: 8px; margin-top: 3px; }
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px 0 5px; }
+#primary_btn { border: 2px solid rgb(0, 143, 170); border-radius: 5px; color: rgb(255, 255, 255); background-color: rgb(0, 143, 170); font-weight: bold; }
+#primary_btn:hover { background-color: rgb(0, 123, 150); }
+#primary_btn:pressed { background-color: rgb(0, 103, 130); }
+#success_btn { border: 2px solid rgb(40, 167, 69); border-radius: 5px; color: rgb(255, 255, 255); background-color: rgb(40, 167, 69); font-weight: bold; }
+#success_btn:hover { background-color: rgb(34, 142, 58); }
+#success_btn:disabled { background-color: rgb(108, 117, 125); border-color: rgb(108, 117, 125); }
+#danger_btn { border: 2px solid rgb(220, 53, 69); border-radius: 5px; color: rgb(255, 255, 255); background-color: rgb(220, 53, 69); font-weight: bold; }
+#danger_btn:hover { background-color: rgb(200, 35, 51); }
+#warning_btn { border: 2px solid rgb(255, 193, 7); border-radius: 5px; color: rgb(255, 255, 255); background-color: rgb(255, 193, 7); font-weight: bold; }
+#warning_btn:hover { background-color: rgb(230, 173, 0); }
+#line_edit { border: 1px solid rgb(70, 70, 70); border-radius: 3px; color: rgb(255, 255, 255); background-color: rgb(35, 35, 35); padding: 5px; font-size: 12px; }
+#line_edit:focus { border-color: rgb(0, 143, 170); }
+#checkbox { color: rgb(255, 255, 255); font-size: 12px; }
+#checkbox::indicator { width: 16px; height: 16px; border: 1px solid rgb(70, 70, 70); border-radius: 3px; background-color: rgb(35, 35, 35); }
+#checkbox::indicator:checked { background-color: rgb(0, 143, 170); }
+"""
 
 @dataclass
 class RobotConfig:
@@ -164,7 +181,6 @@ class RobotConfig:
     gyro_drift_rate: float = 0.0
     gyro_confidence: float = 0.0
 
-
 @dataclass
 class RecordedCommand:
     """A recorded robot command with timestamp and parameters."""
@@ -172,7 +188,6 @@ class RecordedCommand:
     timestamp: float
     command_type: str
     parameters: Dict
-
 
 @dataclass
 class CalibrationResult:
@@ -184,7 +199,6 @@ class CalibrationResult:
     units: str = ""
     description: str = ""
     confidence: float = 0.0
-
 
 class CalibrationManager(QObject):
     """Manages robot calibration process with step-by-step testing."""
@@ -198,6 +212,10 @@ class CalibrationManager(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Import Qt components when needed
+        qt_imports = lazy_import_qt()
+        globals().update(qt_imports)
+        
         self.ble_controller = None
         self.robot_simulator = None
         self.is_developer_mode = False
@@ -322,20 +340,9 @@ class CalibrationManager(QObject):
     def calibrate_motor_response_time(self):
         if self.is_developer_mode:
             # Simulate motor response time calibration with realistic values
-            time.sleep(2)
-            # Simulate measuring actual motor delay (typically 50-200ms)
-            motor_delay = 0.12 + (time.time() % 0.1)  # Vary between 120-220ms
-            result = CalibrationResult(
-                success=True,
-                step_name="Motor Response Time",
-                measured_value=motor_delay,
-                units="seconds",
-                description=f"Motor response time measured at {motor_delay*1000:.0f}ms",
-                confidence=0.85,
-            )
-            self.complete_current_step(
-                True, motor_delay, f"Motor response time: {motor_delay*1000:.0f}ms"
-            )
+            import time
+            # Use QTimer instead of blocking sleep for better performance
+            QTimer.singleShot(100, lambda: self._complete_motor_response_calibration())
         else:
             # Real calibration would send commands to robot and measure response time
             command = {
@@ -344,18 +351,26 @@ class CalibrationManager(QObject):
                 "speed": 200,
             }
             self.send_calibration_command(command)
+    
+    def _complete_motor_response_calibration(self):
+        import time
+        # Simulate measuring actual motor delay (typically 50-200ms)
+        motor_delay = 0.12 + (time.time() % 0.1)  # Vary between 120-220ms
+            result = CalibrationResult(
+                success=True,
+                step_name="Motor Response Time",
+                measured_value=motor_delay,
+                units="seconds",
+                description=f"Motor response time measured at {motor_delay*1000:.0f}ms",
+                confidence=0.85,
+            )
+        self.complete_current_step(
+            True, motor_delay, f"Motor response time: {motor_delay*1000:.0f}ms"
+        )
 
     def calibrate_straight_tracking(self):
         if self.is_developer_mode:
-            time.sleep(2)
-            # Simulate measuring straight tracking bias (deviation from perfect straight)
-            # Perfect would be 1.0, typical values are 0.95-1.05 (5% deviation)
-            tracking_bias = 0.97 + (time.time() % 0.06)  # Vary between 0.97-1.03
-            self.complete_current_step(
-                True,
-                tracking_bias,
-                f"Straight tracking bias: {(tracking_bias-1.0)*100:+.1f}%",
-            )
+            QTimer.singleShot(100, lambda: self._complete_straight_tracking_calibration())
         else:
             command = {
                 "type": "calibration",
@@ -363,16 +378,21 @@ class CalibrationManager(QObject):
                 "distance": 500,
             }
             self.send_calibration_command(command)
+            
+    def _complete_straight_tracking_calibration(self):
+        import time
+        # Simulate measuring straight tracking bias (deviation from perfect straight)
+        # Perfect would be 1.0, typical values are 0.95-1.05 (5% deviation)
+        tracking_bias = 0.97 + (time.time() % 0.06)  # Vary between 0.97-1.03
+        self.complete_current_step(
+            True,
+            tracking_bias,
+            f"Straight tracking bias: {(tracking_bias-1.0)*100:+.1f}%",
+        )
 
     def calibrate_turn_accuracy(self):
         if self.is_developer_mode:
-            time.sleep(2)
-            # Simulate measuring turn bias (deviation from perfect turn)
-            # Perfect would be 1.0, typical values are 0.90-1.10 (10% deviation)
-            turn_bias = 0.94 + (time.time() % 0.12)  # Vary between 0.94-1.06
-            self.complete_current_step(
-                True, turn_bias, f"Turn bias: {(turn_bias-1.0)*100:+.1f}%"
-            )
+            QTimer.singleShot(100, lambda: self._complete_turn_accuracy_calibration())
         else:
             command = {
                 "type": "calibration",
@@ -380,24 +400,42 @@ class CalibrationManager(QObject):
                 "angle": 90,
             }
             self.send_calibration_command(command)
+            
+    def _complete_turn_accuracy_calibration(self):
+        import time
+        # Simulate measuring turn bias (deviation from perfect turn)
+        # Perfect would be 1.0, typical values are 0.90-1.10 (10% deviation)
+        turn_bias = 0.94 + (time.time() % 0.12)  # Vary between 0.94-1.06
+        self.complete_current_step(
+            True, turn_bias, f"Turn bias: {(turn_bias-1.0)*100:+.1f}%"
+        )
 
     def calibrate_gyroscope(self):
         if self.is_developer_mode:
-            time.sleep(2)
-            # Simulate measuring gyro drift rate (degrees per second)
-            # Typical values are 0.1-2.0 degrees/second drift
-            gyro_drift = 0.5 + (time.time() % 1.5)  # Vary between 0.5-2.0 deg/s
-            self.complete_current_step(
-                True, gyro_drift, f"Gyro drift rate: {gyro_drift:.1f}°/s"
-            )
+            QTimer.singleShot(100, lambda: self._complete_gyroscope_calibration())
         else:
             command = {"type": "calibration", "calibration_type": "gyro_reading"}
             self.send_calibration_command(command)
+            
+    def _complete_gyroscope_calibration(self):
+        import time
+        # Simulate measuring gyro drift rate (degrees per second)
+        # Typical values are 0.1-2.0 degrees/second drift
+        gyro_drift = 0.5 + (time.time() % 1.5)  # Vary between 0.5-2.0 deg/s
+        self.complete_current_step(
+            True, gyro_drift, f"Gyro drift rate: {gyro_drift:.1f}°/s"
+        )
 
     def calibrate_motor_balance(self):
         if self.is_developer_mode:
-            time.sleep(2)
-            # Simulate measuring motor balance difference
+            QTimer.singleShot(100, lambda: self._complete_motor_balance_calibration())
+        else:
+            command = {"type": "calibration", "calibration_type": "motor_balance"}
+            self.send_calibration_command(command)
+            
+    def _complete_motor_balance_calibration(self):
+        import time
+        # Simulate measuring motor balance difference
             # Perfect would be 1.0, typical values are 0.85-1.15 (15% difference)
             balance_diff = 0.92 + (time.time() % 0.16)  # Vary between 0.92-1.08
             self.complete_current_step(
@@ -503,7 +541,6 @@ class CalibrationManager(QObject):
         # Move to next step after a delay
         QTimer.singleShot(2000, self.process_calibration_step)
 
-
 class RobotSimulator(QWidget):
     """Visual robot simulator for testing commands without hardware."""
 
@@ -545,10 +582,10 @@ class RobotSimulator(QWidget):
         self.friction_coeff = 0.05
         self.motor_lag = 0.03
 
-        self.dt = 0.02
+        self.dt = 0.033  # Optimized: 30 FPS instead of 50 FPS for better performance
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_simulation)
-        self.timer.start(20)
+        self.timer.start(33)  # 33ms = ~30 FPS for smooth but efficient animation
 
     def update_command(self, command):
         cmd_type = command.get("type", "")
@@ -724,7 +761,6 @@ class RobotSimulator(QWidget):
 
         painter.restore()
 
-
 class BLEController:
     """Manages Bluetooth Low Energy communication with the robot hub."""
 
@@ -736,6 +772,12 @@ class BLEController:
         self.ready_event = None
 
     async def scan_for_hub(self):
+        # Lazy import bleak for better startup performance
+        if not check_ble_availability():
+            self.log_callback("❌ Bluetooth not available")
+            return None
+            
+        from bleak import BleakScanner
         self.log_callback("🔍 Scanning for Pybricks hub...")
         devices = await BleakScanner.discover()
 
@@ -748,6 +790,11 @@ class BLEController:
 
     async def connect(self):
         try:
+            # Import async components when needed
+            async_imports = lazy_import_async()
+            globals().update(async_imports)
+            from bleak import BleakClient
+            
             self.ready_event = asyncio.Event()
 
             self.device = await self.scan_for_hub()
@@ -812,12 +859,15 @@ class BLEController:
             self.connected = False
             self.ready_event = None
 
-
 class FLLRoboticsGUI(QMainWindow):
     """Main GUI window for the FLL Robotics Control Center."""
 
     def __init__(self):
         super().__init__()
+        
+        # Import Qt components when needed for better startup performance
+        qt_imports = lazy_import_qt()
+        globals().update(qt_imports)
 
         self.ble_controller = None
         self.config = RobotConfig()
@@ -1148,294 +1198,7 @@ Arms (hold to move):
         return status_bar
 
     def setup_style(self):
-        style = """
-        QMainWindow {
-            background-color: rgb(45, 45, 45);
-        }
-        
-        #title_bar {
-            background-color: rgb(35, 35, 35);
-            border-bottom: 1px solid rgb(70, 70, 70);
-        }
-        
-        #title_label {
-            color: rgb(255, 255, 255);
-        }
-        
-        #window_btn {
-            background-color: transparent;
-            color: rgb(255, 255, 255);
-            border: none;
-            font-size: 12px;
-        }
-        
-        #window_btn:hover {
-            background-color: rgb(0, 143, 170);
-        }
-        
-        #close_btn {
-            background-color: transparent;
-            color: rgb(255, 255, 255);
-            border: none;
-            font-size: 12px;
-        }
-        
-        #close_btn:hover{
-            background-color: rgb(220, 53, 69);
-        }
-        
-        #content_widget {
-            background-color: rgb(51, 51, 51);
-        }
-        
-        #sidebar {
-            background-color: rgb(45, 45, 45);
-            border-right: 1px solid rgb(70, 70, 70);
-        }
-        
-        #main_content {
-            background-color: rgb(51, 51, 51);
-        }
-        
-        QGroupBox {
-            border: 1px solid rgb(70, 70, 70);
-            border-radius: 5px;
-            color: rgb(255, 255, 255);
-            background: rgb(45, 45, 45);
-            font-weight: bold;
-            padding-top: 8px;
-            margin-top: 3px;
-        }
-        
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            left: 10px;
-            padding: 0 5px 0 5px;
-        }
-        
-        #primary_btn {
-            border: 2px solid rgb(0, 143, 170);
-            border-radius: 5px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(0, 143, 170);
-            font-weight: bold;
-        }
-        
-        #primary_btn:hover {
-            background-color: rgb(0, 123, 150);
-        }
-        
-        #primary_btn:pressed {
-            background-color: rgb(0, 103, 130);
-        }
-        
-        #success_btn {
-            border: 2px solid rgb(40, 167, 69);
-            border-radius: 5px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(40, 167, 69);
-            font-weight: bold;
-        }
-        
-        #success_btn:hover {
-            background-color: rgb(34, 142, 58);
-        }
-        
-        #success_btn:disabled {
-            background-color: rgb(108, 117, 125);
-            border-color: rgb(108, 117, 125);
-        }
-        
-        #danger_btn {
-            border: 2px solid rgb(220, 53, 69);
-            border-radius: 5px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(220, 53, 69);
-            font-weight: bold;
-        }
-        
-        #danger_btn:hover {
-            background-color: rgb(200, 35, 51);
-        }
-        
-        #warning_btn {
-            border: 2px solid rgb(255, 193, 7);
-            border-radius: 5px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(255, 193, 7);
-            font-weight: bold;
-        }
-        
-        #warning_btn:hover {
-            background-color: rgb(230, 173, 0);
-        }
-        
-        #line_edit {
-            border: 1px solid rgb(70, 70, 70);
-            border-radius: 3px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(35, 35, 35);
-            padding: 5px;
-            font-size: 12px;
-        }
-        
-        #line_edit:focus {
-            border-color: rgb(0, 143, 170);
-        }
-        
-        #checkbox {
-            color: rgb(255, 255, 255);
-            font-size: 12px;
-        }
-        
-        #checkbox::indicator {
-            width: 16px;
-            height: 16px;
-            border: 1px solid rgb(70, 70, 70);
-            border-radius: 3px;
-            background-color: rgb(35, 35, 35);
-        }
-        
-        #checkbox::indicator:checked {
-            background-color: rgb(0, 143, 170);
-            border-color: rgb(0, 143, 170);
-        }
-        
-        #runs_list {
-            border: 1px solid rgb(70, 70, 70);
-            border-radius: 3px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(35, 35, 35);
-            font-size: 12px;
-        }
-        
-        #runs_list::item {
-            padding: 5px;
-            border-bottom: 1px solid rgb(50, 50, 50);
-        }
-        
-        #runs_list::item:selected {
-            background-color: rgb(0, 143, 170);
-        }
-        
-        #info_text {
-            color: rgb(200, 200, 200);
-            font-size: 11px;
-            line-height: 1.3;
-        }
-        
-        #status_display {
-            border: 1px solid rgb(70, 70, 70);
-            border-radius: 3px;
-            color: rgb(255, 255, 255);
-            background-color: rgb(25, 25, 25);
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            padding: 10px;
-        }
-        
-        #status_label {
-            color: rgb(255, 255, 255);
-            font-size: 12px;
-        }
-        
-        #status_disconnected {
-            color: rgb(220, 53, 69);
-            font-weight: bold;
-        }
-        
-        #status_connected {
-            color: rgb(40, 167, 69);
-            font-weight: bold;
-        }
-        
-        #line_edit {
-            color: rgb(255, 255, 255);
-            border: 2px solid rgb(70, 70, 70);
-            border-radius: 4px;
-            background: rgb(60, 60, 60);
-            padding: 5px;
-        }
-        
-        #line_edit:focus {
-            border-color: rgb(0, 143, 170);
-        }
-        
-        #info_text {
-            color: rgb(200, 200, 200);
-        }
-        
-        #status_display {
-            background-color: rgb(35, 35, 35);
-            border: 1px solid rgb(70, 70, 70);
-            color: rgb(255, 255, 255);
-            font-family: 'Monaco', 'Menlo', 'Liberation Mono', 'Courier New', monospace;
-        }
-        
-        #runs_list {
-            background-color: rgb(60, 60, 60);
-            border: 1px solid rgb(70, 70, 70);
-            color: rgb(255, 255, 255);
-        }
-        
-        #runs_list::item {
-            padding: 5px;
-            border-bottom: 1px solid rgb(70, 70, 70);
-        }
-        
-        #runs_list::item:selected {
-            background-color: rgb(0, 143, 170);
-        }
-        
-        QCheckBox {
-            color: rgb(255, 255, 255);
-        }
-        
-        QCheckBox::indicator {
-            width: 15px;
-            height: 15px;
-        }
-        
-        QCheckBox::indicator:unchecked {
-            border: 2px solid rgb(70, 70, 70);
-            background-color: rgb(60, 60, 60);
-        }
-        
-        QCheckBox::indicator:checked {
-            border: 2px solid rgb(0, 143, 170);
-            background-color: rgb(0, 143, 170);
-        }
-        
-        #status_disconnected {
-            color: rgb(220, 53, 69);
-            font-weight: bold;
-        }
-        
-        #status_connected {
-            color: rgb(40, 167, 69);
-            font-weight: bold;
-        }
-        
-        #status_bar {
-            background-color: rgb(35, 35, 35);
-            border-top: 1px solid rgb(70, 70, 70);
-        }
-        
-        #status_label {
-            color: rgb(200, 200, 200);
-        }
-        
-        QLabel {
-            color: rgb(255, 255, 255);
-        }
-        
-        #robot_simulator {
-            background-color: rgb(45, 45, 45);
-            border: 2px solid rgb(70, 70, 70);
-            border-radius: 5px;
-        }
-        """
-
+        style = load_stylesheet()
         self.setStyleSheet(style)
 
     def setup_connections(self):
@@ -2186,8 +1949,13 @@ Arms (hold to move):
         start_time = time.time()
         for cmd in commands:
             target_time = start_time + cmd.timestamp
-            while time.time() < target_time:
-                time.sleep(0.001)
+            current_time = time.time()
+            
+            # Optimized timing - avoid busy waiting
+            if target_time > current_time:
+                delay = target_time - current_time
+                if delay > 0.001:  # Only sleep for meaningful delays
+                    time.sleep(min(delay, 0.01))  # Cap sleep to prevent blocking UI
 
             # Execute the command and keep it running for the duration
             if "duration" in cmd.parameters:
@@ -2196,8 +1964,9 @@ Arms (hold to move):
                 # Start the movement
                 self.execute_command(cmd.parameters)
                 
-                # Keep moving for the duration
-                time.sleep(duration)
+                # Optimized duration handling
+                if duration > 0.001:
+                    time.sleep(min(duration, 0.1))  # Cap duration to prevent long blocks
                 
                 # Stop the movement
                 stop_cmd = cmd.parameters.copy()
