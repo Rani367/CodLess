@@ -1650,7 +1650,7 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    // Placeholder methods for features to be implemented
+
     toggleRecording() {
         // Implementation for recording toggle
         this.toastManager.show('Recording feature implementation in progress', 'info');

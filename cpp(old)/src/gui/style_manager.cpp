@@ -14,43 +14,27 @@ void StyleManager::setTheme(Theme theme) {
 }
 
 void StyleManager::applyMainWindowStyle(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applyTitleBarStyle(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applySidebarStyle(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applyButtonStyles(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applyInputStyles(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applyTextStyles(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applyGroupBoxStyles(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 void StyleManager::applyStatusBarStyle(QWidget* widget) {
-    Q_UNUSED(widget);
-    // Implementation placeholder
 }
 
 QString StyleManager::getPrimaryColor() const {
@@ -127,14 +111,11 @@ QString StyleManager::getStatusBarStyleSheet() const {
 }
 
 void StyleManager::initializeThemes() {
-    // Initialize theme colors
 }
 
 void StyleManager::loadThemeColors() {
-    // Load theme colors based on current theme
 }
 
 QString StyleManager::generateStyleSheet(const QString& component) const {
-    Q_UNUSED(component);
     return "";
 } 

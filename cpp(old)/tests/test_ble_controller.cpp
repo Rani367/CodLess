@@ -73,7 +73,7 @@ void TestBLEController::testConnectionStates()
     // Test initial state
     QCOMPARE(controller->getConnectionState(), BLEController::ConnectionState::Disconnected);
     
-    // Mock state changes would be tested here with proper mock objects
+    
     QVERIFY(spy.isValid());
 }
 

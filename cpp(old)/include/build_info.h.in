@@ -1,6 +1,4 @@
 #pragma once
-
-// Auto-generated build information
 #define BUILD_VERSION "@CMAKE_PROJECT_VERSION@"
 #define BUILD_TIMESTAMP "@CMAKE_CURRENT_TIMESTAMP@"
 #define BUILD_COMMIT_HASH "@GIT_COMMIT_HASH@"

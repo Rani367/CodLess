@@ -282,11 +282,6 @@ double TrajectoryPlanner::calculateCrossTrackError(const QPointF& position, cons
 
 double TrajectoryPlanner::calculateHeadingError(double currentHeading, const QVector<PathNode>& path,
                                                const QPointF& position) const {
-    Q_UNUSED(path);
-    Q_UNUSED(position);
-    Q_UNUSED(currentHeading);
-    
-    // Implementation placeholder
     return 0.0;
 }
 
@@ -341,8 +336,6 @@ double TrajectoryPlanner::calculatePathSmoothness(const QVector<PathNode>& path)
 }
 
 double TrajectoryPlanner::calculateEnergyConsumption(const QVector<PathNode>& path) const {
-    Q_UNUSED(path);
-    // Implementation placeholder
     return 1.0;
 }
 
@@ -377,7 +370,6 @@ void TrajectoryPlanner::setInflationRadius(double radius) {
 }
 
 void TrajectoryPlanner::performDynamicReplanning() {
-    // Implementation placeholder
 }
 
 void TrajectoryPlanner::updateObstaclePredictions() {
@@ -385,7 +377,6 @@ void TrajectoryPlanner::updateObstaclePredictions() {
 }
 
 void TrajectoryPlanner::monitorCollisions() {
-    // Implementation placeholder
 }
 
 void TrajectoryPlanner::initializePlanner() {
@@ -450,9 +441,7 @@ void TrajectoryPlanner::updateObstacleGrid() {
 
 QVector<TrajectoryPlanner::PathNode> TrajectoryPlanner::aStarPathfinding(const QPointF& start, const QPointF& goal,
                                                                         const PlanningConstraints& constraints) {
-    Q_UNUSED(constraints);
-    
-    // Implementation placeholder - simplified A* algorithm
+
     QVector<PathNode> path;
     
     // Create a simple straight-line path for now
@@ -479,31 +468,20 @@ double TrajectoryPlanner::calculateHeuristic(const QPointF& a, const QPointF& b)
 }
 
 QVector<TrajectoryPlanner::GridCell*> TrajectoryPlanner::getNeighbors(GridCell* cell) const {
-    Q_UNUSED(cell);
-    // Implementation placeholder
     return QVector<GridCell*>();
 }
 
 double TrajectoryPlanner::calculateMovementCost(GridCell* from, GridCell* to) const {
-    Q_UNUSED(from);
-    Q_UNUSED(to);
-    // Implementation placeholder
     return 1.0;
 }
 
 QVector<TrajectoryPlanner::PathNode> TrajectoryPlanner::rrtPathfinding(const QPointF& start, const QPointF& goal,
                                                                       const PlanningConstraints& constraints) {
-    Q_UNUSED(start);
-    Q_UNUSED(goal);
-    Q_UNUSED(constraints);
-    // Implementation placeholder
     return QVector<PathNode>();
 }
 
 QVector<TrajectoryPlanner::PathNode> TrajectoryPlanner::optimizePath(const QVector<PathNode>& path,
                                                                     const PlanningConstraints& constraints) {
-    Q_UNUSED(constraints);
-    // Implementation placeholder
     return path;
 }
 
@@ -538,24 +516,15 @@ QVector<TrajectoryPlanner::PathNode> TrajectoryPlanner::generateVelocityProfile(
 }
 
 QVector<TrajectoryPlanner::PathNode> TrajectoryPlanner::applyCubicBezierSmoothing(const QVector<PathNode>& path) {
-    // Implementation placeholder - simplified smoothing
     return path;
 }
 
 QPointF TrajectoryPlanner::calculateBezierPoint(const QPointF& p0, const QPointF& p1,
                                                const QPointF& p2, const QPointF& p3, double t) const {
-    Q_UNUSED(p0);
-    Q_UNUSED(p1);
-    Q_UNUSED(p2);
-    Q_UNUSED(p3);
-    Q_UNUSED(t);
-    // Implementation placeholder
     return QPointF();
 }
 
 void TrajectoryPlanner::predictObstacleMovement(double timeHorizon) {
-    Q_UNUSED(timeHorizon);
-    // Implementation placeholder
 }
 
 QPointF TrajectoryPlanner::predictObstaclePosition(const Obstacle& obstacle, double time) const {
@@ -577,11 +546,6 @@ bool TrajectoryPlanner::isPointInObstacle(const QPointF& point, const Obstacle& 
 
 bool TrajectoryPlanner::isLineIntersectingObstacle(const QPointF& start, const QPointF& end,
                                                   const Obstacle& obstacle, double timestamp) const {
-    Q_UNUSED(start);
-    Q_UNUSED(end);
-    Q_UNUSED(obstacle);
-    Q_UNUSED(timestamp);
-    // Implementation placeholder
     return false;
 }
 

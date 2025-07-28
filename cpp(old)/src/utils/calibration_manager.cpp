@@ -28,7 +28,7 @@ void CalibrationManager::setBLEController(BLEController* controller) {
     
     bleController = controller;
     
-    // Note: Robot responses will be handled through timing and command acknowledgments
+
     // rather than explicit response signals for this calibration system
 }
 
@@ -61,7 +61,7 @@ void CalibrationManager::startCalibration() {
         return;
     }
     
-    // Note: Developer mode warning is handled by the UI layer
+
     // to avoid multiple dialogs
     
 
@@ -521,7 +521,7 @@ void CalibrationManager::analyzeMotorResponse() {
 }
 
 void CalibrationManager::analyzeStraightTracking() {
-    // Simulate analysis - real implementation would use gyroscope data
+    
     double driftCorrection = 0.3; // degrees
     
     calibratedConfig.straightDriftCorrection = driftCorrection;

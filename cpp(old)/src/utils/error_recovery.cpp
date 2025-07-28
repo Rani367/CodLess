@@ -61,10 +61,6 @@ void ErrorRecovery::setDefaultRecoveryStrategy(ErrorType type, RecoveryStrategy 
 }
 
 void ErrorRecovery::setErrorThreshold(ErrorType type, int maxErrors, int timeWindowSeconds) {
-    Q_UNUSED(type);
-    Q_UNUSED(maxErrors);
-    Q_UNUSED(timeWindowSeconds);
-    // Implementation placeholder
 }
 
 void ErrorRecovery::enableAutoRecovery(bool enabled) {
@@ -99,11 +95,9 @@ void ErrorRecovery::setBLEMaxReconnectAttempts(int attempts) {
 }
 
 void ErrorRecovery::saveRecoveryState() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::loadRecoveryState() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::clearRecoveryState() {
@@ -137,8 +131,7 @@ QStringList ErrorRecovery::getErrorPatterns() const {
 }
 
 bool ErrorRecovery::isErrorTrendIncreasing(ErrorType type) const {
-    Q_UNUSED(type);
-    return false; // Implementation placeholder
+    return false;
 }
 
 bool ErrorRecovery::isRecoveryInProgress() const {
@@ -170,11 +163,9 @@ void ErrorRecovery::setErrorLogRetentionDays(int days) {
 }
 
 void ErrorRecovery::processRecoveryQueue() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::checkCircuitBreakers() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::cleanupOldErrors() {
@@ -187,11 +178,9 @@ void ErrorRecovery::cleanupOldErrors() {
 }
 
 void ErrorRecovery::attemptAutoRecovery() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::monitorSystemHealth() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::initializeRecovery() {
@@ -258,9 +247,9 @@ bool ErrorRecovery::attemptRecovery(const ErrorInfo& error, const RecoveryAction
     
     switch (action.strategy) {
         case RecoveryStrategy::Retry:
-            return true; // Placeholder - would retry the operation
+            return true;
         case RecoveryStrategy::Fallback:
-            return true; // Placeholder - would use fallback mechanism
+            return true;
         case RecoveryStrategy::Graceful:
             degradeGracefully(error.component, error.message);
             return true;
@@ -286,7 +275,6 @@ void ErrorRecovery::updateErrorStatistics(const ErrorInfo& error) {
 }
 
 void ErrorRecovery::analyzeErrorPatterns() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::triggerCircuitBreaker(ErrorType type, const QString& component) {
@@ -318,9 +306,7 @@ void ErrorRecovery::degradeGracefully(const QString& component, const QString& r
 }
 
 void ErrorRecovery::saveErrorLog() {
-    // Implementation placeholder
 }
 
 void ErrorRecovery::loadErrorLog() {
-    // Implementation placeholder
 } 

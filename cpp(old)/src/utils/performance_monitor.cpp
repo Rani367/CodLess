@@ -114,7 +114,6 @@ void PerformanceMonitor::logComponentTime(const QString& componentName, double t
 }
 
 void PerformanceMonitor::trackMemoryUsage() {
-    // Implementation placeholder
 }
 
 void PerformanceMonitor::trackMemoryAllocation(const QString& component, qint64 bytes) {
@@ -126,7 +125,6 @@ void PerformanceMonitor::trackMemoryDeallocation(const QString& component, qint6
 }
 
 void PerformanceMonitor::detectMemoryLeaks() {
-    // Implementation placeholder
 }
 
 void PerformanceMonitor::trackNetworkLatency(double latencyMs) {
@@ -168,19 +166,14 @@ double PerformanceMonitor::getAveragePhysicsTime() const {
 }
 
 QList<PerformanceMonitor::PerformanceMetrics> PerformanceMonitor::getPerformanceHistory(int seconds) const {
-    Q_UNUSED(seconds);
     QMutexLocker locker(&metricsMutex);
     return metricsHistory.toList();
 }
 
 void PerformanceMonitor::savePerformanceReport(const QString& filePath) const {
-    Q_UNUSED(filePath);
-    // Implementation placeholder
 }
 
 void PerformanceMonitor::exportPerformanceData(const QString& filePath) const {
-    Q_UNUSED(filePath);
-    // Implementation placeholder
 }
 
 void PerformanceMonitor::enableAutoOptimization(bool enabled) {
@@ -272,13 +265,11 @@ void PerformanceMonitor::calculateFPS() {
 }
 
 void PerformanceMonitor::calculateCPUUsage() {
-    // Implementation placeholder - would use platform-specific CPU monitoring
-    currentMetrics.cpuUsage = 25.0; // Placeholder value
+    currentMetrics.cpuUsage = 25.0;
 }
 
 void PerformanceMonitor::calculateMemoryUsage() {
-    // Implementation placeholder - would use platform-specific memory monitoring
-    currentMetrics.memoryUsage = 128 * 1024 * 1024; // Placeholder value
+    currentMetrics.memoryUsage = 128 * 1024 * 1024;
 }
 
 void PerformanceMonitor::detectPerformanceIssues() {

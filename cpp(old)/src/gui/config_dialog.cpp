@@ -721,7 +721,7 @@ void ConfigDialog::resetToDefaults() {
 }
 
 void ConfigDialog::validateInputs() {
-    // This method is kept for potential future validation needs
+
     // but the preview functionality has been removed
 }
 

@@ -1476,7 +1476,7 @@ void MainWindow::executeCommand(const QVariantHash& command) {
             }
         }
         
-        // Apply motor delay compensation would be handled by the hub
+        
         // or could be implemented as a delay in command sending
     }
     
