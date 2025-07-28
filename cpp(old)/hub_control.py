@@ -52,137 +52,158 @@ try:
 except:
     pass
 
-keyboard = poll()
-keyboard.register(stdin)
+poll_obj = poll()
+poll_obj.register(stdin, 1)
 
-hub.display.icon([
-    [0, 100, 0, 100, 0],
-    [100, 100, 100, 100, 100],
-    [0, 100, 100, 100, 0],
-    [0, 0, 100, 0, 0],
-    [0, 0, 100, 0, 0]
-])
+stdout.write("rdy\n")
+wait(1)
+
+def execute_command(cmd):
+    try:
+        cmd_type = cmd.get("type", "")
+        
+        if cmd_type == "drive" and drive_base:
+            speed = cmd.get("speed", 0)
+            turn_rate = cmd.get("turn_rate", 0)
+            drive_base.drive(speed, turn_rate)
+            
+        elif cmd_type == "stop" and drive_base:
+            drive_base.stop()
+            
+        elif cmd_type == "arm1" and "arm1" in motors:
+            speed = cmd.get("speed", 0)
+            if speed == 0:
+                motors["arm1"].stop()
+            else:
+                motors["arm1"].run(speed)
+                
+        elif cmd_type == "arm2" and "arm2" in motors:
+            speed = cmd.get("speed", 0)
+            if speed == 0:
+                motors["arm2"].stop()
+            else:
+                motors["arm2"].run(speed)
+                
+        elif cmd_type == "beep":
+            hub.speaker.beep(frequency=1000, duration=100)
+            
+        elif cmd_type == "light":
+            color_map = {
+                "red": Color.RED,
+                "green": Color.GREEN,
+                "blue": Color.BLUE,
+                "yellow": Color.YELLOW,
+                "white": Color.WHITE,
+                "off": None
+            }
+            color = color_map.get(cmd.get("color", "off"))
+            if color:
+                hub.light.on(color)
+            else:
+                hub.light.off()
+                
+        elif cmd_type == "display":
+            icon = cmd.get("icon", [])
+            if icon:
+                hub.display.icon(icon)
+            else:
+                hub.display.off()
+                
+        elif cmd_type == "calibration":
+            calibration_type = cmd.get("calibration_type", "")
+            
+            if calibration_type == "motor_response":
+                start_time = time.time()
+                if drive_base:
+                    drive_base.drive(100, 0)
+                    wait(100)
+                    drive_base.stop()
+                response_time = time.time() - start_time
+                result = {
+                    "type": "calibration_result",
+                    "calibration_type": "motor_response",
+                    "measured_value": response_time,
+                    "success": True
+                }
+                stdout.write(ujson.dumps(result) + "\n")
+                
+            elif calibration_type == "straight_tracking":
+                if drive_base:
+                    initial_heading = hub.imu.heading()
+                    drive_base.straight(300)
+                    final_heading = hub.imu.heading()
+                    drift = abs(final_heading - initial_heading)
+                    result = {
+                        "type": "calibration_result",
+                        "calibration_type": "straight_tracking",
+                        "measured_value": drift,
+                        "success": True
+                    }
+                    stdout.write(ujson.dumps(result) + "\n")
+                    
+            elif calibration_type == "turn_accuracy":
+                if drive_base:
+                    initial_heading = hub.imu.heading()
+                    target_angle = cmd.get("angle", 90)
+                    drive_base.turn(target_angle)
+                    actual_angle = hub.imu.heading() - initial_heading
+                    accuracy = actual_angle / target_angle if target_angle != 0 else 1.0
+                    result = {
+                        "type": "calibration_result",
+                        "calibration_type": "turn_accuracy", 
+                        "measured_value": accuracy,
+                        "success": True
+                    }
+                    stdout.write(ujson.dumps(result) + "\n")
+                    
+            elif calibration_type == "gyro_reading":
+                readings = []
+                for _ in range(10):
+                    readings.append(hub.imu.angular_velocity()[2])
+                    wait(10)
+                avg_drift = sum(readings) / len(readings)
+                result = {
+                    "type": "calibration_result",
+                    "calibration_type": "gyro_reading",
+                    "measured_value": abs(avg_drift),
+                    "success": True
+                }
+                stdout.write(ujson.dumps(result) + "\n")
+                
+            elif calibration_type == "motor_balance":
+                if drive_base and "arm1" in motors:
+                    left_motor.reset_angle(0)
+                    right_motor.reset_angle(0)
+                    drive_base.straight(200)
+                    left_angle = abs(left_motor.angle())
+                    right_angle = abs(right_motor.angle())
+                    balance = left_angle / right_angle if right_angle != 0 else 1.0
+                    result = {
+                        "type": "calibration_result",
+                        "calibration_type": "motor_balance",
+                        "measured_value": balance,
+                        "success": True
+                    }
+                    stdout.write(ujson.dumps(result) + "\n")
+                    
+        stdout.write("rdy\n")
+        
+    except Exception as e:
+        error_result = {
+            "type": "error",
+            "message": str(e)
+        }
+        stdout.write(ujson.dumps(error_result) + "\n")
+        stdout.write("rdy\n")
 
 while True:
-    stdout.buffer.write(b"rdy")
-    
-    while not keyboard.poll(10):
-        wait(1)
-    
-    try:
-        data = stdin.buffer.read()
-        if data:
-            command_str = data.decode('utf-8')
-            command = ujson.loads(command_str)
-            
-            cmd_type = command.get('type', '')
-            
-            if cmd_type == 'drive' and drive_base:
-                speed = command.get('speed', 0)
-                turn_rate = command.get('turn_rate', 0)
-                drive_base.drive(speed, turn_rate)
-                stdout.buffer.write(b"DRIVE_OK")
-                
-            elif cmd_type in ['arm1', 'arm2'] and cmd_type in motors:
-                motor = motors[cmd_type]
-                speed = command.get('speed', 0)
-                if speed == 0:
-                    motor.stop()
-                else:
-                    motor.run(speed)
-                stdout.buffer.write(b"ARM_OK")
-                
-            elif cmd_type == 'config':
-                try:
-                    axle_track = command.get('axle_track', 112)
-                    wheel_diameter = command.get('wheel_diameter', 56)
-                    if drive_base:
-                        drive_base = DriveBase(left_motor, right_motor, 
-                                             wheel_diameter=wheel_diameter, 
-                                             axle_track=axle_track)
-                        
-                        straight_speed = command.get('straight_speed', 500)
-                        straight_acceleration = command.get('straight_acceleration', 250)
-                        turn_rate = command.get('turn_rate', 200)
-                        turn_acceleration = command.get('turn_acceleration', 300)
-                        
-                        drive_base.settings(
-                            straight_speed=straight_speed,
-                            straight_acceleration=straight_acceleration,
-                            turn_rate=turn_rate,
-                            turn_acceleration=turn_acceleration
-                        )
-                        
-                    stdout.buffer.write(b"CONFIG_OK")
-                except:
-                    stdout.buffer.write(b"CONFIG_ERROR")
-                    
-            elif cmd_type == 'calibrate':
-                try:
-                    calibration_type = command.get('calibration_type', '')
-                    
-                    if calibration_type == 'gyro_reading':
-                        # Get gyroscope heading
-                        gyro_value = hub.imu.heading()
-                        stdout.buffer.write(f"GYRO:{gyro_value}".encode())
-                    
-                    elif calibration_type == 'motor_position':
-                        # Get motor positions
-                        if drive_base:
-                            left_pos = left_motor.angle()
-                            right_pos = right_motor.angle()
-                            stdout.buffer.write(f"MOTORS:{left_pos},{right_pos}".encode())
-                        else:
-                            stdout.buffer.write(b"MOTORS_NOT_AVAILABLE")
-                    
-                    elif calibration_type == 'motor_balance':
-                        # Run motors for balance test
-                        if drive_base:
-                            # Reset motor positions
-                            left_motor.reset_angle(0)
-                            right_motor.reset_angle(0)
-                            
-                            # Run both motors at same speed for 1 second
-                            left_motor.run(200)
-                            right_motor.run(200)
-                            wait(1000)
-                            
-                            # Stop and read positions
-                            left_motor.stop()
-                            right_motor.stop()
-                            
-                            left_pos = left_motor.angle()
-                            right_pos = right_motor.angle()
-                            
-                            stdout.buffer.write(f"BALANCE:{left_pos},{right_pos}".encode())
-                        else:
-                            stdout.buffer.write(b"BALANCE_NOT_AVAILABLE")
-                    
-                    elif calibration_type == 'response_time':
-                        # Test motor response time
-                        if drive_base:
-                            # Record timestamp, start motor, stop motor
-                            start_time = time.ticks_ms()
-                            left_motor.run(200)
-                            wait(100)
-                            left_motor.stop()
-                            end_time = time.ticks_ms()
-                            
-                            response_time = time.ticks_diff(end_time, start_time)
-                            stdout.buffer.write(f"RESPONSE_TIME:{response_time}".encode())
-                        else:
-                            stdout.buffer.write(b"RESPONSE_TIME_NOT_AVAILABLE")
-                    
-                    else:
-                        stdout.buffer.write(b"UNKNOWN_CALIBRATION_TYPE")
-                        
-                except Exception as e:
-                    stdout.buffer.write(b"CALIBRATION_ERROR")
-                    
-            else:
-                stdout.buffer.write(b"UNKNOWN_CMD")
-                
-    except Exception as e:
-        stdout.buffer.write(b"ERROR")
-    
-    wait(10) 
+    if poll_obj.poll(0):
+        line = stdin.readline().strip()
+        if line:
+            try:
+                command = ujson.loads(line)
+                execute_command(command)
+            except:
+                stdout.write("rdy\n")
+    else:
+        wait(10) 

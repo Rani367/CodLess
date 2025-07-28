@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-CodLess - FLL Robotics Control Center
-A PySide6-based GUI application for controlling LEGO SPIKE Prime robots.
-"""
 
 __version__ = "1.0.0"
 
@@ -12,7 +8,6 @@ import shutil
 import glob
 import tempfile
 
-# Check for required dependencies
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
     PYSIDE_AVAILABLE = True
@@ -29,13 +24,11 @@ except ImportError:
     BLE_AVAILABLE = False
     sys.exit(1)
 
-# Prevent Python from writing bytecode files
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
 
 def clean_cache():
-    """Remove Python cache files and __pycache__ directories."""
     patterns = ["__pycache__", "*.pyc", "*.pyo", "*.pyd"]
     removed_count = 0
 
@@ -46,28 +39,19 @@ def clean_cache():
                     cache_dir = os.path.join(root, "__pycache__")
                     try:
                         shutil.rmtree(cache_dir)
-                        print(f"Removed: {cache_dir}")
                         removed_count += 1
-                    except Exception as e:
-                        print(f"Error removing {cache_dir}: {e}")
+                    except Exception:
+                        pass
         else:
             for file_path in glob.glob(pattern, recursive=True):
                 try:
                     os.remove(file_path)
-                    print(f"Removed: {file_path}")
                     removed_count += 1
-                except Exception as e:
-                    print(f"Error removing {file_path}: {e}")
-
-    if removed_count == 0:
-        print("No cache files found to clean.")
-    else:
-        print(f"Cleaned {removed_count} cache files/directories.")
+                except Exception:
+                    pass
 
 
 clean_cache()
-
-# Standard library imports
 import asyncio
 import threading
 import time
@@ -77,7 +61,6 @@ from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 import math
 
-# PySide6 imports
 from PySide6.QtCore import (
     QTimer,
     QPropertyAnimation,
@@ -121,10 +104,9 @@ from PySide6.QtWidgets import (
 
 from bleak import BleakScanner, BleakClient
 
-# Bluetooth and application constants
 PYBRICKS_COMMAND_EVENT_CHAR_UUID = "c5f50002-8280-46da-89f4-6d8051e4aeef"
 HUB_NAME_PREFIX = "Pybricks"
-# Use a writable directory for saved runs - try user home first, fallback to temp directory
+
 try:
     SAVED_RUNS_DIR = os.path.join(os.path.expanduser("~"), ".codless", "saved_runs")
 except Exception:
@@ -135,22 +117,16 @@ CALIBRATION_TIMEOUT = 10000
 
 @dataclass
 class RobotConfig:
-    """Robot hardware configuration and motion parameters."""
-    # Hardware configuration
     axle_track: float = 112.0
     wheel_diameter: float = 56.0
     left_motor_port: str = "A"
     right_motor_port: str = "B"
     arm1_motor_port: str = "C"
     arm2_motor_port: str = "D"
-
-    # Motion parameters
     straight_speed: float = 500.0
     straight_acceleration: float = 250.0
     turn_rate: float = 200.0
     turn_acceleration: float = 300.0
-
-    # Calibration compensation values
     motor_delay: float = 0.0
     motor_delay_confidence: float = 0.0
     straight_tracking_bias: float = 0.0
@@ -165,7 +141,6 @@ class RobotConfig:
 
 @dataclass
 class RecordedCommand:
-    """Recorded robot command with timestamp."""
     timestamp: float
     command_type: str
     parameters: Dict
@@ -173,7 +148,6 @@ class RecordedCommand:
 
 @dataclass
 class CalibrationResult:
-    """Calibration step result with measurement data."""
     success: bool = False
     step_name: str = ""
     measured_value: float = 0.0
@@ -183,7 +157,6 @@ class CalibrationResult:
 
 
 class CalibrationManager(QObject):
-    """Manages robot calibration process."""
     calibration_started = Signal()
     calibration_step_changed = Signal(int, str)
     calibration_progress = Signal(int)
@@ -316,8 +289,8 @@ class CalibrationManager(QObject):
 
     def calibrate_motor_response_time(self):
         if self.is_developer_mode:
-            time.sleep(2)
-            motor_delay = 0.12 + (time.time() % 0.1)  # Simulate 120-220ms delay
+            time.sleep(1)
+            motor_delay = 0.12 + (time.time() % 0.1)
             result = CalibrationResult(
                 success=True,
                 step_name="Motor Response Time",
@@ -356,7 +329,7 @@ class CalibrationManager(QObject):
 
     def calibrate_turn_accuracy(self):
         if self.is_developer_mode:
-            time.sleep(2)
+            time.sleep(1)
             turn_bias = 0.94 + (time.time() % 0.12)  # Simulate 94-106% accuracy
             self.complete_current_step(
                 True, turn_bias, f"Turn bias: {(turn_bias-1.0)*100:+.1f}%"
@@ -371,7 +344,7 @@ class CalibrationManager(QObject):
 
     def calibrate_gyroscope(self):
         if self.is_developer_mode:
-            time.sleep(2)
+            time.sleep(1)
             gyro_drift = 0.5 + (time.time() % 1.5)  # Simulate 0.5-2.0 deg/s drift
             self.complete_current_step(
                 True, gyro_drift, f"Gyro drift rate: {gyro_drift:.1f}°/s"
@@ -382,7 +355,7 @@ class CalibrationManager(QObject):
 
     def calibrate_motor_balance(self):
         if self.is_developer_mode:
-            time.sleep(2)
+            time.sleep(1)
             balance_diff = 0.92 + (time.time() % 0.16)  # Simulate 92-108% balance
             self.complete_current_step(
                 True,
@@ -501,8 +474,6 @@ class CalibrationManager(QObject):
 
 
 class RobotSimulator(QWidget):
-    """Visual robot simulator for testing commands without hardware."""
-
     def __init__(self):
         super().__init__()
         self.setMinimumSize(300, 200)
@@ -541,11 +512,8 @@ class RobotSimulator(QWidget):
         self.friction_coeff = 0.05
         self.motor_lag = 0.03
 
-        # Background map support
         self.background_map = None
         self.scaled_background_map = None
-
-        # Calibration compensation factors
         self.calibration_compensations = {
             'motor_delay': 0.0,
             'straight_tracking_bias': 0.0,
@@ -557,39 +525,28 @@ class RobotSimulator(QWidget):
         self.dt = 0.02
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_simulation)
-        self.timer.start(20)
+        self.timer.start(33)  # 30fps instead of 50fps
 
     def set_background_map(self, pixmap):
-        """Set background map for the simulator."""
         self.background_map = pixmap
-        self.scaled_background_map = None  # Will be recreated on next paint
+        self.scaled_background_map = None
         self.update()
 
     def apply_calibration_data(self, config):
-        """Apply calibration data to simulator physics for accurate simulation."""
         self.calibration_compensations['motor_delay'] = config.motor_delay
         self.calibration_compensations['straight_tracking_bias'] = config.straight_tracking_bias
         self.calibration_compensations['turn_bias'] = config.turn_bias
         self.calibration_compensations['motor_balance_difference'] = config.motor_balance_difference
         self.calibration_compensations['gyro_drift_rate'] = config.gyro_drift_rate
 
-        # Adjust physics parameters based on calibration
-        # Apply motor delay compensation
         if config.motor_delay_confidence > 0.5:
             self.motor_lag = 0.03 + (config.motor_delay * 0.1)
 
-        # Apply motor balance to friction differences
         if config.motor_balance_confidence > 0.5:
             self.friction_coeff = 0.05 + abs(config.motor_balance_difference * 0.02)
 
-        # Adjust turn accuracy
         if config.turn_confidence > 0.5:
             self.max_turn_accel = 600 * (1.0 + config.turn_bias * 0.1)
-
-        # Apply gyro drift simulation
-        if config.gyro_confidence > 0.5:
-            # Gyro drift will be applied during movement simulation
-            pass
 
     def update_command(self, command):
         cmd_type = command.get("type", "")
@@ -598,12 +555,13 @@ class RobotSimulator(QWidget):
             speed = command.get("speed", 0) * 1.5
             turn_rate = command.get("turn_rate", 0) * 1.2
             
-            # Apply calibration compensations
-            if self.calibration_compensations['straight_tracking_bias'] != 0:
-                speed *= (1.0 + self.calibration_compensations['straight_tracking_bias'])
+            bias = self.calibration_compensations['straight_tracking_bias']
+            if bias != 0:
+                speed *= (1.0 + bias)
             
-            if self.calibration_compensations['turn_bias'] != 0:
-                turn_rate *= (1.0 + self.calibration_compensations['turn_bias'])
+            tbias = self.calibration_compensations['turn_bias']
+            if tbias != 0:
+                turn_rate *= (1.0 + tbias)
             
             self.target_spd = speed
             self.target_turn = turn_rate
@@ -629,23 +587,16 @@ class RobotSimulator(QWidget):
         max_arm_change = self.max_arm_accel * self.dt
 
         def s_curve_profile(error, max_change, current_accel, max_accel):
-            jerk_limit = max_accel * 8
-            target_accel = min(max_accel, max(error * 15, -max_accel))
+            target_accel = max(-max_accel, min(max_accel, error * 15))
             accel_error = target_accel - current_accel
-            max_jerk_change = jerk_limit * self.dt
+            max_jerk_change = max_accel * 8 * self.dt
 
             if abs(accel_error) > max_jerk_change:
-                if accel_error > 0:
-                    new_accel = current_accel + max_jerk_change
-                else:
-                    new_accel = current_accel - max_jerk_change
+                new_accel = current_accel + (max_jerk_change if accel_error > 0 else -max_jerk_change)
             else:
                 new_accel = target_accel
 
-            friction_factor = 1.0 - self.friction_coeff * self.dt
-            damping = 0.92 + 0.08 * math.exp(-abs(error) * 0.1)
-
-            return new_accel * friction_factor * damping
+            return new_accel * (1.0 - self.friction_coeff * self.dt) * 0.95
 
         self.speed_accel = s_curve_profile(
             speed_error, max_speed_change, self.speed_accel, self.max_drive_accel
@@ -680,19 +631,13 @@ class RobotSimulator(QWidget):
             momentum_factor = 1.0 / (1.0 + self.robot_mass * 0.1)
             inertia_factor = 1.0 / (1.0 + self.robot_inertia * 2.0)
 
-            # Apply gyro drift simulation
             gyro_drift = self.calibration_compensations.get('gyro_drift_rate', 0.0)
             if gyro_drift != 0.0:
-                # Add slight drift to angle over time
-                drift_error = gyro_drift * self.dt * 0.1
-                sim_turn += drift_error
+                sim_turn += gyro_drift * self.dt * 0.1
 
-            # Apply motor balance compensation simulation
             motor_balance_diff = self.calibration_compensations.get('motor_balance_difference', 0.0)
             if motor_balance_diff != 0.0 and abs(sim_speed) > 0.01:
-                # Simulate slight turning due to motor imbalance
-                balance_turn = motor_balance_diff * sim_speed * 0.05
-                sim_turn += balance_turn
+                sim_turn += motor_balance_diff * sim_speed * 0.05
 
             self.robot_angle += sim_turn * self.dt * inertia_factor
             self.robot_angle = self.robot_angle % 360
@@ -747,22 +692,11 @@ class RobotSimulator(QWidget):
 
         self.draw_robot(painter)
         
-        # Draw status text
         painter.setPen(QPen(QColor(255, 255, 255), 1))
-        painter.setFont(QFont("Arial", 10))
-
-        status_text = f"Position: ({int(self.robot_x)}, {int(self.robot_y)})"
-        status_text += f" | Angle: {int(self.robot_angle)}°"
+        painter.setFont(QFont("Arial", 9))
+        
+        status_text = f"Pos: ({int(self.robot_x)}, {int(self.robot_y)}) | {int(self.robot_angle)}°"
         painter.drawText(10, 20, status_text)
-
-        physics_text = f"Speed: {self.actual_spd:.1f} | Turn: {self.actual_turn:.1f}"
-        painter.drawText(10, 40, physics_text)
-
-        accel_text = f"Accel: {self.speed_accel:.1f} | T-Accel: {self.turn_accel:.1f}"
-        painter.drawText(10, 60, accel_text)
-
-        arm_text = f"Arm1: {int(self.arm1_angle)}° | Arm2: {int(self.arm2_angle)}°"
-        painter.drawText(10, 80, arm_text)
 
     def draw_robot(self, painter):
         painter.save()
@@ -807,8 +741,6 @@ class RobotSimulator(QWidget):
 
 
 class BLEController:
-    """Manages Bluetooth Low Energy communication with the robot hub."""
-
     def __init__(self, log_callback):
         self.client = None
         self.device = None
@@ -895,8 +827,6 @@ class BLEController:
 
 
 class FLLRoboticsGUI(QMainWindow):
-    """Main GUI window for the FLL Robotics Control Center."""
-
     def __init__(self):
         super().__init__()
 
@@ -1661,7 +1591,6 @@ Arms (hold to move):
         self.status_label.setText(message)
 
     def disable_controls_until_calibration(self):
-        """Disable all robot controls until calibration is completed."""
         self.record_btn.setEnabled(False)
         self.save_btn.setEnabled(False)
         self.play_btn.setEnabled(False)
@@ -1677,7 +1606,6 @@ Arms (hold to move):
         self.upload_map_btn.setToolTip("Calibration required before map upload")
 
     def enable_controls_after_calibration(self):
-        """Enable all robot controls after successful calibration."""
         self.record_btn.setEnabled(True)
         self.play_btn.setEnabled(True)
         self.delete_btn.setEnabled(True)
@@ -1830,7 +1758,6 @@ Arms (hold to move):
             self.robot_simulator.actual_arm2_spd = 0
 
     def upload_fll_map(self):
-        """Allow user to upload an FLL map image for better visualization."""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Upload FLL Map",
@@ -1877,7 +1804,6 @@ Arms (hold to move):
                 self.execute_command(config_command)
 
     def on_calibration_completed(self, config):
-        """Handle calibration completion from the config dialog."""
         # Update the config with calibrated values
         self.config = config
 
@@ -1915,7 +1841,6 @@ Arms (hold to move):
         self.log_status("Robot calibrated! All controls are now enabled.", "success")
 
     def on_calibration_failed(self, reason):
-        """Handle calibration failure from the config dialog."""
         # Reset calibration flag and disable controls
         self.is_calibrated = False
         self._actual_calibration_complete = False
@@ -1923,20 +1848,16 @@ Arms (hold to move):
         self.log_status("Calibration failed. Please try again.", "error")
 
     def on_calibration_started(self):
-        """Handle calibration started signal."""
         self.log_status("Calibration started...", "info")
 
     def on_calibration_step_changed(self, step, description):
-        """Handle calibration step change signal."""
         self.log_status(f"Step {step}: {description}", "info")
 
     def on_calibration_progress(self, percentage):
-        """Handle calibration progress signal."""
         # Could update a progress bar if we had one
         pass
 
     def on_calibration_step_completed(self, result):
-        """Handle calibration step completion signal."""
         if result.success:
             self.log_status(f"✓ {result.description}", "success")
         else:
@@ -2013,7 +1934,7 @@ Arms (hold to move):
             self.log_status(f"Command error: {str(e)}", "error")
 
     def apply_calibration_compensation(self, cmd: Dict) -> Dict:
-        """Apply calibration compensations to improve robot accuracy."""
+
         if not self.is_calibrated:
             return cmd
 
@@ -2137,7 +2058,6 @@ Arms (hold to move):
             )
             
     def record_key_press(self, key: str):
-        """Record the start of a key press with timestamp."""
         if not self.is_recording:
             return
             
@@ -2145,7 +2065,6 @@ Arms (hold to move):
         self.key_press_times[key] = ts - self.recording_start_time
         
     def record_key_release(self, key: str):
-        """Record the end of a key press with duration."""
         if not self.is_recording or key not in self.key_press_times:
             return
             
@@ -2257,14 +2176,12 @@ Arms (hold to move):
                         with open(f"{SAVED_RUNS_DIR}/{filename}", "r") as f:
                             run_data = json.load(f)
                             runs[run_data["name"]] = run_data
-                    except (json.JSONDecodeError, KeyError) as e:
-                        # Skip corrupted files, but continue loading others
-                        print(f"Warning: Skipping corrupted run file {filename}: {e}")
+                    except (json.JSONDecodeError, KeyError):
                         continue
-        except OSError as e:
-            print(f"Warning: Cannot access saved runs directory {SAVED_RUNS_DIR}: {e}")
-        except Exception as e:
-            print(f"Warning: Error loading saved runs: {e}")
+        except OSError:
+            pass
+        except Exception:
+            pass
 
         return runs
 
@@ -2305,7 +2222,7 @@ Arms (hold to move):
         for cmd in commands:
             target_time = start_time + cmd.timestamp
             while time.time() < target_time:
-                time.sleep(0.001)
+                time.sleep(0.005)
 
             if "duration" in cmd.parameters:
                 duration = cmd.parameters["duration"]
@@ -2484,10 +2401,9 @@ while True:
         self.log_status("Pybricks hub code copied to clipboard!", "info")
         self.copy_pybricks_btn.setText("Copied!")
 
-        QTimer.singleShot(2000, lambda: self.copy_pybricks_btn.setText("Copy Hub Code"))
+        QTimer.singleShot(1500, lambda: self.copy_pybricks_btn.setText("Copy Hub Code"))
 
     def generate_competition_code(self):
-        """Generate Pybricks code with all saved runs for competition use."""
         if not self.saved_runs:
             self.log_status(
                 "No saved runs found! Record and save some runs first.", "warning"
@@ -2510,14 +2426,13 @@ while True:
         self.competition_mode_btn.setText("Copied!")
 
         QTimer.singleShot(
-            3000, lambda: self.competition_mode_btn.setText("Generate Competition Code")
+            2000, lambda: self.competition_mode_btn.setText("Generate Competition Code")
         )
 
         # Show instructions dialog
         self._show_competition_instructions()
 
     def _generate_competition_pybricks_code(self) -> str:
-        """Generate Pybricks competition code with all saved runs."""
         code_lines = [
             "from pybricks.hubs import PrimeHub",
             "from pybricks.pupdevices import Motor",
@@ -2547,49 +2462,41 @@ while True:
             "",
             "# --- HELPER FUNCTIONS ---",
             "def move_forward(speed, duration_ms):",
-            '    """Move forward at given speed for duration in milliseconds."""',
             "    drive_base.drive(speed, 0)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def move_backward(speed, duration_ms):",
-            '    """Move backward at given speed for duration in milliseconds."""',
             "    drive_base.drive(-speed, 0)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def turn_left(angle, duration_ms):",
-            '    """Turn left at given angle for duration in milliseconds."""',
             "    drive_base.drive(0, -angle)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def turn_right(angle, duration_ms):",
-            '    """Turn right at given angle for duration in milliseconds."""',
             "    drive_base.drive(0, angle)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def arm1_up(speed, duration_ms):",
-            '    """Move arm 1 up at given speed for duration in milliseconds."""',
             "    arm1_motor.run(speed)",
             "    wait(duration_ms)",
             "    arm1_motor.stop()",
             "",
             "def arm1_down(speed, duration_ms):",
-            '    """Move arm 1 down at given speed for duration in milliseconds."""',
             "    arm1_motor.run(-speed)",
             "    wait(duration_ms)",
             "    arm1_motor.stop()",
             "",
             "def arm2_up(speed, duration_ms):",
-            '    """Move arm 2 up at given speed for duration in milliseconds."""',
             "    arm2_motor.run(speed)",
             "    wait(duration_ms)",
             "    arm2_motor.stop()",
             "",
             "def arm2_down(speed, duration_ms):",
-            '    """Move arm 2 down at given speed for duration in milliseconds."""',
             "    arm2_motor.run(-speed)",
             "    wait(duration_ms)",
             "    arm2_motor.stop()",
@@ -2603,7 +2510,7 @@ while True:
 
         for i, (run_name, run_data) in enumerate(self.saved_runs.items(), 1):
             func_name = f"run_{i}"
-            func_lines = [f"def {func_name}():", f'    """{run_name}"""']
+            func_lines = [f"def {func_name}():"]
             commands = [RecordedCommand(**cmd) for cmd in run_data["commands"]]
 
             for cmd in commands:
@@ -2675,7 +2582,6 @@ while True:
         return "\n".join(code_lines)
 
     def _show_competition_instructions(self):
-        """Show instructions for using the competition code."""
         instructions = f"""
 COMPETITION MODE CODE GENERATED!
 
@@ -2740,8 +2646,6 @@ TIP: Test each run before competition to ensure accuracy!
 
 
 class ConfigDialog(QDialog):
-    """Robot configuration and calibration dialog."""
-
     def __init__(self, parent, config: RobotConfig):
         super().__init__(parent)
         self.config = config
@@ -3351,7 +3255,6 @@ class ConfigDialog(QDialog):
 
 
 def main():
-    """Main application entry point."""
     app = QApplication(sys.argv)
     app.setApplicationName(f"CodLess - FLL Robotics Control Center v{__version__}")
 
