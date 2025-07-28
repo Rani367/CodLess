@@ -10,6 +10,7 @@ import os
 import sys
 import shutil
 import glob
+import tempfile
 
 # Check for required dependencies
 try:
@@ -122,7 +123,11 @@ from bleak import BleakScanner, BleakClient
 # Bluetooth and application constants
 PYBRICKS_COMMAND_EVENT_CHAR_UUID = "c5f50002-8280-46da-89f4-6d8051e4aeef"
 HUB_NAME_PREFIX = "Pybricks"
-SAVED_RUNS_DIR = "saved_runs"
+# Use a writable directory for saved runs - try user home first, fallback to temp directory
+try:
+    SAVED_RUNS_DIR = os.path.join(os.path.expanduser("~"), ".codless", "saved_runs")
+except Exception:
+    SAVED_RUNS_DIR = os.path.join(tempfile.gettempdir(), "codless_saved_runs")
 DEFAULT_TIMEOUT = 10000
 CALIBRATION_TIMEOUT = 10000
 
@@ -2050,10 +2055,11 @@ Arms (hold to move):
             "commands": [asdict(cmd) for cmd in self.recorded_commands],
         }
 
-        os.makedirs(SAVED_RUNS_DIR, exist_ok=True)
-        filename = f"{SAVED_RUNS_DIR}/{run_name.replace(' ', '_')}.json"
-
         try:
+            # Create the directory if it doesn't exist
+            os.makedirs(SAVED_RUNS_DIR, exist_ok=True)
+            filename = f"{SAVED_RUNS_DIR}/{run_name.replace(' ', '_')}.json"
+
             with open(filename, "w") as f:
                 json.dump(run_data, f, indent=2)
 
@@ -2064,6 +2070,11 @@ Arms (hold to move):
 
             self.recorded_commands = []
 
+        except OSError as e:
+            if e.errno == 30:  # Read-only file system
+                self.log_status(f"Cannot save run: File system is read-only. Saved runs directory: {SAVED_RUNS_DIR}", "error")
+            else:
+                self.log_status(f"Failed to create directory or save run: {str(e)}", "error")
         except Exception as e:
             self.log_status(f"Failed to save run: {str(e)}", "error")
 
@@ -2075,11 +2086,18 @@ Arms (hold to move):
         try:
             for filename in os.listdir(SAVED_RUNS_DIR):
                 if filename.endswith(".json"):
-                    with open(f"{SAVED_RUNS_DIR}/{filename}", "r") as f:
-                        run_data = json.load(f)
-                        runs[run_data["name"]] = run_data
+                    try:
+                        with open(f"{SAVED_RUNS_DIR}/{filename}", "r") as f:
+                            run_data = json.load(f)
+                            runs[run_data["name"]] = run_data
+                    except (json.JSONDecodeError, KeyError) as e:
+                        # Skip corrupted files, but continue loading others
+                        print(f"Warning: Skipping corrupted run file {filename}: {e}")
+                        continue
+        except OSError as e:
+            print(f"Warning: Cannot access saved runs directory {SAVED_RUNS_DIR}: {e}")
         except Exception as e:
-            pass
+            print(f"Warning: Error loading saved runs: {e}")
 
         return runs
 
