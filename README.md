@@ -1,13 +1,19 @@
 # CodLess FLL Robotics Control Center v3.0.0
 
-A professional, feature-rich robotics control and simulation platform for FIRST LEGO League (FLL) competitions. This web-based application provides advanced robot control, recording/playback functionality, real-time simulation, and comprehensive calibration tools.
+A professional, feature-rich robotics control and simulation platform for FIRST LEGO League (FLL) competitions. This web-based application provides advanced robot control, recording/playback functionality, real-time simulation, and comprehensive calibration tools with **direct hub programming** - no Pybricks website required!
 
 ![CodLess Robotics Banner](assets/banner.png)
 
-## ✨ Features
+## ✨ Key Features
+
+### 🚀 **NEW: Direct Hub Programming**
+- **Direct code upload** to SPIKE Prime hub without Pybricks website
+- **Competition code download** - upload all saved runs as autonomous code
+- **Seamless integration** with Pybricks firmware using native protocols
+- **No additional setup** required on the robot
 
 ### 🤖 Robot Control
-- **Bluetooth LE connectivity** to Pybricks-compatible hubs
+- **Bluetooth LE connectivity** to Pybricks-compatible hubs  
 - **Real-time robot control** with keyboard input
 - **Advanced calibration system** for precision movement
 - **Emergency stop functionality** for safety
@@ -35,6 +41,12 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 - **Movement parameter tuning**
 - **Calibration confidence scoring**
 
+### 🏆 Competition Ready
+- **Generate competition code** with all saved runs
+- **Direct download to robot** for autonomous operation
+- **Hub button navigation** to select runs during competition
+- **No computer needed** during FLL matches
+
 ### 🌐 Progressive Web App (PWA)
 - **Offline functionality** with service worker caching
 - **Installable on desktop and mobile devices**
@@ -53,7 +65,7 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 
 ### Prerequisites
 - Modern web browser with Web Bluetooth API support (Chrome 56+, Edge 79+)
-- Pybricks-compatible LEGO hub (SPIKE Prime, Robot Inventor, etc.)
+- Pybricks-compatible LEGO hub (SPIKE Prime, Robot Inventor, etc.) with Pybricks firmware
 - HTTPS connection (required for Web Bluetooth)
 
 ### Installation
@@ -85,9 +97,10 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 ### Hub Setup
 
 1. **Flash Pybricks firmware** to your LEGO hub following the [official Pybricks installation guide](https://pybricks.com/install/)
-2. **Copy the generated hub code** from the application (use the "Copy Hub Code" button)
-3. **Paste and run the code** in the [Pybricks Code IDE](https://code.pybricks.com)
-4. **Connect to the hub** using the application's Bluetooth connection feature
+2. **Connect to the hub** using the application's Bluetooth connection feature
+3. **Optional**: Copy the hub code for manual setup (use the "Copy Hub Code" button)
+
+**That's it!** No need to use the Pybricks website - the app communicates directly with your hub.
 
 ## 🎯 Usage Guide
 
@@ -130,6 +143,12 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
    - Click "Play" to execute the sequence
    - Monitor execution in real-time
    - Stop or pause playback as needed
+
+3. **Competition Mode** ⭐
+   - Click "Download Competition Code to Robot" 
+   - All saved runs are uploaded as autonomous programs
+   - Use hub buttons during competition to select runs
+   - No computer connection needed during matches!
 
 ### Simulation Mode
 

@@ -10,7 +10,9 @@
 const APP_CONFIG = {
     VERSION: '3.0.0',
     NAME: 'CodLess FLL Robotics Control Center',
-    BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
+    PYBRICKS_SERVICE_UUID: 'c5f50001-8280-46da-89f4-6d8051e4aeef',
+    PYBRICKS_COMMAND_EVENT_CHAR_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
+    PYBRICKS_HUB_CAPABILITIES_CHAR_UUID: 'c5f50003-8280-46da-89f4-6d8051e4aeef',
     HUB_NAME_PREFIX: 'Pybricks',
     DEFAULT_COMMAND_TIMEOUT: 1000,
     MAX_LOG_ENTRIES: 1000,
@@ -333,6 +335,7 @@ class BLEController extends EventEmitter {
         this.server = null;
         this.service = null;
         this.characteristic = null;
+        this.hubCapabilitiesChar = null;
         this.connected = false;
         this.connecting = false;
         this.commandQueue = [];
@@ -342,6 +345,7 @@ class BLEController extends EventEmitter {
         this.maxConnectionAttempts = 3;
         this.batteryLevel = null;
         this.hubInfo = null;
+        this.readyEvent = null;
     }
 
     async connect() {
@@ -353,12 +357,10 @@ class BLEController extends EventEmitter {
         this.connectionAttempts++;
 
         try {
-            // Check for Web Bluetooth API support
             if (!navigator.bluetooth) {
                 throw new Error('Web Bluetooth API is not supported in this browser. Please use Chrome 56+, Edge 79+, or another compatible browser with HTTPS.');
             }
 
-            // Check if we're in a secure context (HTTPS)
             if (!window.isSecureContext) {
                 throw new Error('Web Bluetooth requires a secure context (HTTPS). Please access this application over HTTPS.');
             }
@@ -367,7 +369,7 @@ class BLEController extends EventEmitter {
             
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: APP_CONFIG.HUB_NAME_PREFIX }],
-                optionalServices: [APP_CONFIG.BLUETOOTH_SERVICE_UUID]
+                optionalServices: [APP_CONFIG.PYBRICKS_SERVICE_UUID]
             });
 
             this.device.addEventListener('gattserverdisconnected', () => {
@@ -375,8 +377,14 @@ class BLEController extends EventEmitter {
             });
 
             this.server = await this.device.gatt.connect();
-            this.service = await this.server.getPrimaryService(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
-            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
+            this.service = await this.server.getPrimaryService(APP_CONFIG.PYBRICKS_SERVICE_UUID);
+            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.PYBRICKS_COMMAND_EVENT_CHAR_UUID);
+            
+            try {
+                this.hubCapabilitiesChar = await this.service.getCharacteristic(APP_CONFIG.PYBRICKS_HUB_CAPABILITIES_CHAR_UUID);
+            } catch (error) {
+                console.warn('Hub capabilities characteristic not available:', error);
+            }
 
             await this.characteristic.startNotifications();
             this.characteristic.addEventListener('characteristicvaluechanged', (event) => {
@@ -387,16 +395,12 @@ class BLEController extends EventEmitter {
             this.connecting = false;
             this.connectionAttempts = 0;
             
-            // Get hub information
             await this.requestHubInfo();
             
             this.emit('connected', {
                 deviceName: this.device.name,
                 deviceId: this.device.id
             });
-
-            // Start command queue processing
-            this.processCommandQueue();
 
             return true;
 
@@ -406,9 +410,8 @@ class BLEController extends EventEmitter {
             
             let errorMessage = error.message;
             
-            // Handle specific Bluetooth errors with user-friendly messages
             if (error.name === 'NotFoundError') {
-                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running the provided code.';
+                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running Pybricks firmware.';
             } else if (error.name === 'NotAllowedError') {
                 errorMessage = 'Bluetooth access was denied. Please allow Bluetooth access and try again.';
             } else if (error.name === 'SecurityError') {
@@ -427,15 +430,91 @@ class BLEController extends EventEmitter {
             });
 
             if (this.connectionAttempts < this.maxConnectionAttempts) {
-                // Retry connection with exponential backoff
                 const retryDelay = Math.min(2000 * Math.pow(2, this.connectionAttempts - 1), 10000);
-                this.logger.log(`Retrying connection in ${retryDelay/1000} seconds...`, 'info');
                 setTimeout(() => this.connect(), retryDelay);
-            } else {
-                this.logger.log('Maximum connection attempts reached. Please try again manually.', 'error');
             }
 
             return false;
+        }
+    }
+
+    handleIncomingData(event) {
+        const data = new Uint8Array(event.target.value.buffer);
+        
+        if (data[0] === 0x01) {
+            const payload = data.slice(1);
+            const message = new TextDecoder().decode(payload);
+            
+            if (message === 'rdy' && this.readyEvent) {
+                this.readyEvent.resolve();
+                this.readyEvent = null;
+            } else {
+                this.emit('hubMessage', message);
+            }
+        } else if (data[0] === 0x02) {
+            this.batteryLevel = data[1];
+            this.emit('batteryUpdate', this.batteryLevel);
+        } else if (data[0] === 0x03) {
+            try {
+                const infoJson = new TextDecoder().decode(data.slice(1));
+                this.hubInfo = JSON.parse(infoJson);
+                this.emit('hubInfoUpdate', this.hubInfo);
+            } catch (error) {
+                console.error('Error parsing hub info:', error);
+            }
+        }
+    }
+
+    async waitForReady(timeout = 5000) {
+        return new Promise((resolve, reject) => {
+            this.readyEvent = { resolve, reject };
+            setTimeout(() => {
+                if (this.readyEvent) {
+                    this.readyEvent.reject(new Error('Timeout waiting for ready'));
+                    this.readyEvent = null;
+                }
+            }, timeout);
+        });
+    }
+
+    async downloadAndRunProgram(program) {
+        if (!this.connected) {
+            throw new Error('Not connected to hub');
+        }
+
+        try {
+            const encoder = new TextEncoder();
+            const programData = encoder.encode(program);
+            
+            const command = new Uint8Array(1 + programData.length);
+            command[0] = 0x05;
+            command.set(programData, 1);
+            
+            await this.characteristic.writeValue(command);
+            
+            await this.waitForReady(10000);
+            
+            this.emit('programDownloaded');
+            
+            return true;
+        } catch (error) {
+            this.emit('programError', error.message);
+            throw error;
+        }
+    }
+
+    async stopProgram() {
+        if (!this.connected) {
+            throw new Error('Not connected to hub');
+        }
+
+        try {
+            const command = new Uint8Array([0x04]);
+            await this.characteristic.writeValue(command);
+            return true;
+        } catch (error) {
+            console.error('Error stopping program:', error);
+            throw error;
         }
     }
 
@@ -468,145 +547,39 @@ class BLEController extends EventEmitter {
             throw new Error('Not connected to hub');
         }
 
-        const commandWithId = {
-            ...command,
-            id: Date.now() + Math.random(),
-            timestamp: Date.now(),
-            priority: priority || false
-        };
-
-        if (priority) {
-            this.commandQueue.unshift(commandWithId);
-        } else {
-            this.commandQueue.push(commandWithId);
-        }
-
-        if (!this.isProcessingQueue) {
-            this.processCommandQueue();
-        }
-
-        return commandWithId.id;
-    }
-
-    async processCommandQueue() {
-        if (this.isProcessingQueue || !this.connected) {
-            return;
-        }
-
-        this.isProcessingQueue = true;
-
-        while (this.commandQueue.length > 0 && this.connected) {
-            const command = this.commandQueue.shift();
-            
-            try {
-                const startTime = Date.now();
-                await this.sendRawCommand(command);
-                const latency = Date.now() - startTime;
-                
-                this.emit('commandSent', { command, latency });
-                
-                // Update performance monitor
-                if (window.app?.performanceMonitor) {
-                    window.app.performanceMonitor.updateLatency(latency);
-                }
-
-                // Rate limiting
-                const timeSinceLastCommand = Date.now() - this.lastCommandTime;
-                const minInterval = 50; // Minimum 50ms between commands
-                
-                if (timeSinceLastCommand < minInterval) {
-                    await new Promise(resolve => setTimeout(resolve, minInterval - timeSinceLastCommand));
-                }
-                
-                this.lastCommandTime = Date.now();
-
-            } catch (error) {
-                this.emit('commandError', { command, error: error.message });
-            }
-        }
-
-        this.isProcessingQueue = false;
-    }
-
-    async sendRawCommand(command) {
-        if (!this.characteristic) {
-            throw new Error('No characteristic available');
-        }
-
-        const commandStr = JSON.stringify(command);
-        const encoder = new TextEncoder();
-        const data = encoder.encode(commandStr);
-        const buffer = new Uint8Array(data.length + 1);
-        buffer[0] = 0x06; // Command type
-        buffer.set(data, 1);
-
-        await this.characteristic.writeValue(buffer);
-    }
-
-    handleIncomingData(event) {
         try {
-            const value = event.target.value;
-            const data = new Uint8Array(value.buffer);
+            await this.waitForReady(1000);
             
-            if (data[0] === 0x01) { // Text response
-                const payload = new TextDecoder().decode(data.slice(1));
-                this.processHubMessage(payload);
-            } else if (data[0] === 0x02) { // Battery info
-                this.processBatteryInfo(data.slice(1));
-            } else if (data[0] === 0x03) { // Hub info
-                this.processHubInfo(data.slice(1));
-            }
+            const commandStr = JSON.stringify(command);
+            const encoder = new TextEncoder();
+            const commandData = encoder.encode(commandStr);
+            
+            const buffer = new Uint8Array(1 + commandData.length);
+            buffer[0] = 0x06; // stdin command
+            buffer.set(commandData, 1);
+            
+            await this.characteristic.writeValue(buffer);
+            
+            return true;
         } catch (error) {
-            this.emit('dataError', { error: error.message });
-        }
-    }
-
-    processHubMessage(message) {
-        this.emit('hubMessage', { message });
-        
-        if (message === "ready") {
-            this.emit('hubReady');
-        } else if (message.startsWith("error:")) {
-            this.emit('hubError', { error: message.substring(6) });
-        } else if (message === "ok") {
-            this.emit('commandAck');
-        }
-    }
-
-    processBatteryInfo(data) {
-        if (data.length >= 1) {
-            this.batteryLevel = data[0];
-            this.emit('batteryUpdate', { level: this.batteryLevel });
-        }
-    }
-
-    processHubInfo(data) {
-        try {
-            const infoStr = new TextDecoder().decode(data);
-            this.hubInfo = JSON.parse(infoStr);
-            this.emit('hubInfo', this.hubInfo);
-        } catch (error) {
-            console.error('Error parsing hub info:', error);
+            console.error('Error sending command:', error);
+            throw error;
         }
     }
 
     async requestHubInfo() {
-        if (this.connected) {
-            await this.sendCommand({ type: 'get_info' }, true);
-        }
+        // Hub info will be provided automatically after connection
+        return;
     }
 
     async requestBatteryLevel() {
-        if (this.connected) {
-            await this.sendCommand({ type: 'get_battery' }, true);
-        }
+        // Battery level will be monitored automatically
+        return;
     }
 
     emergencyStop() {
         if (this.connected) {
-            // Clear command queue and send immediate stop
-            this.commandQueue = [];
-            this.sendCommand({ type: 'emergency_stop' }, true);
+            this.sendCommand({ type: 'emergency_stop' });
         }
     }
 }
@@ -1318,47 +1291,38 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     setupEventListeners() {
-        // Hub connection
         document.getElementById('connectBtn')?.addEventListener('click', () => this.toggleConnection());
         document.getElementById('developerMode')?.addEventListener('change', (e) => this.toggleDeveloperMode(e.target.checked));
         
-        // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
         
-        // Pybricks integration
+        document.getElementById('downloadCompetitionBtn')?.addEventListener('click', () => this.downloadCompetitionCodeToRobot());
         document.getElementById('copyCodeBtn')?.addEventListener('click', () => this.copyPybricksCode());
         document.getElementById('openPybricksBtn')?.addEventListener('click', () => this.openPybricksIDE());
         
-        // Recording controls
         document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
         document.getElementById('saveBtn')?.addEventListener('click', () => this.saveCurrentRun());
         document.getElementById('pauseBtn')?.addEventListener('click', () => this.pauseRecording());
         
-        // Run management
         document.getElementById('savedRunsList')?.addEventListener('change', (e) => this.selectRun(e.target.value));
         document.getElementById('playBtn')?.addEventListener('click', () => this.playSelectedRun());
         document.getElementById('deleteBtn')?.addEventListener('click', () => this.deleteSelectedRun());
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportSelectedRun());
         document.getElementById('importBtn')?.addEventListener('click', () => this.importRun());
         
-        // Simulator controls
         document.getElementById('uploadMapBtn')?.addEventListener('click', () => this.uploadMap());
         document.getElementById('resetSimBtn')?.addEventListener('click', () => this.resetSimulator());
         document.getElementById('fullscreenSimBtn')?.addEventListener('click', () => this.toggleSimulatorFullscreen());
         
-        // Emergency controls
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
         
-        // Log controls
         document.getElementById('clearLogBtn')?.addEventListener('click', () => this.clearLog());
         document.getElementById('exportLogBtn')?.addEventListener('click', () => this.exportLog());
         
-        // Window controls
         document.querySelector('.minimize-btn')?.addEventListener('click', () => this.minimizeWindow());
         document.querySelector('.maximize-btn')?.addEventListener('click', () => this.toggleMaximize());
         document.querySelector('.close-btn')?.addEventListener('click', () => this.closeWindow());
         
-        // Logger events
         this.logger.onLog((entry) => this.displayLogEntry(entry));
     }
 
@@ -1400,50 +1364,50 @@ class FLLRoboticsApp extends EventEmitter {
 
     setupBLEEvents() {
         this.bleController.on('connecting', () => {
-            this.updateConnectionUI('connecting');
-            this.toastManager.show('Connecting to hub...', 'info');
+            this.logger.log('Connecting to hub...', 'info');
+            this.updateConnectionStatus('connecting');
         });
 
         this.bleController.on('connected', (data) => {
-            this.updateConnectionUI('connected', data.deviceName);
-            this.toastManager.show(`Connected to ${data.deviceName}`, 'success');
             this.logger.log(`Connected to ${data.deviceName}`, 'success');
-            this.startBatteryMonitoring();
+            this.updateConnectionStatus('connected');
+            this.toastManager.show(`Connected to ${data.deviceName}`, 'success');
         });
 
         this.bleController.on('disconnected', () => {
-            this.updateConnectionUI('disconnected');
+            this.logger.log('Disconnected from hub', 'warning');
+            this.updateConnectionStatus('disconnected');
             this.toastManager.show('Hub disconnected', 'warning');
-            this.logger.log('Hub disconnected', 'warning');
         });
 
         this.bleController.on('connectionError', (data) => {
-            this.updateConnectionUI('error');
-            this.toastManager.show(`Connection failed: ${data.error}`, 'error');
             this.logger.log(`Connection failed: ${data.error}`, 'error');
+            this.updateConnectionStatus('error');
+            this.toastManager.show(data.error, 'error');
             
-            // Show troubleshooting help after multiple failed attempts
-            if (data.attempt >= 3) {
-                setTimeout(() => {
-                    this.showTroubleshootingHelp();
-                }, 2000);
+            if (data.attempt >= data.maxAttempts) {
+                this.showConnectionTroubleshooting();
             }
         });
 
-        this.bleController.on('batteryUpdate', (data) => {
-            this.updateBatteryUI(data.level);
-            if (data.level <= this.config.batteryWarning) {
-                this.toastManager.show(`Low battery: ${data.level}%`, 'warning');
-            }
+        this.bleController.on('hubMessage', (message) => {
+            this.logger.log(`Hub: ${message}`, 'info');
         });
 
-        this.bleController.on('hubMessage', (data) => {
-            this.logger.log(`Hub: ${data.message}`, 'info');
+        this.bleController.on('batteryUpdate', (level) => {
+            this.logger.log(`Battery: ${level}%`, 'info');
         });
 
-        this.bleController.on('hubError', (data) => {
-            this.logger.log(`Hub Error: ${data.error}`, 'error');
-            this.toastManager.show(`Hub Error: ${data.error}`, 'error');
+        this.bleController.on('hubInfoUpdate', (info) => {
+            this.logger.log(`Hub info: ${JSON.stringify(info)}`, 'info');
+        });
+
+        this.bleController.on('programDownloaded', () => {
+            this.logger.log('Program downloaded and started successfully', 'success');
+        });
+
+        this.bleController.on('programError', (error) => {
+            this.logger.log(`Program error: ${error}`, 'error');
         });
     }
 
@@ -1632,36 +1596,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.toastManager.show(message, 'info');
     }
 
-    showTroubleshootingHelp() {
-        const troubleshootingSteps = [
-            "🔧 Troubleshooting Connection Issues:",
-            "",
-            "1. Make sure your hub is powered on and running the Pybricks code",
-            "2. Check that you're using Chrome, Edge, or another compatible browser",
-            "3. Ensure you're accessing the app via HTTPS (required for Bluetooth)",
-            "4. Move closer to your hub (Bluetooth range ~10 meters)",
-            "5. Try restarting your hub and refreshing this page",
-            "6. Check if another app is connected to your hub",
-            "",
-            "💡 Tips:",
-            "- The hub LED should be solid blue when ready to connect",
-            "- Make sure the hub name starts with 'Pybricks'",
-            "- Try the simulator mode if physical connection isn't working"
-        ];
 
-        // Show in both logger and as a long-lasting toast
-        troubleshootingSteps.forEach(step => {
-            if (step.trim()) {
-                this.logger.log(step, 'info');
-            }
-        });
-
-        this.toastManager.show(
-            'Connection issues? Check the log for troubleshooting steps or try simulator mode.',
-            'info',
-            8000
-        );
-    }
 
     emergencyStop() {
         this.emergencyStopActive = true;
@@ -1682,7 +1617,7 @@ class FLLRoboticsApp extends EventEmitter {
     // ... [Additional methods for recording, playback, configuration, etc. would continue here]
 
     updateUI() {
-        this.updateConnectionUI();
+        this.updateConnectionStatus();
         this.updateCalibrationUI();
         this.updateRunsList();
         this.updateSimulatorVisibility();
@@ -1690,14 +1625,13 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateDeveloperModeCheckbox();
     }
 
-    updateConnectionUI(status = 'disconnected', deviceName = '') {
+    updateConnectionStatus(status = 'disconnected', deviceName = '') {
         const connectBtn = document.getElementById('connectBtn');
         const hubStatus = document.getElementById('hubStatus');
         const connectionStatus = document.getElementById('connectionStatus');
         
         if (!connectBtn || !hubStatus) return;
 
-        // Check if Bluetooth is not supported
         if (!navigator.bluetooth || !window.isSecureContext) {
             connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Bluetooth Unavailable';
             connectBtn.disabled = true;
@@ -1735,6 +1669,22 @@ class FLLRoboticsApp extends EventEmitter {
                 if (connectionStatus) connectionStatus.textContent = 'Disconnected';
                 break;
         }
+    }
+
+    showConnectionTroubleshooting() {
+        const troubleshootingSteps = [
+            "🔧 Troubleshooting Connection Issues:",
+            "",
+            "1. Make sure your hub is powered on and running Pybricks firmware",
+            "2. Check that you're using Chrome, Edge, or another compatible browser",
+            "3. Ensure you're accessing the app via HTTPS (required for Bluetooth)",
+            "4. Move closer to your hub (Bluetooth range ~10 meters)",
+            "5. Try restarting your hub and refreshing this page",
+            "6. Make sure no other apps are connected to the hub"
+        ];
+        
+        this.logger.log(troubleshootingSteps.join('\n'), 'info');
+        this.toastManager.show('Connection failed multiple times. Check the log for troubleshooting steps.', 'warning', 8000);
     }
 
     updateCalibrationUI() {
@@ -1928,13 +1878,15 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     generatePybricksCode() {
-        return `#!/usr/bin/env micropython
-# Generated by CodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}
+        return `#!/usr/bin/env pybricks-micropython
+# Hub control code for ${APP_CONFIG.NAME} v${APP_CONFIG.VERSION}
 
 from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor
 from pybricks.parameters import Port, Direction
 from pybricks.tools import wait
+from usys import stdin, stdout
+from uselect import poll
 import json
 
 hub = PrimeHub()
@@ -1944,6 +1896,10 @@ left_motor = Motor(Port.${this.config.leftMotorPort})
 right_motor = Motor(Port.${this.config.rightMotorPort})
 arm1_motor = Motor(Port.${this.config.arm1MotorPort})
 arm2_motor = Motor(Port.${this.config.arm2MotorPort})
+
+# Setup polling for stdin
+keyboard = poll()
+keyboard.register(stdin)
 
 def execute_command(cmd):
     cmd_type = cmd.get("type", "")
@@ -1977,33 +1933,25 @@ def execute_command(cmd):
         right_motor.stop()
         arm1_motor.stop()
         arm2_motor.stop()
-    
-    elif cmd_type == "get_battery":
-        level = hub.battery.voltage()
-        hub.ble.send(bytes([0x02, int(level * 100 / 9000)]))
-    
-    elif cmd_type == "get_info":
-        info = {
-            "name": hub.system.name(),
-            "version": "1.0",
-            "features": ["drive", "arms", "battery"]
-        }
-        data = json.dumps(info).encode()
-        response = bytes([0x03]) + data
-        hub.ble.send(response)
 
 def main():
-    hub.ble.send("ready")
-    
     while True:
-        if hub.ble.received() is not None:
-            try:
-                data = hub.ble.received()
-                command = json.loads(data.decode())
+        # Send ready signal
+        stdout.buffer.write(b"\\x01rdy")
+        
+        # Wait for incoming data
+        while not keyboard.poll(10):
+            wait(1)
+        
+        try:
+            data = stdin.buffer.read()
+            if data and data[0] == 0x06:  # stdin command
+                command_str = data[1:].decode('utf-8')
+                command = json.loads(command_str)
                 execute_command(command)
-                hub.ble.send("ok")
-            except Exception as e:
-                hub.ble.send(f"error: {str(e)}")
+                stdout.buffer.write(b"\\x01ok")
+        except Exception as e:
+            stdout.buffer.write(f"\\x01error: {str(e)}".encode())
         
         wait(10)
 
@@ -2097,6 +2045,184 @@ if __name__ == "__main__":
         
         this.logger.log('Application shutting down', 'info');
     }
+
+    async downloadCompetitionCodeToRobot() {
+        if (!this.bleController.connected) {
+            this.toastManager.show('Please connect to the hub first!', 'error');
+            return;
+        }
+
+        if (this.savedRuns.size === 0) {
+            this.toastManager.show('No saved runs found! Record and save some runs first.', 'warning');
+            return;
+        }
+
+        try {
+            this.toastManager.show('Generating competition code...', 'info');
+            
+            const competitionCode = this.generateCompetitionCode();
+            
+            this.toastManager.show('Uploading code to hub...', 'info');
+            
+            await this.bleController.downloadAndRunProgram(competitionCode);
+            
+            this.toastManager.show(`Competition code with ${this.savedRuns.size} runs uploaded successfully!`, 'success');
+            this.logger.log(`Competition code uploaded with ${this.savedRuns.size} runs`, 'success');
+            
+        } catch (error) {
+            this.toastManager.show(`Failed to upload code: ${error.message}`, 'error');
+            this.logger.log(`Code upload failed: ${error.message}`, 'error');
+        }
+    }
+
+    generateCompetitionCode() {
+        const runs = Array.from(this.savedRuns.values());
+        
+        const codeLines = [
+            '#!/usr/bin/env pybricks-micropython',
+            `# Competition Code Generated by ${APP_CONFIG.NAME} v${APP_CONFIG.VERSION}`,
+            `# Generated on: ${new Date().toISOString()}`,
+            `# Contains ${runs.length} saved runs`,
+            '',
+            'from pybricks.hubs import PrimeHub',
+            'from pybricks.pupdevices import Motor',
+            'from pybricks.parameters import Port, Direction, Stop',
+            'from pybricks.robotics import DriveBase',
+            'from pybricks.tools import wait',
+            'from pybricks.media.ev3dev import SoundFile',
+            '',
+            '# Initialize the hub',
+            'hub = PrimeHub()',
+            '',
+            '# Robot configuration',
+            `left_motor = Motor(Port.${this.config.leftMotorPort})`,
+            `right_motor = Motor(Port.${this.config.rightMotorPort})`,
+            `arm1_motor = Motor(Port.${this.config.arm1MotorPort})`,
+            `arm2_motor = Motor(Port.${this.config.arm2MotorPort})`,
+            '',
+            `drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})`,
+            '',
+            '# Drive base settings',
+            `drive_base.settings(straight_speed=${this.config.straightSpeed}, straight_acceleration=${this.config.straightAcceleration}, turn_rate=${this.config.turnRate}, turn_acceleration=${this.config.turnAcceleration})`,
+            '',
+            '# Competition runs',
+        ];
+
+        runs.forEach((run, index) => {
+            const runNumber = index + 1;
+            codeLines.push('');
+            codeLines.push(`def run_${runNumber}():`);
+            codeLines.push(`    """${run.name}"""`);
+            codeLines.push('    hub.light.on_for(100, [100, 100, 100])');
+            
+            if (run.commands && run.commands.length > 0) {
+                let currentTime = 0;
+                
+                run.commands.forEach(cmd => {
+                    const waitTime = Math.max(0, Math.round((cmd.timestamp - currentTime) * 1000));
+                    if (waitTime > 0) {
+                        codeLines.push(`    wait(${waitTime})`);
+                    }
+                    
+                    const params = cmd.parameters;
+                    if (cmd.command_type === 'drive') {
+                        if (params.duration && params.duration > 0) {
+                            const duration = Math.round(params.duration * 1000);
+                            codeLines.push(`    left_motor.run(${params.speed - params.turn_rate})`);
+                            codeLines.push(`    right_motor.run(${params.speed + params.turn_rate})`);
+                            codeLines.push(`    wait(${duration})`);
+                            codeLines.push('    left_motor.stop()');
+                            codeLines.push('    right_motor.stop()');
+                        } else {
+                            codeLines.push(`    left_motor.run(${params.speed - params.turn_rate})`);
+                            codeLines.push(`    right_motor.run(${params.speed + params.turn_rate})`);
+                        }
+                    } else if (cmd.command_type === 'arm1') {
+                        if (params.duration && params.duration > 0) {
+                            const duration = Math.round(params.duration * 1000);
+                            codeLines.push(`    arm1_motor.run(${params.speed})`);
+                            codeLines.push(`    wait(${duration})`);
+                            codeLines.push('    arm1_motor.stop()');
+                        } else {
+                            codeLines.push(`    arm1_motor.run(${params.speed})`);
+                        }
+                    } else if (cmd.command_type === 'arm2') {
+                        if (params.duration && params.duration > 0) {
+                            const duration = Math.round(params.duration * 1000);
+                            codeLines.push(`    arm2_motor.run(${params.speed})`);
+                            codeLines.push(`    wait(${duration})`);
+                            codeLines.push('    arm2_motor.stop()');
+                        } else {
+                            codeLines.push(`    arm2_motor.run(${params.speed})`);
+                        }
+                    }
+                    
+                    currentTime = cmd.timestamp;
+                });
+            }
+            
+            codeLines.push('    # Stop all motors');
+            codeLines.push('    left_motor.stop()');
+            codeLines.push('    right_motor.stop()');
+            codeLines.push('    arm1_motor.stop()');
+            codeLines.push('    arm2_motor.stop()');
+            codeLines.push('    hub.light.on_for(500, [0, 100, 0])');
+        });
+
+        codeLines.push('');
+        codeLines.push('# Main program');
+        codeLines.push('def main():');
+        codeLines.push('    while True:');
+        codeLines.push('        hub.display.char(str(len(runs)))');
+        codeLines.push('        ');
+        codeLines.push('        # Wait for button press to select run');
+        codeLines.push('        selected_run = 1');
+        codeLines.push('        while True:');
+        codeLines.push('            if hub.buttons.pressed():');
+        codeLines.push('                pressed = hub.buttons.pressed()');
+        codeLines.push('                if [hub.buttons.center] == pressed:');
+        codeLines.push('                    break');
+        codeLines.push('                elif [hub.buttons.left] == pressed:');
+        codeLines.push('                    selected_run = max(1, selected_run - 1)');
+        codeLines.push('                    hub.display.char(str(selected_run))');
+        codeLines.push('                    wait(200)');
+        codeLines.push('                elif [hub.buttons.right] == pressed:');
+        codeLines.push(`                    selected_run = min(${runs.length}, selected_run + 1)`);
+        codeLines.push('                    hub.display.char(str(selected_run))');
+        codeLines.push('                    wait(200)');
+        codeLines.push('            wait(50)');
+        codeLines.push('        ');
+        codeLines.push('        # Execute selected run');
+        codeLines.push('        hub.light.on_for(1000, [100, 100, 0])');
+        
+        runs.forEach((run, index) => {
+            const runNumber = index + 1;
+            if (runNumber === 1) {
+                codeLines.push(`        if selected_run == ${runNumber}:`);
+            } else {
+                codeLines.push(`        elif selected_run == ${runNumber}:`);
+            }
+            codeLines.push(`            run_${runNumber}()`);
+        });
+        
+        codeLines.push('        ');
+        codeLines.push('        wait(1000)');
+        codeLines.push('');
+        codeLines.push('# Run definitions');
+        codeLines.push('runs = {');
+        
+        runs.forEach((run, index) => {
+            const runNumber = index + 1;
+            codeLines.push(`    ${runNumber}: "${run.name}",`);
+        });
+        
+        codeLines.push('}');
+        codeLines.push('');
+        codeLines.push('if __name__ == "__main__":');
+        codeLines.push('    main()');
+
+                  return codeLines.join('\n');
+      }
 }
 
 // ============================
