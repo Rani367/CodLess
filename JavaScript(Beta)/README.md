@@ -1,200 +1,328 @@
-# CodLess - FLL Robotics Control Center (JavaScript Web Version)
+# CodLess FLL Robotics Control Center v2.0.0
 
-A modern web-based recreation of the FLL Robotics Control Center with all the functionality of the original Python application.
+A professional, feature-rich robotics control and simulation platform for FIRST LEGO League (FLL) competitions. This web-based application provides advanced robot control, recording/playback functionality, real-time simulation, and comprehensive calibration tools.
 
-## 🚀 Features
+![CodLess Robotics Banner](assets/banner.png)
 
-### Core Functionality
-- **Web Bluetooth Integration** - Connect directly to Pybricks-enabled SPIKE Prime hubs
-- **Real-time Robot Control** - WASD movement controls and QE/RF arm controls
-- **Visual Robot Simulator** - 2D canvas-based robot simulation with physics
-- **Recording & Playback** - Record robot command sequences and replay them
-- **Robot Calibration** - Automated calibration system for motor accuracy
-- **Configuration Management** - Customizable robot parameters and motor ports
+## ✨ Features
 
-### Modern Web Features
-- **Responsive Design** - Works on desktop, tablet, and mobile devices
-- **Beautiful UI** - Modern dark theme with gradients, shadows, and animations
-- **Smooth Animations** - CSS transitions and hover effects throughout
-- **Real-time Updates** - Live status display and simulator visualization
-- **Local Storage** - Saved runs persist between sessions
-- **File Upload** - Map image support for enhanced simulation
+### 🤖 Robot Control
+- **Bluetooth LE connectivity** to Pybricks-compatible hubs
+- **Real-time robot control** with keyboard input
+- **Advanced calibration system** for precision movement
+- **Emergency stop functionality** for safety
+- **Comprehensive motor configuration** for drive and attachment motors
 
-## 🎮 Controls
+### 🎮 Simulation & Visualization
+- **Real-time 3D robot simulator** with physics
+- **Interactive camera controls** (pan, zoom)
+- **Background map support** for field layouts
+- **Movement trail visualization**
+- **Performance monitoring** (FPS, latency)
+- **Obstacle detection and avoidance simulation**
 
-### Movement
-- **W** - Move Forward
-- **S** - Move Backward  
-- **A** - Turn Left
-- **D** - Turn Right
+### 📹 Recording & Playback
+- **High-precision command recording** with timing
+- **Run management system** with save/load functionality
+- **Export/import capabilities** for sharing runs
+- **Pause and resume recording**
+- **Command sequence visualization**
 
-### Arms
-- **Q** - Arm 1 Up
-- **E** - Arm 1 Down
-- **R** - Arm 2 Up
-- **F** - Arm 2 Down
+### ⚙️ Configuration & Calibration
+- **Intuitive configuration interface** for robot parameters
+- **Automated calibration routines** for optimal performance
+- **Motor port mapping** and validation
+- **Movement parameter tuning**
+- **Calibration confidence scoring**
 
-## 🔧 Setup Instructions
+### 🌐 Progressive Web App (PWA)
+- **Offline functionality** with service worker caching
+- **Installable on desktop and mobile devices**
+- **Background sync** for data persistence
+- **Push notifications** (future feature)
+- **Responsive design** for all screen sizes
 
-### 1. Prepare Your SPIKE Prime Hub
+### 🛠️ Developer Tools
+- **Comprehensive logging system** with export capabilities
+- **Real-time performance monitoring**
+- **Debug mode** with detailed diagnostics
+- **Toast notification system** for user feedback
+- **Accessibility compliance** (WCAG 2.1)
 
-1. Visit [code.pybricks.com](https://code.pybricks.com)
-2. Click the "Copy Hub Code" button in the web app
-3. Paste the code into the Pybricks editor
-4. Upload the code to your SPIKE Prime hub
-5. Keep the Pybricks website open
+## 🚀 Getting Started
 
-### 2. Use the Web Application
+### Prerequisites
+- Modern web browser with Web Bluetooth API support (Chrome 56+, Edge 79+)
+- Pybricks-compatible LEGO hub (SPIKE Prime, Robot Inventor, etc.)
+- HTTPS connection (required for Web Bluetooth)
 
-1. Open `index.html` in a modern web browser
-2. Click "Connect to Pybricks Hub" 
-3. Select your hub when prompted
-4. Run calibration for optimal performance
-5. Start controlling your robot!
+### Installation
 
-## 📱 Browser Compatibility
+#### Option 1: Local Development
+```bash
+# Clone the repository
+git clone https://github.com/codless-robotics/fll-control-center.git
+cd fll-control-center/JavaScript(Beta)
 
-### Supported Browsers
-- **Chrome 56+** (Recommended)
-- **Edge 79+**
-- **Opera 43+**
-- **Samsung Internet 6.0+**
+# Serve the application (HTTPS required for Bluetooth)
+# Using Python 3:
+python -m http.server 8000 --bind 127.0.0.1
 
-### Required Features
-- Web Bluetooth API
-- ES6+ JavaScript support
-- Canvas 2D API
-- Local Storage
+# Using Node.js (with http-server):
+npx http-server -p 8000 -a 127.0.0.1 --ssl
+
+# Access at https://localhost:8000
+```
+
+#### Option 2: GitHub Pages (Recommended)
+Visit the live application at: [https://codless-robotics.github.io/fll-control-center/](https://codless-robotics.github.io/fll-control-center/)
+
+#### Option 3: Install as PWA
+1. Visit the application in a supported browser
+2. Click the "Install" button in the address bar
+3. The app will be installed as a desktop/mobile application
+
+### Hub Setup
+
+1. **Flash Pybricks firmware** to your LEGO hub following the [official Pybricks installation guide](https://pybricks.com/install/)
+2. **Copy the generated hub code** from the application (use the "Copy Hub Code" button)
+3. **Paste and run the code** in the [Pybricks Code IDE](https://code.pybricks.com)
+4. **Connect to the hub** using the application's Bluetooth connection feature
 
 ## 🎯 Usage Guide
 
-### Getting Started
-1. **Enable Simulation Mode** - Toggle "Simulation Mode" to test without hardware
-2. **Configure Robot** - Set up motor ports and physical dimensions
-3. **Calibrate** - Run the automated calibration process
-4. **Start Recording** - Begin capturing your robot commands
-5. **Save & Replay** - Store runs and play them back later
+### Basic Operation
 
-### Configuration Options
+1. **Connect Your Hub**
+   - Enable Bluetooth on your device
+   - Click "Connect to Pybricks Hub" 
+   - Select your hub from the device list
+   - Wait for connection confirmation
 
-#### Physical Parameters
-- **Axle Track** - Distance between wheels (mm)
-- **Wheel Diameter** - Wheel size (mm)
-- **Motor Ports** - Assignment for left/right drive and arms
+2. **Configure Your Robot**
+   - Click "Configure Robot" to open settings
+   - Set motor ports and physical parameters
+   - Adjust movement speeds and accelerations
+   - Save your configuration
 
-#### Movement Settings
-- **Straight Speed** - Forward/backward speed (deg/s)
-- **Turn Rate** - Rotation speed (deg/s)
-- **Acceleration** - Motor acceleration values
+3. **Calibrate for Precision** (Recommended)
+   - Navigate to the Calibration tab in configuration
+   - Click "Start Calibration"
+   - Follow the automated calibration routine
+   - Review calibration results and confidence scores
 
-### Recording Workflow
-1. Set a descriptive run name
-2. Click "Record Run" to start
-3. Control your robot using keyboard
-4. Click "Stop Recording" when finished
-5. Click "Save Run" to store permanently
+4. **Control Your Robot**
+   - Use keyboard controls (WASD for movement, QERF for arms)
+   - Hold Space bar for emergency stop
+   - Monitor robot status in real-time
 
-## 🔬 Technical Features
+### Recording & Playback
 
-### Robot Simulation
-- **Realistic Physics** - Motor lag, friction, and inertia modeling
-- **Calibration Integration** - Compensation for hardware variations
-- **Visual Feedback** - Real-time position and status display
-- **Map Support** - Upload FLL maps for better visualization
+1. **Record a Run**
+   - Enter a descriptive name for your run
+   - Click "Record Run" to start recording
+   - Perform your robot sequence
+   - Click "Stop Recording" when finished
+   - Save the run for future use
 
-### Bluetooth Communication
-- **Web Bluetooth API** - Direct browser-to-hub communication
-- **Command Queuing** - Reliable message delivery
-- **Status Monitoring** - Connection state and hub feedback
-- **Error Handling** - Robust connection management
+2. **Play Back Runs**
+   - Select a saved run from the dropdown
+   - Click "Play" to execute the sequence
+   - Monitor execution in real-time
+   - Stop or pause playback as needed
 
-### Data Management
-- **Local Storage** - Persistent run and configuration data
-- **JSON Format** - Human-readable data structures
-- **Import/Export** - Easy backup and sharing
-- **Version Control** - Timestamp tracking for all runs
+### Simulation Mode
+
+1. **Enable Developer Mode**
+   - Check "Simulation Mode" to enable the simulator
+   - Use all controls without a physical robot
+   - Perfect for testing and training
+
+2. **Simulator Features**
+   - Upload field maps as backgrounds
+   - View real-time robot position and orientation
+   - Monitor arm positions and movements
+   - Reset robot position when needed
+
+## ⌨️ Keyboard Controls
+
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `W` | Move Forward | `Q` | Arm 1 Up |
+| `S` | Move Backward | `E` | Arm 1 Down |
+| `A` | Turn Left | `R` | Arm 2 Up |
+| `D` | Turn Right | `F` | Arm 2 Down |
+| `Space` | Emergency Stop | `Esc` | Close Modals |
+
+*Hold multiple keys for combined movements (e.g., W+D for forward-right)*
+
+## 🔧 Configuration Options
+
+### Physical Parameters
+- **Axle Track**: Distance between drive wheels (50-300mm)
+- **Wheel Diameter**: Diameter of drive wheels (20-100mm)
+- **Motor Ports**: Assignment of motors to hub ports (A-D)
+
+### Movement Settings
+- **Straight Speed**: Maximum forward/backward speed (100-1000 deg/s)
+- **Straight Acceleration**: Acceleration for linear movement (50-500 deg/s²)
+- **Turn Rate**: Maximum rotation speed (50-400 deg/s)
+- **Turn Acceleration**: Acceleration for rotation (100-600 deg/s²)
+
+### Advanced Settings
+- **Command Timeout**: Maximum time to wait for command response (100-5000ms)
+- **Battery Warning**: Low battery alert threshold (5-50%)
+- **Auto-save**: Automatically save configuration and runs
+- **Debug Mode**: Enable detailed logging and diagnostics
+
+## 🛡️ Safety Features
+
+- **Emergency Stop**: Immediate halt of all robot movement
+- **Connection Monitoring**: Automatic detection of hub disconnection
+- **Battery Monitoring**: Low battery warnings and status display
+- **Command Validation**: Prevention of invalid or dangerous commands
+- **Timeout Protection**: Automatic stop if communication is lost
+
+## 🔬 Calibration System
+
+The advanced calibration system improves robot accuracy through automated measurement and compensation:
+
+### Calibration Measurements
+1. **Motor Delay**: Response time compensation
+2. **Straight Tracking**: Drift correction for straight-line movement
+3. **Turn Bias**: Rotation accuracy adjustment
+4. **Motor Balance**: Left/right motor power balancing
+5. **Gyro Drift**: Sensor drift compensation
+
+### Confidence Scoring
+Each calibration measurement includes a confidence score (0-100%) indicating the reliability of the measurement. Higher confidence scores result in more aggressive compensation.
+
+## 🌐 Browser Compatibility
+
+| Browser | Version | Bluetooth | PWA | Notes |
+|---------|---------|-----------|-----|-------|
+| Chrome | 56+ | ✅ | ✅ | Recommended |
+| Edge | 79+ | ✅ | ✅ | Full support |
+| Firefox | - | ❌ | ✅ | Simulation only |
+| Safari | - | ❌ | ✅ | Simulation only |
+
+*Web Bluetooth API support is required for physical robot connection*
+
+## 📱 Mobile Support
+
+The application is fully responsive and supports mobile devices:
+- **Touch Controls**: Tap-based interface for mobile users
+- **Mobile Installation**: Install as a mobile app via PWA
+- **Responsive Design**: Optimized layout for all screen sizes
+- **Gesture Support**: Pinch-to-zoom in simulator view
+
+## 🔒 Privacy & Security
+
+- **Local Storage**: All data stored locally on your device
+- **No Tracking**: No analytics or user tracking
+- **Secure Connection**: HTTPS required for all features
+- **Data Export**: Full control over your data with export options
 
 ## 🛠️ Development
 
-### Architecture
-- **Modular Classes** - Separate concerns for simulation, BLE, calibration
-- **Event-Driven** - Responsive UI with proper event handling
-- **Canvas Graphics** - Hardware-accelerated 2D rendering
-- **Modern JavaScript** - ES6+ features throughout
-
-### Code Structure
+### Project Structure
 ```
 JavaScript(Beta)/
-├── index.html          # Main application HTML
-├── styles.css          # Modern CSS with animations
-├── app.js             # Complete JavaScript application
-└── README.md          # This documentation
+├── index.html          # Main application interface
+├── app.js             # Core application logic
+├── styles.css         # Application styling
+├── manifest.json      # PWA configuration
+├── sw.js             # Service worker for offline support
+├── README.md         # This documentation
+└── assets/           # Images and icons
 ```
 
-### Key Classes
-- **`FLLRoboticsApp`** - Main application controller
-- **`RobotSimulator`** - Canvas-based robot visualization
-- **`BLEController`** - Web Bluetooth communication
-- **`CalibrationManager`** - Automated calibration system
-- **`RobotConfig`** - Configuration data structure
+### Key Components
+- **FLLRoboticsApp**: Main application class
+- **BLEController**: Bluetooth communication handler
+- **RobotSimulator**: Physics-based robot simulation
+- **RobotConfig**: Configuration management
+- **ToastManager**: User notification system
+- **Logger**: Comprehensive logging system
+- **PerformanceMonitor**: Real-time performance tracking
 
-## 🎨 Design Philosophy
+### Building & Contributing
 
-### Modern Web Standards
-- **CSS Grid & Flexbox** - Responsive layout system
-- **CSS Variables** - Consistent theming
-- **CSS Animations** - Smooth transitions and effects
-- **Web APIs** - Native browser capabilities
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes** and test thoroughly
+4. **Commit your changes**: `git commit -m 'Add amazing feature'`
+5. **Push to the branch**: `git push origin feature/amazing-feature`
+6. **Open a Pull Request**
 
-### User Experience
-- **Intuitive Interface** - Familiar desktop application feel
-- **Visual Feedback** - Hover states, animations, status indicators
-- **Error Prevention** - Disabled states and clear messaging
-- **Progressive Enhancement** - Graceful degradation for older browsers
+### Code Standards
+- **ES6+ JavaScript** with strict mode
+- **Comprehensive error handling** with try-catch blocks
+- **Accessibility compliance** with ARIA labels
+- **Responsive design** with mobile-first approach
+- **Performance optimization** with efficient algorithms
 
-## 🔍 Troubleshooting
+## 📖 API Documentation
 
-### Connection Issues
-- Ensure Web Bluetooth is enabled in browser flags
-- Verify Pybricks code is uploaded and running
-- Check that hub is in pairing mode
-- Try refreshing the page and reconnecting
+### Robot Command Structure
+```javascript
+// Drive command
+{
+  type: "drive",
+  speed: 200,        // -1000 to 1000 (deg/s)
+  turn_rate: 100     // -1000 to 1000 (deg/s)
+}
 
-### Performance Tips
-- Use simulation mode for development and testing
-- Upload smaller map images for better performance
-- Clear saved runs periodically to free storage
-- Close other Bluetooth applications
+// Arm command
+{
+  type: "arm1",      // or "arm2"
+  speed: 150         // -1000 to 1000 (deg/s)
+}
 
-### Browser Support
-- Chrome/Chromium browsers work best
-- Enable "Experimental Web Platform Features" if needed
-- Some features may not work in private/incognito mode
-- Mobile support varies by device and browser
+// Emergency stop
+{
+  type: "emergency_stop"
+}
+```
 
-## 📈 Future Enhancements
+### Event System
+```javascript
+// Subscribe to events
+app.on('robotConnected', (data) => {
+  console.log(`Connected to ${data.deviceName}`);
+});
 
-### Planned Features
-- Multiple robot support
-- Advanced path planning
-- Competition timer integration
-- Remote collaboration features
-- Enhanced debugging tools
+app.on('calibrationComplete', (results) => {
+  console.log('Calibration finished:', results);
+});
+```
 
-### API Extensions
-- RESTful web service integration
-- Cloud storage synchronization
-- Real-time multiplayer support
-- Advanced analytics and metrics
+## 🤝 Support & Community
 
-## 📄 License
+- **Issues**: Report bugs and request features on [GitHub Issues](https://github.com/codless-robotics/fll-control-center/issues)
+- **Discussions**: Join the community at [GitHub Discussions](https://github.com/codless-robotics/fll-control-center/discussions)
+- **Documentation**: Complete guides at [docs.codless-robotics.com](https://docs.codless-robotics.com)
+- **Discord**: Real-time chat at [discord.gg/codless-robotics](https://discord.gg/codless-robotics)
 
-This project maintains the same license as the original Python application.
+## 📜 License
 
-## 🤝 Contributing
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Contributions welcome! Please maintain the modern web development standards and ensure cross-browser compatibility.
+## 🙏 Acknowledgments
+
+- **Pybricks Team** for the excellent MicroPython platform
+- **FIRST LEGO League** for inspiring robotics education
+- **Open Source Community** for tools and libraries used
+- **Beta Testers** who helped refine the application
 
 ---
 
-**Built with modern web technologies for the FLL robotics community** 🤖✨
+<div align="center">
+
+**Made with ❤️ for the FLL Community**
+
+[Website](https://codless-robotics.com) • [Documentation](https://docs.codless-robotics.com) • [Community](https://discord.gg/codless-robotics)
+
+*Empowering the next generation of robotics engineers*
+
+</div>

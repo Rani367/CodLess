@@ -135,6 +135,7 @@ body {
 .section-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     margin-bottom: 16px;
 }
@@ -798,6 +799,326 @@ kbd:hover {
     background: linear-gradient(135deg, #333333 0%, #2a2a2a 100%);
 }
 
+/* Loading Screen */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.5s ease;
+}
+
+.loading-content {
+    text-align: center;
+    color: #ffffff;
+}
+
+.loading-logo {
+    font-size: 4rem;
+    color: #00a8ff;
+    margin-bottom: 1rem;
+    animation: pulse 2s infinite;
+}
+
+.loading-content h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #b0b0b0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.loading-bar {
+    width: 200px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0 auto 1rem;
+}
+
+.loading-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #00a8ff 0%, #0078d4 100%);
+    width: 0%;
+    animation: loadingProgress 2s ease-in-out infinite;
+}
+
+@keyframes loadingProgress {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+}
+
+.loading-content p {
+    font-size: 0.9rem;
+    color: #b0b0b0;
+}
+
+/* Version Badge */
+.version-badge {
+    background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
+    color: #ffffff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+/* Enhanced Section Headers - Additional Styles */
+
+.section-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.btn-icon:hover {
+    background: rgba(0, 168, 255, 0.2);
+    transform: scale(1.05);
+}
+
+/* Emergency Stop Button */
+.btn-emergency {
+    background: linear-gradient(135deg, #ff4757 0%, #dc3545 100%) !important;
+    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-emergency:hover {
+    background: linear-gradient(135deg, #ff3742 0%, #c82333 100%) !important;
+    box-shadow: 0 6px 20px rgba(255, 71, 87, 0.6);
+    transform: translateY(-2px) scale(1.02);
+}
+
+/* Help Text */
+.help-text {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.4;
+    margin-top: 4px;
+}
+
+/* Controls Help */
+.controls-help {
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(0, 168, 255, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid #00a8ff;
+}
+
+/* Calibration Status */
+.calibration-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+    font-size: 12px;
+    color: #ffc107;
+    margin-top: 8px;
+}
+
+.calibration-status.completed {
+    background: rgba(40, 167, 69, 0.1);
+    border-left-color: #28a745;
+    color: #28a745;
+}
+
+/* Recording Timer */
+.recording-timer {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    animation: pulse 1s infinite;
+}
+
+/* Performance Stats */
+.performance-stats {
+    display: flex;
+    gap: 16px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 11px;
+    color: #888;
+}
+
+.simulator-info {
+    flex: 1;
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 350px;
+}
+
+.toast {
+    background: linear-gradient(135deg, #2d2d2d 0%, #1e1e1e 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    animation: slideInToast 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.toast::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
+}
+
+.toast.success::before {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+}
+
+.toast.warning::before {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+}
+
+.toast.error::before {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.toast-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.toast-header i {
+    font-size: 16px;
+}
+
+.toast-header h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+}
+
+.toast-body {
+    font-size: 13px;
+    color: #e0e0e0;
+    line-height: 1.4;
+}
+
+.toast-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.toast-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+@keyframes slideInToast {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Enhanced Status Bar */
+.status-bar {
+    height: 40px;
+    background: linear-gradient(135deg, #232323 0%, #1a1a1a 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(10px);
+}
+
+.status-content {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.status-content span:first-child {
+    color: #b0b0b0;
+}
+
+.status-content span:last-child {
+    color: #ffffff;
+    font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .controls-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .simulator-controls {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
 @media (max-width: 768px) {
     .app-container {
         margin: 0;
@@ -808,12 +1129,87 @@ kbd:hover {
         width: 240px;
     }
     
-    .controls-grid {
-        grid-template-columns: 1fr;
-    }
-    
     .modal-content {
         width: 95%;
         margin: 20px;
+    }
+    
+    .toast-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .status-bar {
+        flex-direction: column;
+        height: auto;
+        padding: 8px 20px;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .title-content h1 {
+        font-size: 14px;
+    }
+    
+    .version-badge {
+        display: none;
+    }
+    
+    .sidebar {
+        width: 100%;
+        position: absolute;
+        top: 50px;
+        left: 0;
+        height: calc(100vh - 90px);
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .main-content {
+        padding: 12px;
+    }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+    .loading-screen {
+        background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .btn {
+        border: 2px solid currentColor;
+    }
+    
+    .status-indicator {
+        border: 2px solid currentColor;
+    }
+    
+    .modal-content {
+        border: 2px solid #ffffff;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .loading-progress {
+        animation: none;
+        width: 100%;
     }
 }
