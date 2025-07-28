@@ -618,8 +618,8 @@ class RobotSimulator extends EventEmitter {
         this.ctx = canvas.getContext('2d');
         
         // Robot state
-        this.robotX = 300;
-        this.robotY = 200;
+        this.robotX = this.canvas.clientWidth / 2;
+        this.robotY = this.canvas.clientHeight / 2;
         this.robotAngle = 0;
         this.arm1Angle = 0;
         this.arm2Angle = 0;
@@ -643,7 +643,6 @@ class RobotSimulator extends EventEmitter {
         
         // Simulation settings
         this.dt = 0.016; // 60 FPS
-        this.scale = 1.0;
         this.showTrail = false;
         this.trail = [];
         this.maxTrailLength = 100;
@@ -658,6 +657,7 @@ class RobotSimulator extends EventEmitter {
         this.isRunning = false;
         
         this.setupControls();
+        this.setupResizeHandler();
         this.start();
     }
 
@@ -689,14 +689,20 @@ class RobotSimulator extends EventEmitter {
             isDragging = false;
             this.canvas.style.cursor = 'default';
         });
+    }
 
-        // Wheel zoom
-        this.canvas.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-            this.scale *= zoomFactor;
-            this.scale = Math.max(0.5, Math.min(3.0, this.scale));
+    setupResizeHandler() {
+        const resizeObserver = new ResizeObserver(() => {
+            const rect = this.canvas.getBoundingClientRect();
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            
+            this.canvas.width = rect.width * devicePixelRatio;
+            this.canvas.height = rect.height * devicePixelRatio;
+            
+            this.ctx.scale(devicePixelRatio, devicePixelRatio);
         });
+        
+        resizeObserver.observe(this.canvas);
     }
 
     start() {
@@ -752,8 +758,8 @@ class RobotSimulator extends EventEmitter {
         this.robotAngle += this.velocity.angular * dt * 0.5;
 
         // Keep robot in bounds
-        this.robotX = this.clamp(this.robotX, 30, this.canvas.width - 30);
-        this.robotY = this.clamp(this.robotY, 30, this.canvas.height - 30);
+        this.robotX = this.clamp(this.robotX, 30, this.canvas.clientWidth - 30);
+        this.robotY = this.clamp(this.robotY, 30, this.canvas.clientHeight - 30);
 
         // Update arm positions
         this.arm1Angle += this.targetArm1Speed * dt * 0.3;
@@ -783,15 +789,14 @@ class RobotSimulator extends EventEmitter {
 
     render() {
         // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.clearRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
         
         this.ctx.save();
-        this.ctx.scale(this.scale, this.scale);
 
         // Draw background map
         if (this.backgroundMap) {
             this.ctx.globalAlpha = 0.3;
-            this.ctx.drawImage(this.backgroundMap, 0, 0, this.canvas.width / this.scale, this.canvas.height / this.scale);
+            this.ctx.drawImage(this.backgroundMap, 0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
             this.ctx.globalAlpha = 1.0;
         }
 
@@ -820,17 +825,17 @@ class RobotSimulator extends EventEmitter {
         this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.1)';
         this.ctx.lineWidth = 1;
 
-        for (let x = 0; x <= this.canvas.width / this.scale; x += gridSize) {
+        for (let x = 0; x <= this.canvas.clientWidth; x += gridSize) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height / this.scale);
+            this.ctx.lineTo(x, this.canvas.clientHeight);
             this.ctx.stroke();
         }
 
-        for (let y = 0; y <= this.canvas.height / this.scale; y += gridSize) {
+        for (let y = 0; y <= this.canvas.clientHeight; y += gridSize) {
             this.ctx.beginPath();
             this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width / this.scale, y);
+            this.ctx.lineTo(this.canvas.clientWidth, y);
             this.ctx.stroke();
         }
     }
@@ -871,69 +876,119 @@ class RobotSimulator extends EventEmitter {
         this.ctx.rotate((this.robotAngle * Math.PI) / 180);
 
         // Robot body shadow
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        this.ctx.fillRect(-18, -13, 36, 26);
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.beginPath();
+        if (this.ctx.roundRect) {
+            this.ctx.roundRect(-18, -13, 36, 26, 4);
+        } else {
+            this.ctx.rect(-18, -13, 36, 26);
+        }
+        this.ctx.fill();
 
-        // Robot body
-        this.ctx.fillStyle = '#00a8ff';
-        this.ctx.strokeStyle = '#ffffff';
-        this.ctx.lineWidth = 2;
-        this.ctx.fillRect(-20, -15, 40, 30);
-        this.ctx.strokeRect(-20, -15, 40, 30);
+        // Robot body gradient
+        const gradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
+        gradient.addColorStop(0, '#00b8ff');
+        gradient.addColorStop(1, '#0088cc');
+        
+        this.ctx.fillStyle = gradient;
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        if (this.ctx.roundRect) {
+            this.ctx.roundRect(-20, -15, 40, 30, 6);
+        } else {
+            this.ctx.rect(-20, -15, 40, 30);
+        }
+        this.ctx.fill();
+        this.ctx.stroke();
 
         // Direction indicator
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.fillRect(15, -2, 8, 4);
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.beginPath();
+        if (this.ctx.roundRect) {
+            this.ctx.roundRect(15, -3, 8, 6, 2);
+        } else {
+            this.ctx.rect(15, -3, 8, 6);
+        }
+        this.ctx.fill();
 
         // Draw arms
-        this.drawArm(-15, -10, this.arm1Angle, '#28a745', 'Arm 1');
-        this.drawArm(-15, 10, this.arm2Angle, '#dc3545', 'Arm 2');
+        this.drawArm(-15, -10, this.arm1Angle, '#00e676');
+        this.drawArm(-15, 10, this.arm2Angle, '#ff5252');
 
-        // Robot center dot
-        this.ctx.fillStyle = '#ffffff';
+        // Robot center indicator
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.lineWidth = 1;
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, 3, 0, 2 * Math.PI);
+        this.ctx.arc(0, 0, 4, 0, 2 * Math.PI);
         this.ctx.fill();
+        this.ctx.stroke();
 
         this.ctx.restore();
     }
 
-    drawArm(x, y, angle, color, label) {
+    drawArm(x, y, angle, color) {
         this.ctx.save();
         this.ctx.translate(x, y);
         this.ctx.rotate((angle * Math.PI) / 180);
 
         // Arm base
         this.ctx.fillStyle = color;
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.lineWidth = 1;
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, 4, 0, 2 * Math.PI);
+        this.ctx.arc(0, 0, 5, 0, 2 * Math.PI);
         this.ctx.fill();
+        this.ctx.stroke();
 
-        // Arm shaft
-        this.ctx.strokeStyle = color;
-        this.ctx.lineWidth = 3;
+        // Arm shaft with gradient
+        const armGradient = this.ctx.createLinearGradient(0, -2, 0, 2);
+        armGradient.addColorStop(0, color);
+        armGradient.addColorStop(1, this.darkenColor(color, 0.7));
+        
+        this.ctx.strokeStyle = armGradient;
+        this.ctx.lineWidth = 4;
+        this.ctx.lineCap = 'round';
         this.ctx.beginPath();
-        this.ctx.moveTo(0, 0);
-        this.ctx.lineTo(20, 0);
+        this.ctx.moveTo(3, 0);
+        this.ctx.lineTo(18, 0);
         this.ctx.stroke();
 
         // Arm end effector
         this.ctx.fillStyle = color;
-        this.ctx.fillRect(18, -3, 6, 6);
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        if (this.ctx.roundRect) {
+            this.ctx.roundRect(17, -3, 7, 6, 2);
+        } else {
+            this.ctx.rect(17, -3, 7, 6);
+        }
+        this.ctx.fill();
+        this.ctx.stroke();
 
         this.ctx.restore();
+    }
+
+    darkenColor(color, factor) {
+        const hex = color.replace('#', '');
+        const r = Math.floor(parseInt(hex.substr(0, 2), 16) * factor);
+        const g = Math.floor(parseInt(hex.substr(2, 2), 16) * factor);
+        const b = Math.floor(parseInt(hex.substr(4, 2), 16) * factor);
+        return `rgb(${r}, ${g}, ${b})`;
     }
 
     drawInfo() {
         // Info panel background
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(10 / this.scale, 10 / this.scale, 220 / this.scale, 140 / this.scale);
+        this.ctx.fillRect(10, 10, 220, 120);
 
         // Info text
         this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = `${12 / this.scale}px Inter`;
-        const lineHeight = 15 / this.scale;
-        let y = 25 / this.scale;
+        this.ctx.font = '12px Inter';
+        const lineHeight = 15;
+        let y = 25;
 
         const info = [
             `Position: (${Math.round(this.robotX)}, ${Math.round(this.robotY)})`,
@@ -942,12 +997,11 @@ class RobotSimulator extends EventEmitter {
             `Turn Rate: ${Math.round(this.velocity.angular)}`,
             `Arm 1: ${Math.round(this.arm1Angle)}°`,
             `Arm 2: ${Math.round(this.arm2Angle)}°`,
-            `Scale: ${this.scale.toFixed(1)}x`,
             `Trail: ${this.showTrail ? 'ON' : 'OFF'}`
         ];
 
         info.forEach(text => {
-            this.ctx.fillText(text, 15 / this.scale, y);
+            this.ctx.fillText(text, 15, y);
             y += lineHeight;
         });
     }
@@ -992,8 +1046,8 @@ class RobotSimulator extends EventEmitter {
     }
 
     reset() {
-        this.robotX = this.canvas.width / 2;
-        this.robotY = this.canvas.height / 2;
+        this.robotX = this.canvas.clientWidth / 2;
+        this.robotY = this.canvas.clientHeight / 2;
         this.robotAngle = 0;
         this.arm1Angle = 0;
         this.arm2Angle = 0;
@@ -1003,7 +1057,6 @@ class RobotSimulator extends EventEmitter {
         this.targetArm1Speed = 0;
         this.targetArm2Speed = 0;
         this.trail = [];
-        this.scale = 1.0;
     }
 
     clamp(value, min, max) {
@@ -1281,9 +1334,24 @@ class FLLRoboticsApp extends EventEmitter {
     setupRobotSimulator() {
         const canvas = document.getElementById('robotSimulator');
         if (canvas) {
+            this.setupHighDPICanvas(canvas);
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
         }
+    }
+
+    setupHighDPICanvas(canvas) {
+        const ctx = canvas.getContext('2d');
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        
+        canvas.width = rect.width * devicePixelRatio;
+        canvas.height = rect.height * devicePixelRatio;
+        
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
     }
 
     setupBLEEvents() {
