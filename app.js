@@ -1316,6 +1316,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
         
+        document.getElementById('startCalibrationBtn')?.addEventListener('click', () => this.startCalibration());
+        
         document.getElementById('clearLogBtn')?.addEventListener('click', () => this.clearLog());
         document.getElementById('exportLogBtn')?.addEventListener('click', () => this.exportLog());
         
@@ -1633,7 +1635,7 @@ class FLLRoboticsApp extends EventEmitter {
         if (!connectBtn || !hubStatus) return;
 
         if (!navigator.bluetooth || !window.isSecureContext) {
-            connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Bluetooth Unavailable';
+            connectBtn.innerHTML = 'Bluetooth Unavailable';
             connectBtn.disabled = true;
             hubStatus.className = 'status-indicator error';
             const reason = !navigator.bluetooth ? 'Browser not supported' : 'HTTPS required';
@@ -1644,7 +1646,7 @@ class FLLRoboticsApp extends EventEmitter {
         
         switch (status) {
             case 'connecting':
-                connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Connecting...';
+                connectBtn.innerHTML = 'Connecting...';
                 connectBtn.disabled = true;
                 hubStatus.className = 'status-indicator connecting';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Connecting...</span>';
@@ -1652,7 +1654,7 @@ class FLLRoboticsApp extends EventEmitter {
                 break;
                 
             case 'connected':
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Disconnect Hub';
+                connectBtn.innerHTML = 'Disconnect Hub';
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator connected';
                 hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Connected${deviceName ? ` - ${deviceName}` : ''}</span>`;
@@ -1662,7 +1664,7 @@ class FLLRoboticsApp extends EventEmitter {
             case 'error':
             case 'disconnected':
             default:
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                connectBtn.innerHTML = 'Connect to Pybricks Hub';
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator disconnected';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
@@ -1698,6 +1700,23 @@ class FLLRoboticsApp extends EventEmitter {
             calibrationStatus.className = 'calibration-status';
             calibrationStatus.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>Calibration Required</span>';
         }
+    }
+
+    startCalibration() {
+        if (this.isDeveloperMode) {
+            this.toastManager.show('Calibration is not available in simulation mode', 'warning', 3000);
+            this.logger.log('Calibration attempted in simulation mode', 'warning');
+            return;
+        }
+
+        if (!this.isConnected) {
+            this.toastManager.show('Please connect to the hub first', 'error', 3000);
+            this.logger.log('Calibration attempted without hub connection', 'warning');
+            return;
+        }
+
+        this.logger.log('Starting calibration procedure...', 'info');
+        this.toastManager.show('Calibration started - follow the robot movements', 'info', 5000);
     }
 
     updateRunsList() {
