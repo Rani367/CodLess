@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodLess - FLL Robotics Control Center v1.0.0</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="title-bar">
+            <div class="title-content">
+                <i class="fas fa-robot"></i>
+                <h1>CodLess - FLL Robotics Control Center</h1>
+            </div>
+            <div class="window-controls">
+                <button class="window-btn minimize-btn" onclick="minimizeWindow()">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button class="window-btn maximize-btn" onclick="toggleMaximize()">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="window-btn close-btn" onclick="closeWindow()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="main-container">
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-wifi"></i>
+                        <h3>Hub Connection</h3>
+                    </div>
+                    <div class="section-content">
+                        <button id="connectBtn" class="btn btn-primary">
+                            <i class="fas fa-bluetooth"></i>
+                            Connect to Pybricks Hub
+                        </button>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="developerMode" class="checkbox">
+                            <label for="developerMode">Simulation Mode</label>
+                        </div>
+                        <div id="hubStatus" class="status-indicator disconnected">
+                            <div class="status-dot"></div>
+                            <span>Hub Disconnected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-cog"></i>
+                        <h3>Robot Configuration</h3>
+                    </div>
+                    <div class="section-content">
+                        <button id="configBtn" class="btn btn-success">
+                            <i class="fas fa-tools"></i>
+                            Configure Robot
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-code"></i>
+                        <h3>Copy Pybricks Code</h3>
+                    </div>
+                    <div class="section-content">
+                        <p class="info-text">
+                            Click to copy the hub control code to your clipboard, then paste it into code.pybricks.com
+                        </p>
+                        <button id="copyCodeBtn" class="btn btn-primary">
+                            <i class="fas fa-copy"></i>
+                            Copy Hub Code
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-play-circle"></i>
+                        <h3>Saved Runs</h3>
+                    </div>
+                    <div class="section-content">
+                        <select id="savedRunsList" class="select-box">
+                            <option value="">No saved runs</option>
+                        </select>
+                        <div class="button-group">
+                            <button id="playBtn" class="btn btn-success" disabled>
+                                <i class="fas fa-play"></i>
+                                Play
+                            </button>
+                            <button id="deleteBtn" class="btn btn-danger" disabled>
+                                <i class="fas fa-trash"></i>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div id="simulatorSection" class="content-section hidden">
+                    <div class="section-header">
+                        <i class="fas fa-eye"></i>
+                        <h3>Robot Simulator</h3>
+                    </div>
+                    <div class="simulator-container">
+                        <canvas id="robotSimulator" width="600" height="400"></canvas>
+                        <div class="simulator-controls">
+                            <p class="info-text">Real-time visual simulation of your robot's movement and arm positions</p>
+                            <div class="button-group">
+                                <button id="uploadMapBtn" class="btn btn-primary" disabled>
+                                    <i class="fas fa-upload"></i>
+                                    Upload Map
+                                </button>
+                                <button id="resetSimBtn" class="btn btn-success" disabled>
+                                    <i class="fas fa-refresh"></i>
+                                    Reset Position
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="section-header">
+                        <i class="fas fa-microphone"></i>
+                        <h3>Recording Controls</h3>
+                    </div>
+                    <div class="recording-controls">
+                        <div class="input-group">
+                            <label for="runNameInput">Run Name:</label>
+                            <input type="text" id="runNameInput" value="Run 1" class="input-field">
+                        </div>
+                        <div class="button-group">
+                            <button id="recordBtn" class="btn btn-danger" disabled>
+                                <i class="fas fa-circle"></i>
+                                Record Run
+                            </button>
+                            <button id="saveBtn" class="btn btn-success" disabled>
+                                <i class="fas fa-save"></i>
+                                Save Run
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="section-header">
+                        <i class="fas fa-terminal"></i>
+                        <h3>Status Display</h3>
+                    </div>
+                    <div id="statusDisplay" class="status-display"></div>
+                </div>
+
+                <div class="content-section">
+                    <div class="section-header">
+                        <i class="fas fa-keyboard"></i>
+                        <h3>Robot Controls</h3>
+                    </div>
+                    <div class="controls-grid">
+                        <div class="control-group">
+                            <h4>Movement Controls</h4>
+                            <div class="control-keys">
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd>W</kbd>
+                                        <span>Forward</span>
+                                    </div>
+                                </div>
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd>A</kbd>
+                                        <span>Turn Left</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd>S</kbd>
+                                        <span>Backward</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd>D</kbd>
+                                        <span>Turn Right</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <h4>Arm Controls</h4>
+                            <div class="control-keys">
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd>Q</kbd>
+                                        <span>Arm 1 Up</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd>E</kbd>
+                                        <span>Arm 1 Down</span>
+                                    </div>
+                                </div>
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd>R</kbd>
+                                        <span>Arm 2 Up</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd>F</kbd>
+                                        <span>Arm 2 Down</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-content">
+                <span>Status:</span>
+                <span id="statusLabel">Ready</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Robot Configuration</h2>
+                <button class="close-modal" onclick="closeConfigModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="config-tabs">
+                    <button class="tab-btn active" onclick="showTab('physical')">Physical Parameters</button>
+                    <button class="tab-btn" onclick="showTab('movement')">Movement Settings</button>
+                    <button class="tab-btn" onclick="showTab('calibration')">Calibration</button>
+                </div>
+
+                <div id="physicalTab" class="tab-content active">
+                    <div class="config-group">
+                        <h3>Robot Dimensions</h3>
+                        <div class="config-row">
+                            <label>Axle Track (mm):</label>
+                            <input type="number" id="axleTrack" value="112" step="0.1" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label>Wheel Diameter (mm):</label>
+                            <input type="number" id="wheelDiameter" value="56" step="0.1" class="config-input">
+                        </div>
+                    </div>
+
+                    <div class="config-group">
+                        <h3>Motor Ports</h3>
+                        <div class="config-row">
+                            <label>Left Motor Port:</label>
+                            <select id="leftMotorPort" class="config-select">
+                                <option value="A" selected>A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label>Right Motor Port:</label>
+                            <select id="rightMotorPort" class="config-select">
+                                <option value="A">A</option>
+                                <option value="B" selected>B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label>Arm 1 Motor Port:</label>
+                            <select id="arm1MotorPort" class="config-select">
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C" selected>C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label>Arm 2 Motor Port:</label>
+                            <select id="arm2MotorPort" class="config-select">
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D" selected>D</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="movementTab" class="tab-content">
+                    <div class="config-group">
+                        <h3>Speed Settings</h3>
+                        <div class="config-row">
+                            <label>Straight Speed (deg/s):</label>
+                            <input type="number" id="straightSpeed" value="500" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label>Straight Acceleration (deg/s²):</label>
+                            <input type="number" id="straightAccel" value="250" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label>Turn Rate (deg/s):</label>
+                            <input type="number" id="turnRate" value="200" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label>Turn Acceleration (deg/s²):</label>
+                            <input type="number" id="turnAccel" value="300" class="config-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="calibrationTab" class="tab-content">
+                    <div class="config-group">
+                        <h3>Calibration Control</h3>
+                        <p class="calibration-info">
+                            Calibration improves robot accuracy by measuring and compensating for hardware variations.
+                        </p>
+                        <button id="startCalibrationBtn" class="btn btn-warning">
+                            <i class="fas fa-sync"></i>
+                            Start Calibration
+                        </button>
+                        <div id="calibrationProgress" class="progress-container hidden">
+                            <div class="progress-bar">
+                                <div id="progressFill" class="progress-fill"></div>
+                            </div>
+                            <div id="calibrationStep" class="calibration-step">Starting calibration...</div>
+                        </div>
+                        <div id="calibrationResults" class="calibration-results hidden">
+                            <h4>Calibration Results</h4>
+                            <div id="calibrationData"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
