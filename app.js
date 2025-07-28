@@ -618,8 +618,9 @@ class RobotSimulator extends EventEmitter {
         this.ctx = canvas.getContext('2d');
         
         // Robot state
-        this.robotX = this.canvas.clientWidth / 2;
-        this.robotY = this.canvas.clientHeight / 2;
+        const rect = this.canvas.getBoundingClientRect();
+        this.robotX = rect.width / 2;
+        this.robotY = rect.height / 2;
         this.robotAngle = 0;
         this.arm1Angle = 0;
         this.arm2Angle = 0;
@@ -666,13 +667,13 @@ class RobotSimulator extends EventEmitter {
         let isDragging = false;
         let lastMousePos = { x: 0, y: 0 };
         
-        this.canvas.addEventListener('mousedown', (e) => {
+        this.mouseDownHandler = (e) => {
             isDragging = true;
             lastMousePos = { x: e.clientX, y: e.clientY };
             this.canvas.style.cursor = 'grabbing';
-        });
+        };
 
-        this.canvas.addEventListener('mousemove', (e) => {
+        this.mouseMoveHandler = (e) => {
             if (isDragging) {
                 const dx = e.clientX - lastMousePos.x;
                 const dy = e.clientY - lastMousePos.y;
@@ -683,26 +684,37 @@ class RobotSimulator extends EventEmitter {
                 
                 lastMousePos = { x: e.clientX, y: e.clientY };
             }
-        });
+        };
 
-        this.canvas.addEventListener('mouseup', () => {
+        this.mouseUpHandler = () => {
             isDragging = false;
             this.canvas.style.cursor = 'default';
-        });
+        };
+        
+        this.canvas.addEventListener('mousedown', this.mouseDownHandler);
+        this.canvas.addEventListener('mousemove', this.mouseMoveHandler);
+        this.canvas.addEventListener('mouseup', this.mouseUpHandler);
     }
 
     setupResizeHandler() {
-        const resizeObserver = new ResizeObserver(() => {
+        this.resizeObserver = new ResizeObserver(() => {
             const rect = this.canvas.getBoundingClientRect();
             const devicePixelRatio = window.devicePixelRatio || 1;
             
-            this.canvas.width = rect.width * devicePixelRatio;
-            this.canvas.height = rect.height * devicePixelRatio;
-            
-            this.ctx.scale(devicePixelRatio, devicePixelRatio);
+            // Only resize if dimensions have actually changed
+            if (this.canvas.width !== rect.width * devicePixelRatio || 
+                this.canvas.height !== rect.height * devicePixelRatio) {
+                
+                this.canvas.width = rect.width * devicePixelRatio;
+                this.canvas.height = rect.height * devicePixelRatio;
+                
+                // Reset transform and apply scaling
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.scale(devicePixelRatio, devicePixelRatio);
+            }
         });
         
-        resizeObserver.observe(this.canvas);
+        this.resizeObserver.observe(this.canvas);
     }
 
     start() {
@@ -758,8 +770,9 @@ class RobotSimulator extends EventEmitter {
         this.robotAngle += this.velocity.angular * dt * 0.5;
 
         // Keep robot in bounds
-        this.robotX = this.clamp(this.robotX, 30, this.canvas.clientWidth - 30);
-        this.robotY = this.clamp(this.robotY, 30, this.canvas.clientHeight - 30);
+        const rect = this.canvas.getBoundingClientRect();
+        this.robotX = this.clamp(this.robotX, 30, rect.width - 30);
+        this.robotY = this.clamp(this.robotY, 30, rect.height - 30);
 
         // Update arm positions
         this.arm1Angle += this.targetArm1Speed * dt * 0.3;
@@ -788,15 +801,20 @@ class RobotSimulator extends EventEmitter {
     }
 
     render() {
+        if (!this.ctx || !this.canvas) return;
+        
         // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+        const rect = this.canvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        
+        this.ctx.clearRect(0, 0, rect.width, rect.height);
         
         this.ctx.save();
 
         // Draw background map
         if (this.backgroundMap) {
             this.ctx.globalAlpha = 0.3;
-            this.ctx.drawImage(this.backgroundMap, 0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+            this.ctx.drawImage(this.backgroundMap, 0, 0, rect.width, rect.height);
             this.ctx.globalAlpha = 1.0;
         }
 
@@ -821,21 +839,22 @@ class RobotSimulator extends EventEmitter {
     }
 
     drawGrid() {
+        const rect = this.canvas.getBoundingClientRect();
         const gridSize = 50;
         this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.1)';
         this.ctx.lineWidth = 1;
 
-        for (let x = 0; x <= this.canvas.clientWidth; x += gridSize) {
+        for (let x = 0; x <= rect.width; x += gridSize) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.clientHeight);
+            this.ctx.lineTo(x, rect.height);
             this.ctx.stroke();
         }
 
-        for (let y = 0; y <= this.canvas.clientHeight; y += gridSize) {
+        for (let y = 0; y <= rect.height; y += gridSize) {
             this.ctx.beginPath();
             this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.clientWidth, y);
+            this.ctx.lineTo(rect.width, y);
             this.ctx.stroke();
         }
     }
@@ -1065,6 +1084,18 @@ class RobotSimulator extends EventEmitter {
 
     destroy() {
         this.stop();
+        
+        // Remove event listeners
+        if (this.canvas) {
+            this.canvas.removeEventListener('mousedown', this.mouseDownHandler);
+            this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
+            this.canvas.removeEventListener('mouseup', this.mouseUpHandler);
+        }
+        
+        // Clean up resize observer
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
     }
 }
 
@@ -1333,7 +1364,17 @@ class FLLRoboticsApp extends EventEmitter {
 
     setupRobotSimulator() {
         const canvas = document.getElementById('robotSimulator');
+        
         if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            
+            // Ensure canvas has proper initial dimensions
+            if (rect.width === 0 || rect.height === 0) {
+                // Wait for the element to have dimensions
+                setTimeout(() => this.setupRobotSimulator(), 100);
+                return;
+            }
+            
             this.setupHighDPICanvas(canvas);
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
@@ -1345,11 +1386,14 @@ class FLLRoboticsApp extends EventEmitter {
         const devicePixelRatio = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         
+        // Set actual canvas size
         canvas.width = rect.width * devicePixelRatio;
         canvas.height = rect.height * devicePixelRatio;
         
+        // Scale the drawing context
         ctx.scale(devicePixelRatio, devicePixelRatio);
         
+        // Set display size
         canvas.style.width = rect.width + 'px';
         canvas.style.height = rect.height + 'px';
     }
@@ -1643,6 +1687,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateRunsList();
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
+        this.updateDeveloperModeCheckbox();
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
@@ -1721,11 +1766,21 @@ class FLLRoboticsApp extends EventEmitter {
 
     updateSimulatorVisibility() {
         const simulatorSection = document.getElementById('simulatorSection');
+        
         if (!simulatorSection) return;
         
         if (this.isDeveloperMode) {
             simulatorSection.classList.remove('hidden');
-            this.robotSimulator?.start();
+            
+            // Give the DOM time to update before starting simulator
+            setTimeout(() => {
+                if (this.robotSimulator) {
+                    this.robotSimulator.start();
+                } else {
+                    // Re-setup simulator if it doesn't exist
+                    this.setupRobotSimulator();
+                }
+            }, 10);
         } else {
             simulatorSection.classList.add('hidden');
             this.robotSimulator?.stop();
@@ -1744,6 +1799,13 @@ class FLLRoboticsApp extends EventEmitter {
                 }
             }
         });
+    }
+
+    updateDeveloperModeCheckbox() {
+        const developerModeCheckbox = document.getElementById('developerMode');
+        if (developerModeCheckbox) {
+            developerModeCheckbox.checked = this.isDeveloperMode;
+        }
     }
 
     updateBatteryUI(level) {
@@ -1984,6 +2046,22 @@ if __name__ == "__main__":
             document.exitFullscreen();
         } else {
             document.documentElement.requestFullscreen();
+        }
+    }
+
+    toggleSimulatorFullscreen() {
+        const canvas = document.getElementById('robotSimulator');
+        if (!canvas) {
+            this.toastManager.show('Simulator not available', 'warning');
+            return;
+        }
+
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            canvas.requestFullscreen().catch(err => {
+                this.toastManager.show(`Fullscreen not supported: ${err.message}`, 'error');
+            });
         }
     }
 
