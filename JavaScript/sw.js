@@ -1,7 +1,7 @@
 // Service Worker for CodLess FLL Robotics Control Center
-// Version 2.0.0
+// Version 3.0.0
 
-const CACHE_NAME = 'codless-robotics-v2.0.0';
+const CACHE_NAME = 'codless-robotics-v3.0.0';
 const OFFLINE_URL = '/offline.html';
 
 // Files to cache for offline functionality

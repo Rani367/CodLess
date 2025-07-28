@@ -1,4 +1,4 @@
-# CodLess FLL Robotics Control Center v2.0.0
+# CodLess FLL Robotics Control Center v3.0.0
 
 A professional, feature-rich robotics control and simulation platform for FIRST LEGO League (FLL) competitions. This web-based application provides advanced robot control, recording/playback functionality, real-time simulation, and comprehensive calibration tools.
 
@@ -62,7 +62,7 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 ```bash
 # Clone the repository
 git clone https://github.com/codless-robotics/fll-control-center.git
-cd fll-control-center/JavaScript(Beta)
+cd fll-control-center/JavaScript
 
 # Serve the application (HTTPS required for Bluetooth)
 # Using Python 3:
@@ -227,7 +227,7 @@ The application is fully responsive and supports mobile devices:
 
 ### Project Structure
 ```
-JavaScript(Beta)/
+JavaScript/
 ├── index.html          # Main application interface
 ├── app.js             # Core application logic
 ├── styles.css         # Application styling
@@ -313,7 +313,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Pybricks Team** for the excellent MicroPython platform
 - **FIRST LEGO League** for inspiring robotics education
 - **Open Source Community** for tools and libraries used
-- **Beta Testers** who helped refine the application
+- **Community Contributors** who helped refine the application
+
+---
+
+## 📝 Changelog
+
+### Version 3.0.0 (Latest)
+- **🎉 Stable Release**: Removed "Beta" designation - this is now a production-ready application
+- **🔧 Enhanced Browser Compatibility**: Improved Web Bluetooth API error handling with user-friendly messages
+- **🌐 HTTPS Requirements**: Added proactive checks for secure context (HTTPS) requirements
+- **🔄 Improved Connection Reliability**: Added exponential backoff for connection retries
+- **💡 Troubleshooting Assistant**: Automatic troubleshooting help after connection failures
+- **🐛 Bug Fixes**: 
+  - Fixed "not available in browser" error with better error messages
+  - Added browser compatibility warnings on app startup
+  - Improved handling of Bluetooth permission denied scenarios
+  - Enhanced error messages for various connection failure scenarios
+- **📱 Updated UI**: Better connection status indicators for unsupported browsers
+- **🔒 Security**: Enhanced secure context validation for all Bluetooth operations
 
 ---
 

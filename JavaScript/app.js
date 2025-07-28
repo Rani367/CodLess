@@ -1,5 +1,5 @@
 // CodLess FLL Robotics Control Center - Professional JavaScript Application
-// Version 2.0.0 - Enhanced with PWA support, advanced features, and optimizations
+// Version 3.0.0 - Stable release with enhanced browser compatibility and bug fixes
 
 'use strict';
 
@@ -8,7 +8,7 @@
 // ============================
 
 const APP_CONFIG = {
-    VERSION: '2.0.0',
+    VERSION: '3.0.0',
     NAME: 'CodLess FLL Robotics Control Center',
     BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
     HUB_NAME_PREFIX: 'Pybricks',
@@ -19,10 +19,10 @@ const APP_CONFIG = {
 };
 
 const STORAGE_KEYS = {
-    SAVED_RUNS: 'fllRoboticsRuns_v2',
-    CONFIG: 'fllRoboticsConfig_v2',
-    USER_PREFERENCES: 'fllRoboticsPrefs_v2',
-    CALIBRATION_DATA: 'fllRoboticsCalibration_v2'
+    SAVED_RUNS: 'fllRoboticsRuns_v3',
+    CONFIG: 'fllRoboticsConfig_v3',
+    USER_PREFERENCES: 'fllRoboticsPrefs_v3',
+    CALIBRATION_DATA: 'fllRoboticsCalibration_v3'
 };
 
 // ============================
@@ -353,8 +353,14 @@ class BLEController extends EventEmitter {
         this.connectionAttempts++;
 
         try {
+            // Check for Web Bluetooth API support
             if (!navigator.bluetooth) {
-                throw new Error('Web Bluetooth API not supported in this browser');
+                throw new Error('Web Bluetooth API is not supported in this browser. Please use Chrome 56+, Edge 79+, or another compatible browser with HTTPS.');
+            }
+
+            // Check if we're in a secure context (HTTPS)
+            if (!window.isSecureContext) {
+                throw new Error('Web Bluetooth requires a secure context (HTTPS). Please access this application over HTTPS.');
             }
 
             this.emit('connecting');
@@ -398,15 +404,35 @@ class BLEController extends EventEmitter {
             this.connecting = false;
             this.connected = false;
             
+            let errorMessage = error.message;
+            
+            // Handle specific Bluetooth errors with user-friendly messages
+            if (error.name === 'NotFoundError') {
+                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running the provided code.';
+            } else if (error.name === 'NotAllowedError') {
+                errorMessage = 'Bluetooth access was denied. Please allow Bluetooth access and try again.';
+            } else if (error.name === 'SecurityError') {
+                errorMessage = 'Bluetooth access requires HTTPS. Please use a secure connection.';
+            } else if (error.name === 'NetworkError') {
+                errorMessage = 'Failed to connect to the hub. Make sure it\'s in range and try again.';
+            } else if (error.message.includes('User cancelled')) {
+                errorMessage = 'Device selection was cancelled.';
+            }
+            
             this.emit('connectionError', {
-                error: error.message,
+                error: errorMessage,
+                originalError: error.message,
                 attempt: this.connectionAttempts,
                 maxAttempts: this.maxConnectionAttempts
             });
 
             if (this.connectionAttempts < this.maxConnectionAttempts) {
-                // Retry connection after delay
-                setTimeout(() => this.connect(), 2000);
+                // Retry connection with exponential backoff
+                const retryDelay = Math.min(2000 * Math.pow(2, this.connectionAttempts - 1), 10000);
+                this.logger.log(`Retrying connection in ${retryDelay/1000} seconds...`, 'info');
+                setTimeout(() => this.connect(), retryDelay);
+            } else {
+                this.logger.log('Maximum connection attempts reached. Please try again manually.', 'error');
             }
 
             return false;
@@ -1029,6 +1055,9 @@ class FLLRoboticsApp extends EventEmitter {
         try {
             this.showLoadingScreen();
             
+            // Check browser compatibility
+            this.checkBrowserCompatibility();
+            
             // Load saved data
             await this.loadUserData();
             
@@ -1063,6 +1092,51 @@ class FLLRoboticsApp extends EventEmitter {
             console.error('Failed to initialize application:', error);
             this.toastManager.show(`Initialization failed: ${error.message}`, 'error', 0);
         }
+    }
+
+    checkBrowserCompatibility() {
+        const warnings = [];
+        
+        // Check for Web Bluetooth API
+        if (!navigator.bluetooth) {
+            warnings.push('Web Bluetooth API is not supported. Robot connectivity will not work. Please use Chrome 56+, Edge 79+, or another compatible browser.');
+        }
+        
+        // Check for secure context (HTTPS)
+        if (!window.isSecureContext) {
+            warnings.push('This application requires HTTPS for full functionality. Some features may not work properly.');
+        }
+        
+        // Check for Service Worker support
+        if (!('serviceWorker' in navigator)) {
+            warnings.push('Service Worker is not supported. Offline functionality will be limited.');
+        }
+        
+        // Check for Web Serial API (optional, for future features)
+        if (!('serial' in navigator)) {
+            console.info('Web Serial API not supported - this is optional and does not affect current functionality.');
+        }
+        
+        // Show warnings if any
+        if (warnings.length > 0) {
+            setTimeout(() => {
+                warnings.forEach(warning => {
+                    this.toastManager.show(warning, 'warning', 10000);
+                    this.logger.log(`Compatibility Warning: ${warning}`, 'warning');
+                });
+            }, 3000); // Show after loading screen
+        }
+        
+        // Log browser info
+        const userAgent = navigator.userAgent;
+        const isChrome = userAgent.includes('Chrome');
+        const isEdge = userAgent.includes('Edge');
+        const isFirefox = userAgent.includes('Firefox');
+        const isSafari = userAgent.includes('Safari') && !isChrome;
+        
+        this.logger.log(`Browser: ${isChrome ? 'Chrome' : isEdge ? 'Edge' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : 'Unknown'}`, 'info');
+        this.logger.log(`Secure Context: ${window.isSecureContext ? 'Yes' : 'No'}`, 'info');
+        this.logger.log(`Bluetooth Support: ${navigator.bluetooth ? 'Yes' : 'No'}`, 'info');
     }
 
     showLoadingScreen() {
@@ -1235,6 +1309,13 @@ class FLLRoboticsApp extends EventEmitter {
             this.updateConnectionUI('error');
             this.toastManager.show(`Connection failed: ${data.error}`, 'error');
             this.logger.log(`Connection failed: ${data.error}`, 'error');
+            
+            // Show troubleshooting help after multiple failed attempts
+            if (data.attempt >= 3) {
+                setTimeout(() => {
+                    this.showTroubleshootingHelp();
+                }, 2000);
+            }
         });
 
         this.bleController.on('batteryUpdate', (data) => {
@@ -1439,6 +1520,37 @@ class FLLRoboticsApp extends EventEmitter {
         this.toastManager.show(message, 'info');
     }
 
+    showTroubleshootingHelp() {
+        const troubleshootingSteps = [
+            "🔧 Troubleshooting Connection Issues:",
+            "",
+            "1. Make sure your hub is powered on and running the Pybricks code",
+            "2. Check that you're using Chrome, Edge, or another compatible browser",
+            "3. Ensure you're accessing the app via HTTPS (required for Bluetooth)",
+            "4. Move closer to your hub (Bluetooth range ~10 meters)",
+            "5. Try restarting your hub and refreshing this page",
+            "6. Check if another app is connected to your hub",
+            "",
+            "💡 Tips:",
+            "- The hub LED should be solid blue when ready to connect",
+            "- Make sure the hub name starts with 'Pybricks'",
+            "- Try the simulator mode if physical connection isn't working"
+        ];
+
+        // Show in both logger and as a long-lasting toast
+        troubleshootingSteps.forEach(step => {
+            if (step.trim()) {
+                this.logger.log(step, 'info');
+            }
+        });
+
+        this.toastManager.show(
+            'Connection issues? Check the log for troubleshooting steps or try simulator mode.',
+            'info',
+            8000
+        );
+    }
+
     emergencyStop() {
         this.emergencyStopActive = true;
         this.pressedKeys.clear();
@@ -1471,6 +1583,17 @@ class FLLRoboticsApp extends EventEmitter {
         const connectionStatus = document.getElementById('connectionStatus');
         
         if (!connectBtn || !hubStatus) return;
+
+        // Check if Bluetooth is not supported
+        if (!navigator.bluetooth || !window.isSecureContext) {
+            connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Bluetooth Unavailable';
+            connectBtn.disabled = true;
+            hubStatus.className = 'status-indicator error';
+            const reason = !navigator.bluetooth ? 'Browser not supported' : 'HTTPS required';
+            hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Bluetooth Unavailable - ${reason}</span>`;
+            if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}`;
+            return;
+        }
         
         switch (status) {
             case 'connecting':
