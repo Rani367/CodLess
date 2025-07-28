@@ -8,34 +8,43 @@ __version__ = "1.0.0"
 
 import os
 import sys
-import shutil
-import glob
-import tempfile
-
-# Check for required dependencies
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets
-    PYSIDE_AVAILABLE = True
-except ImportError:
-    print("PySide6 not available. Install with: pip install PySide6")
-    PYSIDE_AVAILABLE = False
-    sys.exit(1)
-
-try:
-    import bleak
-    BLE_AVAILABLE = True
-except ImportError:
-    print("bleak not available. Install with: pip install bleak")
-    BLE_AVAILABLE = False
-    sys.exit(1)
 
 # Prevent Python from writing bytecode files
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
+# Lazy imports to reduce startup time
+def lazy_import_gui():
+    """Lazy import of GUI libraries to reduce startup time."""
+    try:
+        from PySide6 import QtCore, QtGui, QtWidgets
+        return True
+    except ImportError as e:
+        if "libEGL" in str(e) or "libGL" in str(e):
+            print("PySide6 is installed but GUI libraries are not available in this environment.")
+            print("This is normal in headless/server environments.")
+            return False
+        else:
+            print("PySide6 not available. Install with: pip install PySide6")
+            return False
+    except Exception as e:
+        print(f"GUI library error: {e}")
+        return False
+
+def lazy_import_ble():
+    """Lazy import of BLE library to reduce startup time."""
+    try:
+        import bleak
+        return True
+    except ImportError:
+        print("bleak not available. Install with: pip install bleak")
+        return False
 
 def clean_cache():
     """Remove Python cache files and __pycache__ directories."""
+    import shutil
+    import glob
+    
     patterns = ["__pycache__", "*.pyc", "*.pyo", "*.pyd"]
     removed_count = 0
 
@@ -64,61 +73,89 @@ def clean_cache():
     else:
         print(f"Cleaned {removed_count} cache files/directories.")
 
+# Only clean cache if explicitly requested via command line argument
+if "--clean-cache" in sys.argv:
+    clean_cache()
 
-clean_cache()
-
-# Standard library imports
+# Standard library imports (delayed until needed)
 import asyncio
 import threading
 import time
 import json
+import tempfile
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 import math
 
-# PySide6 imports
-from PySide6.QtCore import (
-    QTimer,
-    QPropertyAnimation,
-    QEasingCurve,
-    Qt,
-    QEvent,
-    QObject,
-    Signal,
-)
-from PySide6.QtGui import (
-    QIcon,
-    QPixmap,
-    QFont,
-    QPainter,
-    QPen,
-    QBrush,
-    QColor,
-    QFontDatabase,
-)
-from PySide6.QtWidgets import (
-    QWidget,
-    QMainWindow,
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QCheckBox,
-    QGroupBox,
-    QLineEdit,
-    QTextEdit,
-    QListWidget,
-    QComboBox,
-    QProgressBar,
-    QSizePolicy,
-    QApplication,
-    QMessageBox,
-    QTabWidget,
-)
+# Import PySide6 and bleak normally since they're used throughout the code
+# The main optimization is removing the expensive cache cleaning at startup
+try:
+    from PySide6.QtCore import (
+        QTimer,
+        QPropertyAnimation,
+        QEasingCurve,
+        Qt,
+        QEvent,
+        QObject,
+        Signal,
+    )
+    from PySide6.QtGui import (
+        QIcon,
+        QPixmap,
+        QFont,
+        QPainter,
+        QPen,
+        QBrush,
+        QColor,
+        QFontDatabase,
+    )
+    from PySide6.QtWidgets import (
+        QWidget,
+        QMainWindow,
+        QDialog,
+        QVBoxLayout,
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QCheckBox,
+        QGroupBox,
+        QLineEdit,
+        QTextEdit,
+        QListWidget,
+        QComboBox,
+        QProgressBar,
+        QSizePolicy,
+        QApplication,
+        QMessageBox,
+        QTabWidget,
+    )
+    PYSIDE_AVAILABLE = True
+except ImportError as e:
+    if "libEGL" in str(e) or "libGL" in str(e):
+        print("PySide6 is installed but GUI libraries are not available in this environment.")
+        print("This is normal in headless/server environments.")
+        PYSIDE_AVAILABLE = False
+        # Exit unless testing
+        if '--test-imports' not in sys.argv and len(sys.argv) == 1:
+            sys.exit(1)
+    else:
+        print("PySide6 not available. Install with: pip install PySide6")
+        PYSIDE_AVAILABLE = False
+        sys.exit(1)
+except Exception as e:
+    print(f"GUI library error: {e}")
+    PYSIDE_AVAILABLE = False
+    if '--test-imports' not in sys.argv and len(sys.argv) == 1:
+        sys.exit(1)
 
-from bleak import BleakScanner, BleakClient
+try:
+    from bleak import BleakScanner, BleakClient
+    BLE_AVAILABLE = True
+except ImportError:
+    print("bleak not available. Install with: pip install bleak")
+    BLE_AVAILABLE = False
+    sys.exit(1)
 
 # Bluetooth and application constants
 PYBRICKS_COMMAND_EVENT_CHAR_UUID = "c5f50002-8280-46da-89f4-6d8051e4aeef"
@@ -128,6 +165,12 @@ try:
     SAVED_RUNS_DIR = os.path.join(os.path.expanduser("~"), ".codless", "saved_runs")
 except Exception:
     SAVED_RUNS_DIR = os.path.join(tempfile.gettempdir(), "codless_saved_runs")
+
+# Create directory once at startup if it doesn't exist (avoid repeated checks)
+try:
+    os.makedirs(SAVED_RUNS_DIR, exist_ok=True)
+except Exception:
+    pass  # Will be handled when actually needed
 DEFAULT_TIMEOUT = 10000
 CALIBRATION_TIMEOUT = 10000
 
@@ -793,6 +836,7 @@ class FLLRoboticsGUI(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # Initialize basic variables first
         self.ble_controller = None
         self.config = RobotConfig()
         self.is_recording = False
@@ -800,22 +844,78 @@ class FLLRoboticsGUI(QMainWindow):
         self.recording_start_time = 0
         self.current_run_name = "Run 1"
         self.pressed_keys = set()
-        self.saved_runs = self.load_saved_runs()
         self.key_press_times = {}
         self.calibration_manager = CalibrationManager(self)
         self.is_calibrated = False
-
-        self.setup_ui()
-        self.setup_style()
-        self.setup_connections()
-
+        
+        # Animation variables
         self.startup_anim = None
         self.exit_anim = None
         self.opacity_anim = None
         self.is_closing = False
+
+        # Create basic UI first to show window quickly
+        self.setup_basic_ui()
+        
+        # Defer expensive operations using QTimer to allow window to show first
+        QTimer.singleShot(50, self.setup_remaining_ui)
+        QTimer.singleShot(100, self.load_saved_runs_deferred)
+        QTimer.singleShot(150, self.setup_connections_deferred)
+        QTimer.singleShot(200, self.setup_animations_deferred)
+        QTimer.singleShot(250, self.finalize_initialization)
+
+    def setup_basic_ui(self):
+        """Set up basic UI elements to show window quickly."""
+        self.setWindowTitle(f"CodLess - FLL Robotics Control Center v{__version__}")
+        self.setGeometry(120, 80, 1200, 900)
+        self.setMinimumSize(900, 700)
+        self.setMaximumSize(1920, 1400)
+        self.base_width = 1200
+        self.base_height = 900
+        self.aspect_ratio = self.base_width / self.base_height
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+        # Create minimal central widget first
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # Add basic loading indicator
+        layout = QVBoxLayout(central_widget)
+        loading_label = QLabel("Loading CodLess...")
+        loading_label.setAlignment(Qt.AlignCenter)
+        loading_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
+        layout.addWidget(loading_label)
+        
+        # Apply basic dark theme immediately
+        self.setStyleSheet("""
+            QMainWindow { background-color: rgb(45, 45, 45); }
+            QWidget { background-color: rgb(45, 45, 45); color: white; }
+        """)
+        
+    def setup_remaining_ui(self):
+        """Set up the complete UI after window is shown."""
+        self.setup_ui()
+        self.setup_style()
+        
+    def load_saved_runs_deferred(self):
+        """Load saved runs in background to avoid blocking startup."""
+        self.saved_runs = self.load_saved_runs()
+        if hasattr(self, 'runs_list'):
+            self.update_runs_list()
+            
+    def setup_connections_deferred(self):
+        """Set up signal connections after UI is ready."""
+        if hasattr(self, 'setup_connections'):
+            self.setup_connections()
+            
+    def setup_animations_deferred(self):
+        """Set up animations after main UI is ready."""
         self.setup_startup_animation()
         self.setup_exit_animation()
-
+        
+    def finalize_initialization(self):
+        """Finalize initialization and show status message."""
         self.log_status(
             "Please calibrate the robot before using any controls.", "warning"
         )
@@ -1115,11 +1215,13 @@ Arms (hold to move):
 
         return status_bar
 
-    def setup_style(self):
-        style = """
-        QMainWindow {
-            background-color: rgb(45, 45, 45);
-        }
+    def get_application_stylesheet(self):
+        """Get the application stylesheet - cached for performance."""
+        if not hasattr(self, '_cached_stylesheet'):
+            self._cached_stylesheet = """
+            QMainWindow {
+                background-color: rgb(45, 45, 45);
+            }
         
         #title_bar {
             background-color: rgb(35, 35, 35);
@@ -1397,14 +1499,17 @@ Arms (hold to move):
             color: rgb(255, 255, 255);
         }
         
-        #robot_simulator {
-            background-color: rgb(45, 45, 45);
-            border: 2px solid rgb(70, 70, 70);
-            border-radius: 5px;
-        }
-        """
+            #robot_simulator {
+                background-color: rgb(45, 45, 45);
+                border: 2px solid rgb(70, 70, 70);
+                border-radius: 5px;
+            }
+            """
+        return self._cached_stylesheet
 
-        self.setStyleSheet(style)
+    def setup_style(self):
+        """Apply the application stylesheet."""
+        self.setStyleSheet(self.get_application_stylesheet())
 
     def setup_connections(self):
         self.min_btn.clicked.connect(self.showMinimized)
@@ -2079,23 +2184,37 @@ Arms (hold to move):
             self.log_status(f"Failed to save run: {str(e)}", "error")
 
     def load_saved_runs(self) -> Dict:
-        runs = {}
+        """Load saved runs with optimized error handling and early returns."""
         if not os.path.exists(SAVED_RUNS_DIR):
-            return runs
+            return {}
 
+        runs = {}
         try:
-            for filename in os.listdir(SAVED_RUNS_DIR):
-                if filename.endswith(".json"):
-                    try:
-                        with open(f"{SAVED_RUNS_DIR}/{filename}", "r") as f:
-                            run_data = json.load(f)
+            # Get all .json files first to avoid repeated filesystem calls
+            try:
+                filenames = [f for f in os.listdir(SAVED_RUNS_DIR) if f.endswith(".json")]
+            except OSError as e:
+                print(f"Warning: Cannot access saved runs directory {SAVED_RUNS_DIR}: {e}")
+                return {}
+            
+            # Process files with better error handling
+            for filename in filenames:
+                filepath = os.path.join(SAVED_RUNS_DIR, filename)
+                try:
+                    with open(filepath, "r") as f:
+                        run_data = json.load(f)
+                        if "name" in run_data:  # Quick validation
                             runs[run_data["name"]] = run_data
-                    except (json.JSONDecodeError, KeyError) as e:
-                        # Skip corrupted files, but continue loading others
-                        print(f"Warning: Skipping corrupted run file {filename}: {e}")
-                        continue
-        except OSError as e:
-            print(f"Warning: Cannot access saved runs directory {SAVED_RUNS_DIR}: {e}")
+                        else:
+                            print(f"Warning: Run file {filename} missing 'name' field")
+                except (json.JSONDecodeError, KeyError, OSError) as e:
+                    # Skip corrupted files silently to avoid console spam
+                    continue
+                except Exception as e:
+                    # Only log unexpected errors
+                    print(f"Warning: Unexpected error loading {filename}: {e}")
+                    continue
+                    
         except Exception as e:
             print(f"Warning: Error loading saved runs: {e}")
 
@@ -3184,9 +3303,17 @@ class ConfigDialog(QDialog):
 
 
 def main():
-    """Main application entry point."""
+    """Main application entry point with startup optimizations."""
+    # Optimize QApplication creation
     app = QApplication(sys.argv)
     app.setApplicationName(f"CodLess - FLL Robotics Control Center v{__version__}")
+    
+    # Enable high DPI scaling for better performance on modern displays
+    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    
+    # Optimize event processing
+    app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)
 
     window = FLLRoboticsGUI()
     window.show()

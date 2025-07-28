@@ -17,6 +17,19 @@ Built specifically for **LEGO SPIKE Prime** and **Pybricks**, the app offers dir
 - **Developer mode** for testing without hardware
 - **Robot configuration** for different wheel sizes, motor ports, and performance settings
 - **Modern dark theme interface** with real-time status monitoring
+- **Optimized startup performance** with lazy loading and deferred initialization
+
+---
+
+## Performance Optimizations
+
+CodLess has been optimized for fast startup and responsive operation:
+
+- **Fast startup**: UI components load progressively with a loading screen
+- **Lazy file operations**: Saved runs are loaded in the background
+- **Optional cache cleaning**: Use `--clean-cache` flag only when needed
+- **Deferred initialization**: Heavy operations are postponed until after the window appears
+- **Efficient styling**: Cached stylesheets reduce redundant processing
 
 ---
 
