@@ -1606,6 +1606,11 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     setupRobotSimulator() {
+        // Don't create a new simulator if one already exists
+        if (this.robotSimulator) {
+            return;
+        }
+        
         const canvas = document.getElementById('robotSimulator');
         
         if (canvas) {
@@ -2050,17 +2055,24 @@ class FLLRoboticsApp extends EventEmitter {
             
             // Give the DOM time to update before starting simulator
             setTimeout(() => {
+                // Always destroy and recreate the simulator to ensure it works properly
+                // after being hidden and shown again
                 if (this.robotSimulator) {
-                    this.robotSimulator.start();
-                } else {
-                    // Re-setup simulator if it doesn't exist
-                    this.setupRobotSimulator();
+                    this.robotSimulator.destroy();
+                    this.robotSimulator = null;
                 }
+                
+                // Setup and start the simulator
+                this.setupRobotSimulator();
                 this.enableSimulatorControls(true);
             }, 10);
         } else {
             simulatorSection.classList.add('hidden');
-            this.robotSimulator?.stop();
+            if (this.robotSimulator) {
+                this.robotSimulator.stop();
+                this.robotSimulator.destroy();
+                this.robotSimulator = null;
+            }
             this.enableSimulatorControls(false);
         }
     }
