@@ -3521,12 +3521,15 @@ function checkBrowserCompatibility() {
     const isEdge = userAgent.includes('Edge');
     const isChromiumBased = isChrome || isEdge;
     
-    // Check for required features
+    // Check for required features - STRICT check for Bluetooth API
     const hasBluetoothSupport = !!navigator.bluetooth;
     const isSecureContext = window.isSecureContext;
     
+    // Bluetooth API is absolutely required - no exceptions
+    const isSupported = hasBluetoothSupport && isSecureContext;
+    
     return {
-        isSupported: isChromiumBased && hasBluetoothSupport && isSecureContext,
+        isSupported,
         browserName: isChrome ? 'Chrome' : isEdge ? 'Edge' : 'Unknown',
         hasBluetoothSupport,
         isSecureContext
@@ -3581,7 +3584,13 @@ function showBrowserNotSupportedMessage() {
 // ============================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check browser compatibility first
+    // Check if browser was blocked by immediate check
+    if (window.BROWSER_BLOCKED) {
+        console.warn('Browser blocked: Bluetooth API not supported');
+        return;
+    }
+    
+    // Secondary check for browser compatibility
     const browserCheck = checkBrowserCompatibility();
     
     if (!browserCheck.isSupported) {

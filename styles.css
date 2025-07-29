@@ -1279,6 +1279,12 @@ kbd:hover {
     font-size: 64px;
     color: #ff6b6b;
     filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.3));
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }
 
 .browser-not-supported h1 {
@@ -1299,6 +1305,17 @@ kbd:hover {
 .browser-not-supported p strong {
     color: #ff6b6b;
     font-weight: 600;
+}
+
+.blocked-message {
+    background: rgba(255, 107, 107, 0.2);
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 107, 107, 0.4);
+    margin: 20px 0 !important;
+    font-weight: 500;
+    color: #ff6b6b !important;
+    font-size: 16px !important;
 }
 
 .supported-browsers {
@@ -1378,6 +1395,17 @@ kbd:hover {
     position: absolute;
     left: 0;
     top: 4px;
+}
+
+.technical-details .note {
+    color: #ff6b6b !important;
+    font-weight: 500;
+    font-size: 14px !important;
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(255, 107, 107, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 107, 107, 0.2);
 }
 
 /* Responsive design for browser not supported screen */
