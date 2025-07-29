@@ -764,6 +764,48 @@ class RobotSimulator extends EventEmitter {
         }
     }
 
+    updateCommand(command) {
+        // Apply calibration factors if available
+        let calibratedCommand = { ...command };
+        
+        if (this.calibrationFactors) {
+            if (command.type === 'drive') {
+                // Apply speed and turn calibration
+                calibratedCommand.speed = (command.speed || 0) * this.calibrationFactors.speedMultiplier;
+                calibratedCommand.turn_rate = (command.turn_rate || 0) * this.calibrationFactors.turnMultiplier;
+                
+                // Apply drift compensation for straight movement
+                if (command.turn_rate === 0 && command.speed !== 0) {
+                    // Add slight turn to compensate for drift
+                    const driftCompensation = this.calibrationFactors.driftCompensation;
+                    if (driftCompensation && (driftCompensation.x !== 0 || driftCompensation.y !== 0)) {
+                        // Calculate drift compensation angle
+                        const driftAngle = Math.atan2(driftCompensation.y, driftCompensation.x) * 180 / Math.PI;
+                        calibratedCommand.turn_rate = -driftAngle * 0.1; // Small compensation
+                    }
+                }
+            }
+        }
+        
+        // Update simulator targets based on command type
+        if (calibratedCommand.type === 'drive') {
+            this.targetSpeed = calibratedCommand.speed || 0;
+            this.targetTurn = calibratedCommand.turn_rate || 0;
+        } else if (calibratedCommand.type === 'arm1') {
+            this.targetArm1Speed = calibratedCommand.speed || 0;
+        } else if (calibratedCommand.type === 'arm2') {
+            this.targetArm2Speed = calibratedCommand.speed || 0;
+        }
+        
+        // Emit position update for recording/tracking
+        this.emit('positionUpdate', {
+            x: this.robotX,
+            y: this.robotY,
+            angle: this.robotAngle,
+            command: calibratedCommand
+        });
+    }
+
     animate() {
         if (!this.isRunning) return;
 
@@ -803,6 +845,14 @@ class RobotSimulator extends EventEmitter {
         this.robotY += dy;
         this.robotAngle += this.velocity.angular * dt * 0.5;
 
+        // Update arm physics
+        this.arm1Angle += this.targetArm1Speed * dt * 0.2; // Arm movement rate
+        this.arm2Angle += this.targetArm2Speed * dt * 0.2;
+        
+        // Clamp arm angles to realistic limits
+        this.arm1Angle = this.clamp(this.arm1Angle, -180, 180);
+        this.arm2Angle = this.clamp(this.arm2Angle, -180, 180);
+        
         // Keep robot in bounds
         const rect = this.canvas.getBoundingClientRect();
         this.robotX = this.clamp(this.robotX, 30, rect.width - 30);
@@ -1388,6 +1438,7 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
+        document.getElementById('calibrateBtn')?.addEventListener('click', () => this.startCalibration());
         
         // Competition code
         document.getElementById('downloadCompetitionCodeBtn')?.addEventListener('click', () => this.downloadCompetitionCode());
@@ -1632,27 +1683,50 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     applyCalibrationCompensation(command) {
-        if (!this.isCalibrated) return command;
+        if (!this.isCalibrated || !this.calibrationData) return command;
         
         const compensated = { ...command };
         
         if (command.type === 'drive') {
-            // Apply straight tracking compensation
+            // Apply speed calibration
+            if (this.calibrationData.speedAccuracy !== 1.0) {
+                compensated.speed = (command.speed || 0) * this.calibrationData.speedAccuracy;
+            }
+            
+            // Apply turn calibration
+            if (this.calibrationData.turnAccuracy !== 1.0) {
+                compensated.turn_rate = (command.turn_rate || 0) * this.calibrationData.turnAccuracy;
+            }
+            
+            // Apply drift compensation for straight movement
             if (Math.abs(command.speed || 0) > 0 && Math.abs(command.turn_rate || 0) === 0) {
-                if (this.config.straightTrackingConfidence > 0.5) {
-                    compensated.turn_rate = -this.config.straightTrackingBias * (command.speed || 0) * 0.1;
+                const drift = this.calibrationData.straightDrift;
+                if (drift && (drift.x !== 0 || drift.y !== 0)) {
+                    // Calculate compensation turn rate to counteract drift
+                    const driftAngle = Math.atan2(drift.y, drift.x) * 180 / Math.PI;
+                    compensated.turn_rate = -driftAngle * 0.1; // Small compensation
                 }
             }
             
-            // Apply turn bias compensation
-            if (Math.abs(command.turn_rate || 0) > 0 && this.config.turnConfidence > 0.5) {
-                compensated.turn_rate = (command.turn_rate || 0) * (1 + this.config.turnBias);
-            }
-            
-            // Apply motor balance compensation
-            if (this.config.motorBalanceConfidence > 0.5) {
-                const balanceCompensation = this.config.motorBalanceDifference * (command.speed || 0) * 0.05;
-                compensated.turn_rate = (compensated.turn_rate || 0) + balanceCompensation;
+            // Fallback to old calibration system if new data not available
+            if (!this.calibrationData.speedAccuracy && this.config) {
+                // Apply straight tracking compensation
+                if (Math.abs(command.speed || 0) > 0 && Math.abs(command.turn_rate || 0) === 0) {
+                    if (this.config.straightTrackingConfidence > 0.5) {
+                        compensated.turn_rate = -this.config.straightTrackingBias * (command.speed || 0) * 0.1;
+                    }
+                }
+                
+                // Apply turn bias compensation
+                if (Math.abs(command.turn_rate || 0) > 0 && this.config.turnConfidence > 0.5) {
+                    compensated.turn_rate = (command.turn_rate || 0) * (1 + this.config.turnBias);
+                }
+                
+                // Apply motor balance compensation
+                if (this.config.motorBalanceConfidence > 0.5) {
+                    const balanceCompensation = this.config.motorBalanceDifference * (command.speed || 0) * 0.05;
+                    compensated.turn_rate = (compensated.turn_rate || 0) + balanceCompensation;
+                }
             }
         }
         
@@ -1990,10 +2064,303 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    // Placeholder methods for features to be implemented
     toggleRecording() {
-        // Implementation for recording toggle
-        this.toastManager.show('Recording feature implementation in progress', 'info');
+        if (this.isRecording) {
+            this.stopRecording();
+        } else {
+            this.startRecording();
+        }
+    }
+
+    startRecording() {
+        this.isRecording = true;
+        this.recordedCommands = [];
+        this.recordingStartTime = Date.now();
+        
+        // Update UI
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i> Stop Recording';
+            recordBtn.classList.remove('btn-primary');
+            recordBtn.classList.add('btn-danger');
+        }
+        
+        this.toastManager.show('🔴 Recording started - all robot movements will be captured', 'info');
+        this.logger.log('Recording started');
+        
+        // Enable save button for when recording stops
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.disabled = false;
+    }
+
+    stopRecording() {
+        this.isRecording = false;
+        
+        // Update UI
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Start Recording';
+            recordBtn.classList.remove('btn-danger');
+            recordBtn.classList.add('btn-primary');
+        }
+        
+        const duration = (Date.now() - this.recordingStartTime) / 1000;
+        this.toastManager.show(`⏹️ Recording stopped - captured ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`, 'success');
+        this.logger.log(`Recording stopped: ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`);
+    }
+
+    saveCurrentRun() {
+        if (!this.recordedCommands || this.recordedCommands.length === 0) {
+            this.toastManager.show('No recorded commands to save', 'warning');
+            return;
+        }
+
+        const name = prompt('Enter a name for this run:');
+        if (!name) return;
+
+        const run = {
+            id: Date.now().toString(),
+            name: name.trim(),
+            commands: this.recordedCommands.map(cmd => ({
+                command_type: cmd.command.type,
+                parameters: {
+                    ...cmd.command,
+                    duration: cmd.timestamp / 1000 // Convert to seconds
+                }
+            })),
+            createdAt: new Date().toISOString(),
+            duration: this.recordedCommands.length > 0 ? 
+                this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
+        };
+
+        // Save to localStorage
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        savedRuns.push(run);
+        localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+
+        // Update UI
+        this.updateRunsList();
+        this.recordedCommands = [];
+        
+        // Disable save button until next recording
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.disabled = true;
+
+        this.toastManager.show(`✅ Run "${name}" saved successfully!`, 'success');
+        this.logger.log(`Run saved: ${name}`);
+    }
+
+    pauseRecording() {
+        if (!this.isRecording) {
+            this.toastManager.show('No recording in progress to pause', 'warning');
+            return;
+        }
+
+        this.isRecording = false;
+        
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (pauseBtn) {
+            if (pauseBtn.textContent.includes('Pause')) {
+                pauseBtn.innerHTML = '<i class="fas fa-play" aria-hidden="true"></i> Resume';
+                this.toastManager.show('⏸️ Recording paused', 'info');
+            } else {
+                pauseBtn.innerHTML = '<i class="fas fa-pause" aria-hidden="true"></i> Pause';
+                this.isRecording = true;
+                this.toastManager.show('▶️ Recording resumed', 'info');
+            }
+        }
+    }
+
+    async startCalibration() {
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Please connect to your robot or enable developer mode to start calibration', 'warning');
+            return;
+        }
+
+        this.toastManager.show('🔧 Starting robot calibration...', 'info');
+        this.logger.log('Calibration started');
+
+        // Initialize calibration data
+        this.calibrationData = {
+            straightDrift: { x: 0, y: 0 },
+            turnAccuracy: 1.0,
+            speedAccuracy: 1.0,
+            measurements: [],
+            isCalibrating: true
+        };
+
+        try {
+            // Run calibration sequence
+            await this.runCalibrationSequence();
+            
+            // Calculate calibration factors
+            this.calculateCalibrationFactors();
+            
+            // Apply calibration to simulator
+            this.syncSimulatorWithCalibration();
+            
+            // Mark as calibrated
+            this.isCalibrated = true;
+            
+            // Save calibration data
+            this.saveCalibrationData();
+            
+            this.toastManager.show('✅ Calibration completed! Robot and simulator are now synchronized', 'success');
+            this.logger.log('Calibration completed successfully');
+            
+        } catch (error) {
+            this.toastManager.show(`❌ Calibration failed: ${error.message}`, 'error');
+            this.logger.log(`Calibration failed: ${error.message}`, 'error');
+        }
+    }
+
+    async runCalibrationSequence() {
+        const tests = [
+            { name: 'Forward Movement Test', command: { type: 'drive', speed: 200, turn_rate: 0 }, duration: 2000 },
+            { name: 'Turn Right Test', command: { type: 'drive', speed: 0, turn_rate: 90 }, duration: 1000 },
+            { name: 'Turn Left Test', command: { type: 'drive', speed: 0, turn_rate: -90 }, duration: 1000 },
+            { name: 'Backward Movement Test', command: { type: 'drive', speed: -200, turn_rate: 0 }, duration: 2000 }
+        ];
+
+        for (const test of tests) {
+            this.toastManager.show(`Running: ${test.name}`, 'info');
+            
+            // Record starting position (simulator or estimated)
+            const startPos = this.getCurrentPosition();
+            
+            // Execute movement
+            await this.executeCalibrationMove(test.command, test.duration);
+            
+            // Wait for movement to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Record ending position
+            const endPos = this.getCurrentPosition();
+            
+            // Store measurement
+            this.calibrationData.measurements.push({
+                test: test.name,
+                command: test.command,
+                duration: test.duration,
+                startPos,
+                endPos,
+                actualMovement: {
+                    x: endPos.x - startPos.x,
+                    y: endPos.y - startPos.y,
+                    angle: endPos.angle - startPos.angle
+                }
+            });
+            
+            // Stop movement
+            await this.executeCalibrationMove({ type: 'drive', speed: 0, turn_rate: 0 }, 100);
+        }
+    }
+
+    getCurrentPosition() {
+        if (this.isDeveloperMode && this.robotSimulator) {
+            return {
+                x: this.robotSimulator.robotX,
+                y: this.robotSimulator.robotY,
+                angle: this.robotSimulator.robotAngle
+            };
+        } else {
+            // For real robot, we estimate based on commands (could be enhanced with sensors)
+            return this.estimatedPosition || { x: 0, y: 0, angle: 0 };
+        }
+    }
+
+    async executeCalibrationMove(command, duration) {
+        if (this.isDeveloperMode) {
+            this.robotSimulator?.updateCommand(command);
+        } else if (this.bleController.connected) {
+            await this.bleController.sendCommand(command);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, duration));
+    }
+
+    calculateCalibrationFactors() {
+        const measurements = this.calibrationData.measurements;
+        
+        // Analyze forward movement
+        const forwardTest = measurements.find(m => m.test === 'Forward Movement Test');
+        if (forwardTest) {
+            const expectedDistance = (forwardTest.command.speed * forwardTest.duration) / 1000; // mm/s * ms / 1000
+            const actualDistance = Math.sqrt(
+                Math.pow(forwardTest.actualMovement.x, 2) + 
+                Math.pow(forwardTest.actualMovement.y, 2)
+            );
+            
+            this.calibrationData.speedAccuracy = expectedDistance / actualDistance;
+            
+            // Calculate drift (deviation from straight line)
+            const expectedAngle = 0;
+            this.calibrationData.straightDrift.x = forwardTest.actualMovement.x - actualDistance;
+            this.calibrationData.straightDrift.y = forwardTest.actualMovement.y;
+        }
+        
+        // Analyze turn accuracy
+        const rightTurn = measurements.find(m => m.test === 'Turn Right Test');
+        const leftTurn = measurements.find(m => m.test === 'Turn Left Test');
+        
+        if (rightTurn && leftTurn) {
+            const expectedRightTurn = 90; // degrees
+            const expectedLeftTurn = -90; // degrees
+            
+            const rightAccuracy = expectedRightTurn / rightTurn.actualMovement.angle;
+            const leftAccuracy = expectedLeftTurn / leftTurn.actualMovement.angle;
+            
+            this.calibrationData.turnAccuracy = (rightAccuracy + leftAccuracy) / 2;
+        }
+        
+        this.logger.log(`Calibration factors: Speed=${this.calibrationData.speedAccuracy.toFixed(3)}, Turn=${this.calibrationData.turnAccuracy.toFixed(3)}`);
+    }
+
+    syncSimulatorWithCalibration() {
+        if (!this.robotSimulator || !this.calibrationData) return;
+        
+        // Update simulator physics to match real robot behavior
+        this.robotSimulator.calibrationFactors = {
+            speedMultiplier: this.calibrationData.speedAccuracy,
+            turnMultiplier: this.calibrationData.turnAccuracy,
+            driftCompensation: this.calibrationData.straightDrift
+        };
+        
+        this.logger.log('Simulator synchronized with calibration data');
+    }
+
+    saveCalibrationData() {
+        if (this.calibrationData) {
+            localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(this.calibrationData));
+            this.logger.log('Calibration data saved');
+        }
+    }
+
+    generateCalibrationCode(calibrationData) {
+        if (!calibrationData) {
+            return [
+                "# --- CALIBRATION CONSTANTS (No calibration data available) ---",
+                "SPEED_CALIBRATION = 1.0",
+                "TURN_CALIBRATION = 1.0", 
+                "DRIFT_COMPENSATION = 0.0",
+                ""
+            ];
+        }
+
+        const speedCal = calibrationData.speedAccuracy || 1.0;
+        const turnCal = calibrationData.turnAccuracy || 1.0;
+        const drift = calibrationData.straightDrift || { x: 0, y: 0 };
+        const driftComp = drift.x !== 0 || drift.y !== 0 ? 
+            -Math.atan2(drift.y, drift.x) * 180 / Math.PI * 0.1 : 0.0;
+
+        return [
+            "# --- CALIBRATION CONSTANTS (Auto-generated from calibration) ---",
+            `SPEED_CALIBRATION = ${speedCal.toFixed(4)}  # Speed accuracy factor`,
+            `TURN_CALIBRATION = ${turnCal.toFixed(4)}   # Turn accuracy factor`,
+            `DRIFT_COMPENSATION = ${driftComp.toFixed(4)}  # Drift compensation (degrees)`,
+            `# Calibration date: ${new Date().toISOString()}`,
+            ""
+        ];
     }
 
     openConfigModal() {
@@ -2020,6 +2387,9 @@ class FLLRoboticsApp extends EventEmitter {
     generateHubCode() {
         // Get saved runs for competition code generation
         const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        
+        // Get calibration data
+        const calibrationData = this.calibrationData || JSON.parse(localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA) || 'null');
         
         if (savedRuns.length === 0) {
             // Generate basic hub control code if no saved runs
@@ -2177,24 +2547,40 @@ while True:
             `arm1_motor = Motor(Port.${this.config.arm1MotorPort})`,
             `arm2_motor = Motor(Port.${this.config.arm2MotorPort})`,
             "",
+            ...this.generateCalibrationCode(calibrationData),
             "# --- HELPER FUNCTIONS ---",
+            "def apply_calibration(speed, turn_rate):",
+            "    \"\"\"Apply calibration compensation to drive commands\"\"\"",
+            "    calibrated_speed = speed * SPEED_CALIBRATION",
+            "    calibrated_turn = turn_rate * TURN_CALIBRATION",
+            "    ",
+            "    # Apply drift compensation for straight movement",
+            "    if turn_rate == 0 and speed != 0:",
+            "        calibrated_turn += DRIFT_COMPENSATION",
+            "    ",
+            "    return calibrated_speed, calibrated_turn",
+            "",
             "def move_forward(speed, duration_ms):",
-            "    drive_base.drive(speed, 0)",
+            "    cal_speed, cal_turn = apply_calibration(speed, 0)",
+            "    drive_base.drive(cal_speed, cal_turn)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def move_backward(speed, duration_ms):",
-            "    drive_base.drive(-speed, 0)",
+            "    cal_speed, cal_turn = apply_calibration(-speed, 0)",
+            "    drive_base.drive(cal_speed, cal_turn)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def turn_left(angle, duration_ms):",
-            "    drive_base.drive(0, -angle)",
+            "    cal_speed, cal_turn = apply_calibration(0, -angle)",
+            "    drive_base.drive(cal_speed, cal_turn)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
             "def turn_right(angle, duration_ms):",
-            "    drive_base.drive(0, angle)",
+            "    cal_speed, cal_turn = apply_calibration(0, angle)",
+            "    drive_base.drive(cal_speed, cal_turn)",
             "    wait(duration_ms)",
             "    drive_base.stop()",
             "",
