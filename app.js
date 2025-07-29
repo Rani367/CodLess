@@ -625,6 +625,8 @@ class RobotSimulator extends EventEmitter {
         this.arm1Angle = 0;
         this.arm2Angle = 0;
         
+
+        
         // Physics state
         this.velocity = { x: 0, y: 0, angular: 0 };
         this.acceleration = { x: 0, y: 0, angular: 0 };
@@ -740,6 +742,8 @@ class RobotSimulator extends EventEmitter {
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
             this.ctx.textRenderingOptimization = 'optimizeQuality';
+            
+            this.pixelRatio = devicePixelRatio;
         }
     }
 
@@ -861,16 +865,16 @@ class RobotSimulator extends EventEmitter {
         // Draw robot
         this.drawRobot();
         
-        // Draw UI overlays
-        this.drawInfo();
-
         this.ctx.restore();
+        
+        // Draw UI overlays in screen space
+        this.drawInfo();
     }
 
     drawGrid() {
         const rect = this.canvas.getBoundingClientRect();
         const gridSize = 50;
-        const pixelRatio = window.devicePixelRatio || 1;
+        const pixelRatio = this.pixelRatio || 1;
         
         this.ctx.save();
         this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.08)';
@@ -1132,6 +1136,8 @@ class RobotSimulator extends EventEmitter {
     clamp(value, min, max) {
         return Math.min(Math.max(value, min), max);
     }
+
+
 
     destroy() {
         this.stop();
@@ -1839,11 +1845,27 @@ class FLLRoboticsApp extends EventEmitter {
                     // Re-setup simulator if it doesn't exist
                     this.setupRobotSimulator();
                 }
+                this.enableSimulatorControls(true);
             }, 10);
         } else {
             simulatorSection.classList.add('hidden');
             this.robotSimulator?.stop();
+            this.enableSimulatorControls(false);
         }
+    }
+
+    enableSimulatorControls(enabled) {
+        const controls = [
+            'resetSimBtn',
+            'uploadMapBtn'
+        ];
+        
+        controls.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.disabled = !enabled;
+            }
+        });
     }
 
     updateConfigurationUI() {
@@ -2123,6 +2145,19 @@ if __name__ == "__main__":
             });
         }
     }
+
+    resetSimulator() {
+        if (!this.robotSimulator) {
+            this.toastManager.show('Simulator not available', 'warning');
+            return;
+        }
+        
+        this.robotSimulator.reset();
+        this.toastManager.show('Simulator reset', 'success');
+        this.logger.log('Simulator position reset');
+    }
+
+
 
     closeWindow() {
         if (confirm('Close CodLess FLL Robotics Control Center?')) {
