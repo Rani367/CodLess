@@ -7,7 +7,7 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 ## ✨ Features
 
 ### 🤖 Robot Control
-- **Direct Bluetooth LE connectivity** to LEGO SPIKE Prime/Robot Inventor hubs
+- **Bluetooth LE connectivity** to Pybricks-compatible hubs
 - **Real-time robot control** with keyboard input
 - **Advanced calibration system** for precision movement
 - **Emergency stop functionality** for safety
@@ -53,7 +53,7 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 
 ### Prerequisites
 - Modern web browser with Web Bluetooth API support (Chrome 56+, Edge 79+)
-- LEGO SPIKE Prime or Robot Inventor hub
+- Pybricks-compatible LEGO hub (SPIKE Prime, Robot Inventor, etc.)
 - HTTPS connection (required for Web Bluetooth)
 
 ### Installation
@@ -84,9 +84,9 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 
 ### Hub Setup
 
-1. **Download the competition code** from the application (use the "Download Competition Code" button)
-2. **Upload the code** to your LEGO hub using the LEGO Education SPIKE App or MINDSTORMS Robot Inventor App
-3. **Run the code** on your hub to enable Bluetooth communication
+1. **Flash Pybricks firmware** to your LEGO hub following the [official Pybricks installation guide](https://pybricks.com/install/)
+2. **Download the competition code** from the application (use the "Download Competition Code" button)
+3. **Upload and run the downloaded code** on your hub (you can use any MicroPython editor or the Pybricks desktop app - no need for the online IDE)
 4. **Connect to the hub** using the application's Bluetooth connection feature
 
 ## 🎯 Usage Guide
@@ -95,7 +95,7 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 
 1. **Connect Your Hub**
    - Enable Bluetooth on your device
-   - Click "Connect to LEGO Hub" 
+   - Click "Connect to Pybricks Hub" 
    - Select your hub from the device list
    - Wait for connection confirmation
 
@@ -310,6 +310,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
+- **Pybricks Team** for the excellent MicroPython platform
 - **LEGO Education** for the excellent SPIKE Prime and Robot Inventor platforms
 - **FIRST LEGO League** for inspiring robotics education
 - **Open Source Community** for tools and libraries used

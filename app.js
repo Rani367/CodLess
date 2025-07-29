@@ -10,9 +10,8 @@
 const APP_CONFIG = {
     VERSION: '3.0.0',
     NAME: 'CodLess FLL Robotics Control Center',
-    BLUETOOTH_SERVICE_UUID: '00001623-1212-efde-1623-785feabcd123',
-    BLUETOOTH_CHARACTERISTIC_UUID: '00001624-1212-efde-1623-785feabcd123',
-    HUB_NAME_PREFIX: 'LEGO Hub',
+    BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
+    HUB_NAME_PREFIX: 'Pybricks',
     DEFAULT_COMMAND_TIMEOUT: 1000,
     MAX_LOG_ENTRIES: 1000,
     AUTO_SAVE_INTERVAL: 30000, // 30 seconds
@@ -377,7 +376,7 @@ class BLEController extends EventEmitter {
 
             this.server = await this.device.gatt.connect();
             this.service = await this.server.getPrimaryService(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
-            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_CHARACTERISTIC_UUID);
+            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
 
             await this.characteristic.startNotifications();
             this.characteristic.addEventListener('characteristicvaluechanged', (event) => {
@@ -409,7 +408,7 @@ class BLEController extends EventEmitter {
             
             // Handle specific Bluetooth errors with user-friendly messages
             if (error.name === 'NotFoundError') {
-                errorMessage = 'No LEGO hub found. Make sure your hub is powered on and available for connection.';
+                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running the provided code.';
             } else if (error.name === 'NotAllowedError') {
                 errorMessage = 'Bluetooth access was denied. Please allow Bluetooth access and try again.';
             } else if (error.name === 'SecurityError') {
@@ -1702,7 +1701,7 @@ class FLLRoboticsApp extends EventEmitter {
         const troubleshootingSteps = [
             "🔧 Troubleshooting Connection Issues:",
             "",
-            "1. Make sure your hub is powered on and ready for Bluetooth connection",
+            "1. Make sure your hub is powered on and running the Pybricks code",
             "2. Check that you're using Chrome, Edge, or another compatible browser",
             "3. Ensure you're accessing the app via HTTPS (required for Bluetooth)",
             "4. Move closer to your hub (Bluetooth range ~10 meters)",
@@ -1711,7 +1710,7 @@ class FLLRoboticsApp extends EventEmitter {
             "",
             "💡 Tips:",
             "- The hub LED should be solid blue when ready to connect",
-            "- Make sure your LEGO hub supports Bluetooth LE",
+            "- Make sure the hub name starts with 'Pybricks'",
             "- Try the simulator mode if physical connection isn't working"
         ];
 
@@ -1794,7 +1793,7 @@ class FLLRoboticsApp extends EventEmitter {
             case 'error':
             case 'disconnected':
             default:
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to LEGO Hub';
+                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator disconnected';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
@@ -2018,97 +2017,191 @@ class FLLRoboticsApp extends EventEmitter {
         return `#!/usr/bin/env micropython
 # CodLess FLL Competition Robot Code v${APP_CONFIG.VERSION}
 # Generated: ${new Date().toISOString()}
+# Compatible with Pybricks firmware
 
-from hub import port, motion_sensor, button, light_matrix, sound
-import motor
-import motor_pair
-import runloop
-import time
+from pybricks.hubs import PrimeHub
+from pybricks.pupdevices import Motor
+from pybricks.parameters import Port, Direction, Stop, Color, Button
+from pybricks.tools import wait
+from pybricks.media.ev3dev import SoundFile, ImageFile
+import json
 
-# Robot Configuration
-LEFT_MOTOR = port.${this.config.leftMotorPort}
-RIGHT_MOTOR = port.${this.config.rightMotorPort}
-ARM1_MOTOR = port.${this.config.arm1MotorPort}
-ARM2_MOTOR = port.${this.config.arm2MotorPort}
+# Initialize the hub
+hub = PrimeHub()
 
-# Initialize motor pair for driving
-motor_pair.pair(motor_pair.PAIR_1, LEFT_MOTOR, RIGHT_MOTOR)
+# Robot Configuration - Update these ports to match your robot
+LEFT_MOTOR = Motor(Port.${this.config.leftMotorPort})
+RIGHT_MOTOR = Motor(Port.${this.config.rightMotorPort})
+ARM1_MOTOR = Motor(Port.${this.config.arm1MotorPort})
+ARM2_MOTOR = Motor(Port.${this.config.arm2MotorPort})
 
-async def main():
-    print("CodLess FLL Robot Ready!")
-    light_matrix.write("GO")
-    sound.beep(440, 500)
-    
-    # Main competition loop
-    while True:
-        # Check for button presses to run different missions
-        if button.pressed(button.LEFT):
-            await run_mission_1()
-        elif button.pressed(button.RIGHT):
-            await run_mission_2()
-        elif button.pressed(button.CENTER):
-            await emergency_stop()
-        
-        # Wait before checking again
-        await runloop.sleep_ms(100)
-
-async def run_mission_1():
+# Competition mission functions
+def run_mission_1():
     """Mission 1: Forward and back"""
     print("Running Mission 1")
-    light_matrix.write("M1")
+    hub.light.on(Color.BLUE)
     
     # Drive forward
-    motor_pair.move(motor_pair.PAIR_1, 500, velocity=300)
-    await runloop.sleep_ms(2000)
+    LEFT_MOTOR.run(300)
+    RIGHT_MOTOR.run(300)
+    wait(2000)
     
     # Drive backward
-    motor_pair.move(motor_pair.PAIR_1, -500, velocity=300)
-    await runloop.sleep_ms(2000)
+    LEFT_MOTOR.run(-300)
+    RIGHT_MOTOR.run(-300)
+    wait(2000)
     
     # Stop
-    motor_pair.stop(motor_pair.PAIR_1)
-    light_matrix.write("DONE")
+    LEFT_MOTOR.stop()
+    RIGHT_MOTOR.stop()
+    hub.light.on(Color.GREEN)
+    print("Mission 1 Complete")
 
-async def run_mission_2():
+def run_mission_2():
     """Mission 2: Turn and arm movement"""
     print("Running Mission 2")
-    light_matrix.write("M2")
+    hub.light.on(Color.YELLOW)
     
     # Turn left
-    motor_pair.move_tank(motor_pair.PAIR_1, 400, -300, 400)
-    await runloop.sleep_ms(1000)
+    LEFT_MOTOR.run(-200)
+    RIGHT_MOTOR.run(200)
+    wait(1000)
+    
+    # Stop turning
+    LEFT_MOTOR.stop()
+    RIGHT_MOTOR.stop()
     
     # Move arm 1
-    motor.run_for_degrees(ARM1_MOTOR, 180, 200)
-    await runloop.sleep_ms(500)
+    ARM1_MOTOR.run_angle(200, 180)
+    wait(500)
     
     # Move arm 2
-    motor.run_for_degrees(ARM2_MOTOR, -180, 200)
-    await runloop.sleep_ms(500)
+    ARM2_MOTOR.run_angle(200, -180)
+    wait(500)
     
     # Return arms to starting position
-    motor.run_for_degrees(ARM1_MOTOR, -180, 200)
-    motor.run_for_degrees(ARM2_MOTOR, 180, 200)
+    ARM1_MOTOR.run_angle(200, -180)
+    ARM2_MOTOR.run_angle(200, 180)
     
-    light_matrix.write("DONE")
+    hub.light.on(Color.GREEN)
+    print("Mission 2 Complete")
 
-async def emergency_stop():
+def run_mission_3():
+    """Mission 3: Custom mission - Add your own code here"""
+    print("Running Mission 3")
+    hub.light.on(Color.MAGENTA)
+    
+    # Add your custom mission code here
+    # Example: Precision movement
+    LEFT_MOTOR.run_angle(150, 360)  # One full rotation
+    RIGHT_MOTOR.run_angle(150, 360)
+    
+    hub.light.on(Color.GREEN)
+    print("Mission 3 Complete")
+
+def emergency_stop():
     """Emergency stop all motors"""
     print("Emergency Stop!")
-    light_matrix.write("STOP")
-    sound.beep(880, 200)
+    hub.light.on(Color.RED)
     
-    motor_pair.stop(motor_pair.PAIR_1)
-    motor.stop(ARM1_MOTOR)
-    motor.stop(ARM2_MOTOR)
+    LEFT_MOTOR.stop(Stop.BRAKE)
+    RIGHT_MOTOR.stop(Stop.BRAKE)
+    ARM1_MOTOR.stop(Stop.BRAKE)
+    ARM2_MOTOR.stop(Stop.BRAKE)
+    
+    # Sound alert
+    hub.speaker.beep(frequency=880, duration=200)
+
+# Bluetooth communication handler for remote control
+def handle_remote_command(command_data):
+    """Handle commands from the remote control app"""
+    try:
+        command = json.loads(command_data.decode())
+        cmd_type = command.get("type", "")
+        
+        if cmd_type == "mission1":
+            run_mission_1()
+        elif cmd_type == "mission2":
+            run_mission_2()
+        elif cmd_type == "mission3":
+            run_mission_3()
+        elif cmd_type == "emergency_stop":
+            emergency_stop()
+        elif cmd_type == "drive":
+            speed = command.get("speed", 0)
+            turn_rate = command.get("turn_rate", 0)
+            left_speed = speed - turn_rate
+            right_speed = speed + turn_rate
+            LEFT_MOTOR.run(left_speed)
+            RIGHT_MOTOR.run(right_speed)
+        elif cmd_type == "arm1":
+            speed = command.get("speed", 0)
+            if speed == 0:
+                ARM1_MOTOR.stop()
+            else:
+                ARM1_MOTOR.run(speed)
+        elif cmd_type == "arm2":
+            speed = command.get("speed", 0)
+            if speed == 0:
+                ARM2_MOTOR.stop()
+            else:
+                ARM2_MOTOR.run(speed)
+                
+        return "ok"
+    except Exception as e:
+        return f"error: {str(e)}"
+
+# Main program
+def main():
+    print("CodLess FLL Robot Ready!")
+    hub.light.on(Color.WHITE)
+    
+    # Send ready signal for Bluetooth communication
+    if hub.ble.char_write:
+        hub.ble.char_write(b"ready")
+    
+    print("Press hub buttons to run missions:")
+    print("Left button: Mission 1")
+    print("Center button: Mission 2") 
+    print("Right button: Mission 3")
+    print("Connect via Bluetooth for remote control")
+    
+    while True:
+        # Check for button presses on the hub
+        pressed_buttons = hub.buttons.pressed()
+        
+        if Button.LEFT in pressed_buttons:
+            run_mission_1()
+            wait(500)  # Debounce
+            
+        elif Button.CENTER in pressed_buttons:
+            run_mission_2()
+            wait(500)  # Debounce
+            
+        elif Button.RIGHT in pressed_buttons:
+            run_mission_3()
+            wait(500)  # Debounce
+            
+        # Check for Bluetooth commands
+        if hub.ble.char_read:
+            try:
+                data = hub.ble.char_read()
+                if data:
+                    response = handle_remote_command(data)
+                    hub.ble.char_write(response.encode())
+            except:
+                pass  # Continue if Bluetooth not connected
+        
+        wait(50)  # Small delay to prevent excessive CPU usage
 
 # Run the main program
-runloop.run(main())
+if __name__ == "__main__":
+    main()
 `;
     }
 
     uploadToHub() {
-        this.toastManager.show('Upload to Hub functionality coming soon! For now, use the downloaded code with LEGO Education SPIKE App.', 'info');
+        this.toastManager.show('Upload to Hub functionality coming soon! For now, download the code and upload it using the Pybricks desktop app or any MicroPython editor.', 'info');
     }
 
     exportSelectedRun() {
