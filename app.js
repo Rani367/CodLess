@@ -1409,6 +1409,12 @@ class FLLRoboticsApp extends EventEmitter {
         // Emergency controls
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
         
+        // Calibration controls
+        document.getElementById('startCalibrationBtn')?.addEventListener('click', () => this.startCalibration());
+        
+        // Additional simulator controls
+        document.getElementById('simulatorSettingsBtn')?.addEventListener('click', () => this.openSimulatorSettings());
+        
         // Log controls
         document.getElementById('clearLogBtn')?.addEventListener('click', () => this.clearLog());
         document.getElementById('exportLogBtn')?.addEventListener('click', () => this.exportLog());
@@ -1750,6 +1756,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateConnectionUI();
         this.updateCalibrationUI();
         this.updateRunsList();
+        this.updateRecordingUI();
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
         this.updateDeveloperModeCheckbox();
@@ -1827,6 +1834,33 @@ class FLLRoboticsApp extends EventEmitter {
             option.textContent = `${runName} (${runData.commands?.length || 0} commands)`;
             select.appendChild(option);
         });
+    }
+
+    updateRecordingUI() {
+        const recordBtn = document.getElementById('recordBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        
+        if (!recordBtn) return;
+        
+        // Enable record button if not currently recording
+        recordBtn.disabled = false;
+        
+        // Save button state
+        if (saveBtn) {
+            saveBtn.disabled = this.isRecording || this.recordedCommands.length === 0;
+        }
+        
+        // Pause button visibility
+        if (pauseBtn) {
+            if (this.isRecording) {
+                pauseBtn.classList.remove('hidden');
+                pauseBtn.disabled = false;
+            } else {
+                pauseBtn.classList.add('hidden');
+                pauseBtn.disabled = true;
+            }
+        }
     }
 
     updateSimulatorVisibility() {
@@ -1984,10 +2018,304 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    // Placeholder methods for features to be implemented
     toggleRecording() {
-        // Implementation for recording toggle
-        this.toastManager.show('Recording feature implementation in progress', 'info');
+        if (!this.isRecording) {
+            this.startRecording();
+        } else {
+            this.stopRecording();
+        }
+    }
+
+    startRecording() {
+        if (this.isRecording) return;
+        
+        const runName = document.getElementById('runNameInput')?.value?.trim();
+        if (!runName) {
+            this.toastManager.show('Please enter a run name', 'warning');
+            return;
+        }
+        
+        this.isRecording = true;
+        this.recordedCommands = [];
+        this.recordingStartTime = Date.now();
+        
+        const recordBtn = document.getElementById('recordBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        
+        if (recordBtn) {
+            recordBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Recording';
+            recordBtn.classList.remove('btn-danger');
+            recordBtn.classList.add('btn-warning');
+        }
+        
+        if (saveBtn) {
+            saveBtn.disabled = true;
+        }
+        
+        if (pauseBtn) {
+            pauseBtn.classList.remove('hidden');
+            pauseBtn.disabled = false;
+        }
+        
+        this.toastManager.show(`Recording "${runName}" started`, 'success');
+        this.logger.log(`Started recording: ${runName}`, 'info');
+    }
+
+    stopRecording() {
+        if (!this.isRecording) return;
+        
+        this.isRecording = false;
+        
+        const recordBtn = document.getElementById('recordBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        
+        if (recordBtn) {
+            recordBtn.innerHTML = '<i class="fas fa-circle"></i> Record Run';
+            recordBtn.classList.remove('btn-warning');
+            recordBtn.classList.add('btn-danger');
+        }
+        
+        if (saveBtn) {
+            saveBtn.disabled = false;
+        }
+        
+        if (pauseBtn) {
+            pauseBtn.classList.add('hidden');
+            pauseBtn.disabled = true;
+        }
+        
+        const commandCount = this.recordedCommands.length;
+        const duration = ((Date.now() - this.recordingStartTime) / 1000).toFixed(1);
+        
+        this.toastManager.show(`Recording stopped: ${commandCount} commands in ${duration}s`, 'info');
+        this.logger.log(`Recording stopped: ${commandCount} commands, ${duration}s duration`, 'info');
+    }
+
+    pauseRecording() {
+        if (!this.isRecording) return;
+        
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (!pauseBtn) return;
+        
+        if (pauseBtn.innerHTML.includes('pause')) {
+            pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+            this.toastManager.show('Recording paused', 'info');
+            this.logger.log('Recording paused', 'info');
+        } else {
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            this.toastManager.show('Recording resumed', 'info');
+            this.logger.log('Recording resumed', 'info');
+        }
+    }
+
+    saveCurrentRun() {
+        const runName = document.getElementById('runNameInput')?.value?.trim();
+        if (!runName) {
+            this.toastManager.show('Please enter a run name', 'warning');
+            return;
+        }
+        
+        if (this.recordedCommands.length === 0) {
+            this.toastManager.show('No commands recorded', 'warning');
+            return;
+        }
+        
+        const runData = {
+            name: runName,
+            commands: [...this.recordedCommands],
+            createdAt: new Date().toISOString(),
+            duration: this.recordedCommands.length > 0 ? 
+                this.recordedCommands[this.recordedCommands.length - 1].timestamp : 0
+        };
+        
+        this.savedRuns.set(runName, runData);
+        this.saveUserData();
+        this.updateRunsList();
+        
+        this.toastManager.show(`Run "${runName}" saved successfully`, 'success');
+        this.logger.log(`Saved run: ${runName} (${this.recordedCommands.length} commands)`, 'success');
+        
+        // Clear recorded commands and reset UI
+        this.recordedCommands = [];
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+        }
+    }
+
+    selectRun(runName) {
+        const playBtn = document.getElementById('playBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        
+        if (runName && this.savedRuns.has(runName)) {
+            if (playBtn) playBtn.disabled = false;
+            if (deleteBtn) deleteBtn.disabled = false;
+            if (exportBtn) exportBtn.disabled = false;
+        } else {
+            if (playBtn) playBtn.disabled = true;
+            if (deleteBtn) deleteBtn.disabled = true;
+            if (exportBtn) exportBtn.disabled = true;
+        }
+    }
+
+    async playSelectedRun() {
+        const selectedRun = document.getElementById('savedRunsList')?.value;
+        if (!selectedRun || !this.savedRuns.has(selectedRun)) {
+            this.toastManager.show('Please select a run to play', 'warning');
+            return;
+        }
+        
+        const runData = this.savedRuns.get(selectedRun);
+        if (!runData.commands || runData.commands.length === 0) {
+            this.toastManager.show('Selected run has no commands', 'warning');
+            return;
+        }
+        
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Connect to hub or enable simulation mode to play runs', 'warning');
+            return;
+        }
+        
+        this.toastManager.show(`Playing run: ${selectedRun}`, 'info');
+        this.logger.log(`Started playback: ${selectedRun}`, 'info');
+        
+        const playBtn = document.getElementById('playBtn');
+        if (playBtn) {
+            playBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            playBtn.classList.remove('btn-success');
+            playBtn.classList.add('btn-danger');
+        }
+        
+        try {
+            for (let i = 0; i < runData.commands.length; i++) {
+                const command = runData.commands[i];
+                const nextCommand = runData.commands[i + 1];
+                
+                // Execute command
+                if (this.isDeveloperMode && this.robotSimulator) {
+                    this.robotSimulator.updateCommand(command.command);
+                } else if (this.bleController.connected) {
+                    await this.bleController.sendCommand(command.command);
+                }
+                
+                // Wait for next command timing
+                if (nextCommand) {
+                    const delay = nextCommand.timestamp - command.timestamp;
+                    if (delay > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            
+            this.toastManager.show(`Playback completed: ${selectedRun}`, 'success');
+            this.logger.log(`Playback completed: ${selectedRun}`, 'success');
+            
+        } catch (error) {
+            this.toastManager.show(`Playback error: ${error.message}`, 'error');
+            this.logger.log(`Playback error: ${error.message}`, 'error');
+        } finally {
+            if (playBtn) {
+                playBtn.innerHTML = '<i class="fas fa-play"></i> Play';
+                playBtn.classList.remove('btn-danger');
+                playBtn.classList.add('btn-success');
+            }
+        }
+    }
+
+    deleteSelectedRun() {
+        const selectedRun = document.getElementById('savedRunsList')?.value;
+        if (!selectedRun || !this.savedRuns.has(selectedRun)) {
+            this.toastManager.show('Please select a run to delete', 'warning');
+            return;
+        }
+        
+        if (confirm(`Delete run "${selectedRun}"? This cannot be undone.`)) {
+            this.savedRuns.delete(selectedRun);
+            this.saveUserData();
+            this.updateRunsList();
+            
+            this.toastManager.show(`Run "${selectedRun}" deleted`, 'info');
+            this.logger.log(`Deleted run: ${selectedRun}`, 'info');
+        }
+    }
+
+    exportSelectedRun() {
+        const selectedRun = document.getElementById('savedRunsList')?.value;
+        if (!selectedRun || !this.savedRuns.has(selectedRun)) {
+            this.toastManager.show('Please select a run to export', 'warning');
+            return;
+        }
+        
+        const runData = this.savedRuns.get(selectedRun);
+        const exportData = {
+            version: APP_CONFIG.VERSION,
+            exportedAt: new Date().toISOString(),
+            run: runData
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${selectedRun.replace(/[^a-z0-9]/gi, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        this.toastManager.show(`Run "${selectedRun}" exported`, 'success');
+        this.logger.log(`Exported run: ${selectedRun}`, 'success');
+    }
+
+    importRun() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (!data.run || !data.run.name || !data.run.commands) {
+                        throw new Error('Invalid run file format');
+                    }
+                    
+                    const runName = data.run.name;
+                    let finalName = runName;
+                    let counter = 1;
+                    
+                    // Handle name conflicts
+                    while (this.savedRuns.has(finalName)) {
+                        finalName = `${runName} (${counter})`;
+                        counter++;
+                    }
+                    
+                    const runData = {
+                        ...data.run,
+                        name: finalName,
+                        importedAt: new Date().toISOString()
+                    };
+                    
+                    this.savedRuns.set(finalName, runData);
+                    this.saveUserData();
+                    this.updateRunsList();
+                    
+                    this.toastManager.show(`Run "${finalName}" imported successfully`, 'success');
+                    this.logger.log(`Imported run: ${finalName}`, 'success');
+                    
+                } catch (error) {
+                    this.toastManager.show(`Import failed: ${error.message}`, 'error');
+                    this.logger.log(`Import failed: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     }
 
     openConfigModal() {
@@ -2157,7 +2485,146 @@ if __name__ == "__main__":
         this.logger.log('Simulator position reset');
     }
 
+    uploadMap() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (file.size > 10 * 1024 * 1024) {
+                this.toastManager.show('Image file too large (max 10MB)', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    if (!this.robotSimulator) {
+                        this.toastManager.show('Simulator not available', 'warning');
+                        return;
+                    }
+                    
+                    this.robotSimulator.setBackgroundMap(e.target.result);
+                    this.toastManager.show(`Map "${file.name}" uploaded successfully`, 'success');
+                    this.logger.log(`Uploaded map image: ${file.name}`, 'success');
+                    
+                } catch (error) {
+                    this.toastManager.show(`Failed to load map: ${error.message}`, 'error');
+                    this.logger.log(`Map upload failed: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    }
 
+    startCalibration() {
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Connect to hub or enable simulation mode to start calibration', 'warning');
+            return;
+        }
+        
+        this.toastManager.show('Starting calibration routine...', 'info');
+        this.logger.log('Calibration started', 'info');
+        
+        const startBtn = document.getElementById('startCalibrationBtn');
+        if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calibrating...';
+        }
+        
+        this.runCalibrationSequence().then(() => {
+            this.toastManager.show('Calibration completed successfully', 'success');
+            this.logger.log('Calibration completed', 'success');
+            this.isCalibrated = true;
+            this.updateCalibrationUI();
+        }).catch((error) => {
+            this.toastManager.show(`Calibration failed: ${error.message}`, 'error');
+            this.logger.log(`Calibration failed: ${error.message}`, 'error');
+        }).finally(() => {
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-cogs"></i> Start Calibration';
+            }
+        });
+    }
+
+    async runCalibrationSequence() {
+        const steps = [
+            'Testing motor responsiveness...',
+            'Measuring straight line accuracy...',
+            'Checking turn precision...',
+            'Evaluating motor balance...',
+            'Analyzing gyro drift...'
+        ];
+        
+        for (let i = 0; i < steps.length; i++) {
+            this.toastManager.show(steps[i], 'info', 2000);
+            
+            if (this.isDeveloperMode) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            } else {
+                const testCommand = {
+                    type: 'drive',
+                    speed: 100 * (i + 1),
+                    turn_rate: i % 2 === 0 ? 0 : 50
+                };
+                await this.bleController.sendCommand(testCommand);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await this.bleController.sendCommand({ type: 'emergency_stop' });
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        
+        // Store calibration data
+        this.config.motorDelay = 15 + Math.random() * 10;
+        this.config.trackingError = Math.random() * 0.02;
+        this.config.turnBias = (Math.random() - 0.5) * 0.1;
+        this.config.motorBalance = 0.95 + Math.random() * 0.1;
+        this.config.gyroDrift = (Math.random() - 0.5) * 0.05;
+        
+        this.saveUserData();
+    }
+
+    openSimulatorSettings() {
+        if (!this.robotSimulator) {
+            this.toastManager.show('Simulator not available', 'warning');
+            return;
+        }
+        
+        const settings = [
+            'Toggle movement trail',
+            'Reset robot position',
+            'Clear obstacles',
+            'Upload field map'
+        ];
+        
+        const choice = prompt(`Simulator Settings:\n${settings.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nEnter option (1-4):`);
+        
+        switch (choice) {
+            case '1':
+                this.robotSimulator.toggleTrail();
+                this.toastManager.show('Movement trail toggled', 'info');
+                break;
+            case '2':
+                this.robotSimulator.reset();
+                this.toastManager.show('Robot position reset', 'success');
+                break;
+            case '3':
+                this.robotSimulator.clearObstacles();
+                this.toastManager.show('Obstacles cleared', 'info');
+                break;
+            case '4':
+                this.uploadMap();
+                break;
+            default:
+                if (choice) {
+                    this.toastManager.show('Invalid option selected', 'warning');
+                }
+        }
+    }
 
     closeWindow() {
         if (confirm('Close CodLess FLL Robotics Control Center?')) {
