@@ -2449,7 +2449,7 @@ class FLLRoboticsApp extends EventEmitter {
 
     async startCalibration() {
         if (!this.bleController.connected && !this.isDeveloperMode) {
-            this.toastManager.show('Connect to hub or enable simulation mode to calibrate', 'warning');
+            this.toastManager.show('Robot not connected, connect to use this feature', 'warning');
             return;
         }
 
