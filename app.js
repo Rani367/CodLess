@@ -1458,7 +1458,30 @@ class FLLRoboticsApp extends EventEmitter {
         
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
         
-        document.getElementById('startCalibrationBtn')?.addEventListener('click', () => this.startCalibration());
+        // Setup calibration button using event delegation
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'startCalibrationBtn') {
+                console.log('Calibration button clicked via delegation!', e);
+                e.preventDefault();
+                e.stopPropagation();
+                this.startCalibration();
+            }
+        });
+        
+        // Also try direct event listener as backup
+        const calibrationBtn = document.getElementById('startCalibrationBtn');
+        console.log('Setting up calibration button event listener, button found:', !!calibrationBtn);
+        if (calibrationBtn) {
+            console.log('Button element:', calibrationBtn);
+            calibrationBtn.addEventListener('click', (e) => {
+                console.log('Calibration button clicked directly!', e);
+                e.preventDefault();
+                e.stopPropagation();
+                this.startCalibration();
+            });
+        } else {
+            console.error('startCalibrationBtn not found in DOM!');
+        }
         
         // Log button event listeners removed
         
@@ -2063,6 +2086,19 @@ class FLLRoboticsApp extends EventEmitter {
             modal.style.display = 'block';
             modal.setAttribute('aria-hidden', 'false');
             this.updateConfigurationUI();
+            
+            // Debug: Check if calibration button is available after modal opens
+            setTimeout(() => {
+                const calibrationBtn = document.getElementById('startCalibrationBtn');
+                console.log('After modal open - calibration button found:', !!calibrationBtn);
+                if (calibrationBtn) {
+                    console.log('Button properties:', {
+                        disabled: calibrationBtn.disabled,
+                        style: calibrationBtn.style.cssText,
+                        offsetParent: calibrationBtn.offsetParent
+                    });
+                }
+            }, 100);
         }
     }
 
@@ -2448,6 +2484,7 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     async startCalibration() {
+        console.log('startCalibration method called');
         if (!this.bleController.connected && !this.isDeveloperMode) {
             this.toastManager.show('Robot not connected, connect to use this feature', 'warning');
             return;
