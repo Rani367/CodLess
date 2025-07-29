@@ -2292,7 +2292,12 @@ while True:
             "}",
             "",
             `# Use hub buttons to select runs (1-${savedRuns.length})`,
+            savedRuns.length <= 3 ? 
+                `# LEFT=Run1, CENTER=Run2, RIGHT=Run3` :
+                `# CENTER=Select, LEFT=Run, RIGHT=Show Selection`,
             "hub.light.on(Color.WHITE)",
+            savedRuns.length > 3 ? "hub._current_selection = 1  # Initialize selection" : "",
+            savedRuns.length > 3 ? "hub.display.number(1)  # Show initial selection" : "",
             "",
             "while True:",
             "    pressed_buttons = hub.buttons.pressed()",
@@ -2300,30 +2305,63 @@ while True:
         );
 
         // Add button selection logic
-        savedRuns.forEach((run, index) => {
-            const runNumber = index + 1;
-            let buttonCheck;
-            
-            if (runNumber === 1) {
-                buttonCheck = "if Button.LEFT in pressed_buttons:";
-            } else if (runNumber === 2) {
-                buttonCheck = "elif Button.CENTER in pressed_buttons:";
-            } else if (runNumber === 3) {
-                buttonCheck = "elif Button.RIGHT in pressed_buttons:";
-            } else {
-                // For more than 3 runs, use multiple button presses
-                buttonCheck = `elif len(pressed_buttons) == ${Math.min(runNumber - 3, 3)}:  # ${runNumber} button presses`;
-            }
+        if (savedRuns.length <= 3) {
+            // Simple button mapping for 1-3 runs
+            savedRuns.forEach((run, index) => {
+                const runNumber = index + 1;
+                let buttonCheck;
+                
+                if (runNumber === 1) {
+                    buttonCheck = "if Button.LEFT in pressed_buttons:";
+                } else if (runNumber === 2) {
+                    buttonCheck = "elif Button.CENTER in pressed_buttons:";
+                } else if (runNumber === 3) {
+                    buttonCheck = "elif Button.RIGHT in pressed_buttons:";
+                }
 
+                codeLines.push(
+                    `    ${buttonCheck}`,
+                    `        hub.light.on(Color.BLUE)`,
+                    `        runs[${runNumber}]()  # ${run.name}`,
+                    `        hub.light.on(Color.GREEN)`,
+                    `        wait(1000)  # Prevent multiple runs`,
+                    ""
+                );
+            });
+        } else {
+            // Menu system for 4+ runs
             codeLines.push(
-                `    ${buttonCheck}`,
-                `        hub.light.on(Color.BLUE)`,
-                `        runs[${runNumber}]()  # ${run.name}`,
-                `        hub.light.on(Color.GREEN)`,
-                `        wait(1000)  # Prevent multiple runs`,
+                "    # Menu system for multiple runs",
+                "    if Button.CENTER in pressed_buttons:",
+                "        # Cycle through run selection",
+                "        current_selection = getattr(hub, '_current_selection', 1)",
+                `        current_selection = (current_selection % ${savedRuns.length}) + 1`,
+                "        hub._current_selection = current_selection",
+                "        ",
+                "        # Show current selection on hub display",
+                "        hub.display.number(current_selection)",
+                "        hub.light.on(Color.YELLOW)",
+                "        wait(500)",
+                "        hub.light.on(Color.WHITE)",
+                "        wait(500)",
+                "",
+                "    elif Button.LEFT in pressed_buttons:",
+                "        # Run the currently selected run",
+                "        current_selection = getattr(hub, '_current_selection', 1)",
+                "        hub.light.on(Color.BLUE)",
+                "        runs[current_selection]()",
+                "        hub.light.on(Color.GREEN)",
+                "        wait(1000)",
+                "",
+                "    elif Button.RIGHT in pressed_buttons:",
+                "        # Show current selection",
+                "        current_selection = getattr(hub, '_current_selection', 1)",
+                "        hub.display.number(current_selection)",
+                "        hub.light.on(Color.CYAN)",
+                "        wait(1000)",
                 ""
             );
-        });
+        }
 
         codeLines.push(
             "    wait(50)  # Small delay for button polling",
