@@ -659,6 +659,7 @@ class RobotSimulator extends EventEmitter {
         
         this.setupControls();
         this.setupResizeHandler();
+        this.updateCanvasSize();
         this.start();
     }
 
@@ -694,27 +695,52 @@ class RobotSimulator extends EventEmitter {
         this.canvas.addEventListener('mousedown', this.mouseDownHandler);
         this.canvas.addEventListener('mousemove', this.mouseMoveHandler);
         this.canvas.addEventListener('mouseup', this.mouseUpHandler);
+        
+        this.wheelHandler = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        
+        this.touchHandler = (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        };
+        
+        this.canvas.addEventListener('wheel', this.wheelHandler, { passive: false });
+        this.canvas.addEventListener('touchstart', this.touchHandler, { passive: false });
+        this.canvas.addEventListener('touchmove', this.touchHandler, { passive: false });
     }
 
     setupResizeHandler() {
         this.resizeObserver = new ResizeObserver(() => {
-            const rect = this.canvas.getBoundingClientRect();
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            
-            // Only resize if dimensions have actually changed
-            if (this.canvas.width !== rect.width * devicePixelRatio || 
-                this.canvas.height !== rect.height * devicePixelRatio) {
-                
-                this.canvas.width = rect.width * devicePixelRatio;
-                this.canvas.height = rect.height * devicePixelRatio;
-                
-                // Reset transform and apply scaling
-                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                this.ctx.scale(devicePixelRatio, devicePixelRatio);
-            }
+            this.updateCanvasSize();
         });
         
         this.resizeObserver.observe(this.canvas);
+    }
+    
+    updateCanvasSize() {
+        const rect = this.canvas.getBoundingClientRect();
+        const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        
+        const newWidth = Math.floor(rect.width * devicePixelRatio);
+        const newHeight = Math.floor(rect.height * devicePixelRatio);
+        
+        if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
+            this.canvas.width = newWidth;
+            this.canvas.height = newHeight;
+            
+            this.canvas.style.width = rect.width + 'px';
+            this.canvas.style.height = rect.height + 'px';
+            
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            this.ctx.scale(devicePixelRatio, devicePixelRatio);
+            
+            this.ctx.imageSmoothingEnabled = true;
+            this.ctx.imageSmoothingQuality = 'high';
+            this.ctx.textRenderingOptimization = 'optimizeQuality';
+        }
     }
 
     start() {
@@ -803,11 +829,12 @@ class RobotSimulator extends EventEmitter {
     render() {
         if (!this.ctx || !this.canvas) return;
         
-        // Clear canvas
         const rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
         
-        this.ctx.clearRect(0, 0, rect.width, rect.height);
+        // Clear with a slight performance optimization
+        this.ctx.fillStyle = '#0f0f0f';
+        this.ctx.fillRect(0, 0, rect.width, rect.height);
         
         this.ctx.save();
 
@@ -822,12 +849,14 @@ class RobotSimulator extends EventEmitter {
         this.drawGrid();
         
         // Draw trail
-        if (this.showTrail) {
+        if (this.showTrail && this.trail.length > 1) {
             this.drawTrail();
         }
         
         // Draw obstacles
-        this.drawObstacles();
+        if (this.obstacles.length > 0) {
+            this.drawObstacles();
+        }
         
         // Draw robot
         this.drawRobot();
@@ -841,41 +870,59 @@ class RobotSimulator extends EventEmitter {
     drawGrid() {
         const rect = this.canvas.getBoundingClientRect();
         const gridSize = 50;
-        this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.1)';
-        this.ctx.lineWidth = 1;
+        const pixelRatio = window.devicePixelRatio || 1;
+        
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.08)';
+        this.ctx.lineWidth = 0.5;
+        this.ctx.globalCompositeOperation = 'multiply';
 
-        for (let x = 0; x <= rect.width; x += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, rect.height);
-            this.ctx.stroke();
+        this.ctx.beginPath();
+        
+        for (let x = 0.5; x <= rect.width; x += gridSize) {
+            this.ctx.moveTo(Math.floor(x) + 0.5, 0);
+            this.ctx.lineTo(Math.floor(x) + 0.5, rect.height);
         }
 
-        for (let y = 0; y <= rect.height; y += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(rect.width, y);
-            this.ctx.stroke();
+        for (let y = 0.5; y <= rect.height; y += gridSize) {
+            this.ctx.moveTo(0, Math.floor(y) + 0.5);
+            this.ctx.lineTo(rect.width, Math.floor(y) + 0.5);
         }
+        
+        this.ctx.stroke();
+        this.ctx.restore();
     }
 
     drawTrail() {
         if (this.trail.length < 2) return;
 
-        this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.5)';
-        this.ctx.lineWidth = 2;
+        this.ctx.save();
+        this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, 'rgba(0, 196, 255, 0.6)');
+        gradient.addColorStop(1, 'rgba(0, 196, 255, 0.2)');
+        this.ctx.strokeStyle = gradient;
+        
         this.ctx.beginPath();
         
         for (let i = 0; i < this.trail.length; i++) {
             const point = this.trail[i];
+            const x = Math.round(point.x);
+            const y = Math.round(point.y);
+            
             if (i === 0) {
-                this.ctx.moveTo(point.x, point.y);
+                this.ctx.moveTo(x, y);
             } else {
-                this.ctx.lineTo(point.x, point.y);
+                this.ctx.lineTo(x, y);
             }
         }
         
         this.ctx.stroke();
+        this.ctx.restore();
     }
 
     drawObstacles() {
@@ -891,27 +938,28 @@ class RobotSimulator extends EventEmitter {
 
     drawRobot() {
         this.ctx.save();
-        this.ctx.translate(this.robotX, this.robotY);
+        this.ctx.translate(Math.round(this.robotX), Math.round(this.robotY));
         this.ctx.rotate((this.robotAngle * Math.PI) / 180);
 
         // Robot body shadow
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         this.ctx.beginPath();
         if (this.ctx.roundRect) {
-            this.ctx.roundRect(-18, -13, 36, 26, 4);
+            this.ctx.roundRect(-19, -14, 38, 28, 5);
         } else {
-            this.ctx.rect(-18, -13, 36, 26);
+            this.ctx.rect(-19, -14, 38, 28);
         }
         this.ctx.fill();
 
         // Robot body gradient
         const gradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
-        gradient.addColorStop(0, '#00b8ff');
-        gradient.addColorStop(1, '#0088cc');
+        gradient.addColorStop(0, '#00c4ff');
+        gradient.addColorStop(0.5, '#0099cc');
+        gradient.addColorStop(1, '#006ba3');
         
         this.ctx.fillStyle = gradient;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.lineWidth = 1.5;
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        this.ctx.lineWidth = 1;
         this.ctx.beginPath();
         if (this.ctx.roundRect) {
             this.ctx.roundRect(-20, -15, 40, 30, 6);
@@ -922,14 +970,17 @@ class RobotSimulator extends EventEmitter {
         this.ctx.stroke();
 
         // Direction indicator
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.lineWidth = 0.5;
         this.ctx.beginPath();
         if (this.ctx.roundRect) {
-            this.ctx.roundRect(15, -3, 8, 6, 2);
+            this.ctx.roundRect(16, -2.5, 6, 5, 1.5);
         } else {
-            this.ctx.rect(15, -3, 8, 6);
+            this.ctx.rect(16, -2.5, 6, 5);
         }
         this.ctx.fill();
+        this.ctx.stroke();
 
         // Draw arms
         this.drawArm(-15, -10, this.arm1Angle, '#00e676');
@@ -937,10 +988,10 @@ class RobotSimulator extends EventEmitter {
 
         // Robot center indicator
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.lineWidth = 0.5;
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, 4, 0, 2 * Math.PI);
+        this.ctx.arc(0, 0, 3, 0, 2 * Math.PI);
         this.ctx.fill();
         this.ctx.stroke();
 
@@ -1090,6 +1141,9 @@ class RobotSimulator extends EventEmitter {
             this.canvas.removeEventListener('mousedown', this.mouseDownHandler);
             this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
             this.canvas.removeEventListener('mouseup', this.mouseUpHandler);
+            this.canvas.removeEventListener('wheel', this.wheelHandler);
+            this.canvas.removeEventListener('touchstart', this.touchHandler);
+            this.canvas.removeEventListener('touchmove', this.touchHandler);
         }
         
         // Clean up resize observer
@@ -1383,19 +1437,24 @@ class FLLRoboticsApp extends EventEmitter {
 
     setupHighDPICanvas(canvas) {
         const ctx = canvas.getContext('2d');
-        const devicePixelRatio = window.devicePixelRatio || 1;
+        const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         const rect = canvas.getBoundingClientRect();
         
-        // Set actual canvas size
-        canvas.width = rect.width * devicePixelRatio;
-        canvas.height = rect.height * devicePixelRatio;
+        const width = Math.floor(rect.width * devicePixelRatio);
+        const height = Math.floor(rect.height * devicePixelRatio);
         
-        // Scale the drawing context
-        ctx.scale(devicePixelRatio, devicePixelRatio);
+        canvas.width = width;
+        canvas.height = height;
         
-        // Set display size
         canvas.style.width = rect.width + 'px';
         canvas.style.height = rect.height + 'px';
+        
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.textRenderingOptimization = 'optimizeQuality';
     }
 
     setupBLEEvents() {
