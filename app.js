@@ -2291,13 +2291,13 @@ while True:
             ...runsDict,
             "}",
             "",
-            `# Use hub buttons to select runs (1-${savedRuns.length})`,
+            `# Use hub buttons to run missions directly (1-${savedRuns.length} runs available)`,
             savedRuns.length <= 3 ? 
                 `# LEFT=Run1, CENTER=Run2, RIGHT=Run3` :
-                `# CENTER=Select, LEFT=Run, RIGHT=Show Selection`,
+                savedRuns.length <= 7 ?
+                    `# L=Run1, C=Run2, R=Run3, LC=Run4, LR=Run5, CR=Run6, LCR=Run7` :
+                    `# L=Run1, C=Run2, R=Run3, LC=Run4, LR=Run5, CR=Run6, LCR=Run7, then sequential presses for Run8+`,
             "hub.light.on(Color.WHITE)",
-            savedRuns.length > 3 ? "hub._current_selection = 1  # Initialize selection" : "",
-            savedRuns.length > 3 ? "hub.display.number(1)  # Show initial selection" : "",
             "",
             "while True:",
             "    pressed_buttons = hub.buttons.pressed()",
@@ -2329,38 +2329,80 @@ while True:
                 );
             });
         } else {
-            // Menu system for 4+ runs
+            // Direct run system for 4+ runs using button combinations
             codeLines.push(
-                "    # Menu system for multiple runs",
-                "    if Button.CENTER in pressed_buttons:",
-                "        # Cycle through run selection",
-                "        current_selection = getattr(hub, '_current_selection', 1)",
-                `        current_selection = (current_selection % ${savedRuns.length}) + 1`,
-                "        hub._current_selection = current_selection",
-                "        ",
-                "        # Show current selection on hub display",
-                "        hub.display.number(current_selection)",
-                "        hub.light.on(Color.YELLOW)",
-                "        wait(500)",
-                "        hub.light.on(Color.WHITE)",
-                "        wait(500)",
-                "",
-                "    elif Button.LEFT in pressed_buttons:",
-                "        # Run the currently selected run",
-                "        current_selection = getattr(hub, '_current_selection', 1)",
+                "    # Direct run system - press button combinations to run specific missions",
+                "    ",
+                "    # Single button presses for runs 1-3",
+                "    if pressed_buttons == {Button.LEFT}:",
                 "        hub.light.on(Color.BLUE)",
-                "        runs[current_selection]()",
+                "        runs[1]()  # Run 1",
                 "        hub.light.on(Color.GREEN)",
                 "        wait(1000)",
                 "",
-                "    elif Button.RIGHT in pressed_buttons:",
-                "        # Show current selection",
-                "        current_selection = getattr(hub, '_current_selection', 1)",
-                "        hub.display.number(current_selection)",
-                "        hub.light.on(Color.CYAN)",
+                "    elif pressed_buttons == {Button.CENTER}:",
+                "        hub.light.on(Color.BLUE)",
+                "        runs[2]()  # Run 2", 
+                "        hub.light.on(Color.GREEN)",
+                "        wait(1000)",
+                "",
+                "    elif pressed_buttons == {Button.RIGHT}:",
+                "        hub.light.on(Color.BLUE)",
+                "        runs[3]()  # Run 3",
+                "        hub.light.on(Color.GREEN)", 
                 "        wait(1000)",
                 ""
             );
+
+            // Add button combinations for runs 4+
+            for (let i = 4; i <= savedRuns.length; i++) {
+                const runName = savedRuns[i-1].name;
+                let buttonCombo;
+                
+                if (i === 4) {
+                    buttonCombo = "elif pressed_buttons == {Button.LEFT, Button.CENTER}:";
+                } else if (i === 5) {
+                    buttonCombo = "elif pressed_buttons == {Button.LEFT, Button.RIGHT}:";
+                } else if (i === 6) {
+                    buttonCombo = "elif pressed_buttons == {Button.CENTER, Button.RIGHT}:";
+                } else if (i === 7) {
+                    buttonCombo = "elif pressed_buttons == {Button.LEFT, Button.CENTER, Button.RIGHT}:";
+                } else {
+                    // For runs 8+, use sequential button presses with timing
+                    const pressCount = i - 7;
+                    buttonCombo = `elif len(pressed_buttons) == 1 and hub._press_count == ${pressCount}:`;
+                    
+                    // Add press counting logic before the button checks
+                    if (i === 8) {
+                        codeLines.splice(-7, 0, 
+                            "    # Sequential press system for runs 8+",
+                            "    if not hasattr(hub, '_press_count'):",
+                            "        hub._press_count = 0",
+                            "        hub._last_press_time = 0",
+                            "    ",
+                            "    current_time = hub.system.time()",
+                            "    if current_time - hub._last_press_time > 2000:  # Reset after 2 seconds",
+                            "        hub._press_count = 0",
+                            "    ",
+                            "    if len(pressed_buttons) == 1:",
+                            "        hub._press_count += 1",
+                            "        hub._last_press_time = current_time",
+                            "        hub.display.number(hub._press_count + 7)  # Show which run will execute",
+                            "        wait(300)  # Debounce",
+                            "    ",
+                        );
+                    }
+                }
+
+                codeLines.push(
+                    `    ${buttonCombo}`,
+                    `        hub.light.on(Color.BLUE)`,
+                    `        runs[${i}]()  # ${runName}`,
+                    `        hub.light.on(Color.GREEN)`,
+                    `        wait(1000)`,
+                    ""
+                );
+            }
         }
 
         codeLines.push(
