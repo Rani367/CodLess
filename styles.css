@@ -304,6 +304,22 @@ body {
     box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
 }
 
+.status-indicator.simulated {
+    background: rgba(255, 165, 0, 0.1);
+    border: 1px solid rgba(255, 165, 0, 0.3);
+}
+
+.status-indicator.simulated .status-dot {
+    background: #ffa500;
+    box-shadow: 0 0 10px rgba(255, 165, 0, 0.5);
+    animation: pulse-sim 1.5s infinite;
+}
+
+@keyframes pulse-sim {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }

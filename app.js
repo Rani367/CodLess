@@ -535,6 +535,11 @@ class BLEController extends EventEmitter {
     }
 
     async sendRawCommand(command) {
+        // Handle simulation mode
+        if (this.isSimulatingConnection) {
+            return this.simulateCommand(command);
+        }
+        
         if (!this.characteristic) {
             throw new Error('No characteristic available');
         }
@@ -547,6 +552,40 @@ class BLEController extends EventEmitter {
         buffer.set(data, 1);
 
         await this.characteristic.writeValue(buffer);
+    }
+
+    simulateCommand(command) {
+        // Simulate command execution with realistic delay
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                // Simulate different command responses
+                switch (command.type) {
+                    case 'get_info':
+                        this.emit('hubMessage', { message: 'Simulated Pybricks Hub v3.2.0' });
+                        break;
+                    case 'get_battery':
+                        // Battery info is handled by the simulated battery monitoring
+                        break;
+                    case 'emergency_stop':
+                        this.emit('hubMessage', { message: 'Emergency stop activated (simulated)' });
+                        break;
+                    case 'drive_straight':
+                    case 'turn':
+                    case 'stop':
+                    case 'arm_move':
+                        // Simulate movement commands with realistic execution time
+                        const duration = command.distance ? Math.abs(command.distance) * 2 : 100;
+                        setTimeout(() => {
+                            this.emit('hubMessage', { message: 'ok' });
+                        }, Math.min(duration, 3000)); // Cap at 3 seconds
+                        break;
+                    default:
+                        this.emit('hubMessage', { message: 'ok' });
+                        break;
+                }
+                resolve();
+            }, 10 + Math.random() * 40); // 10-50ms delay to simulate network latency
+        });
     }
 
     handleIncomingData(event) {
@@ -1247,6 +1286,9 @@ class FLLRoboticsApp extends EventEmitter {
         // Auto-save
         this.autoSaveTimer = null;
         
+        // Simulation
+        this.simulatedBatteryInterval = null;
+        
         // Note: init() will be called explicitly after construction
     }
 
@@ -1478,6 +1520,76 @@ class FLLRoboticsApp extends EventEmitter {
             console.error('Error loading user data:', error);
             // If there's a critical error, offer to reset all data
             this.clearCorruptedData();
+        }
+        
+        // Apply simulation state after loading config
+        this.applySimulationState();
+    }
+
+    applySimulationState() {
+        // Apply simulation state based on current config
+        if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // Start simulation
+            this.bleController.isSimulatingConnection = true;
+            this.bleController.connected = true;
+            this.updateConnectionUI('connected', 'Simulated Robot');
+            this.toastManager.show('Simulation mode activated', 'info');
+            this.logger.log('Simulation mode activated', 'info');
+            
+            // Start simulated battery monitoring
+            this.startSimulatedBatteryMonitoring();
+            
+            // Show visual simulator
+            this.updateSimulatorVisibility();
+        } else if (!this.config.simulateConnected && this.bleController.isSimulatingConnection) {
+            // Stop simulation
+            this.bleController.isSimulatingConnection = false;
+            this.bleController.connected = false;
+            this.updateConnectionUI('disconnected');
+            this.toastManager.show('Simulation mode deactivated', 'info');
+            this.logger.log('Simulation mode deactivated', 'info');
+            
+            // Stop simulated battery monitoring
+            this.stopSimulatedBatteryMonitoring();
+            
+            // Hide visual simulator if not in developer mode
+            this.updateSimulatorVisibility();
+        } else if (this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // User wants simulation but is connected to real robot - show warning
+            this.toastManager.show('Disconnect from real robot first to enable simulation mode', 'warning');
+        } else if (!this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // Real robot connected, simulation disabled - just update UI to reflect current state
+            this.updateConnectionUI('connected', this.bleController.device?.name || 'Pybricks Hub');
+        }
+    }
+
+    startSimulatedBatteryMonitoring() {
+        // Simulate battery updates
+        if (this.simulatedBatteryInterval) {
+            clearInterval(this.simulatedBatteryInterval);
+        }
+        
+        let batteryLevel = 85; // Start at 85%
+        this.simulatedBatteryInterval = setInterval(() => {
+            if (this.bleController.isSimulatingConnection) {
+                // Emit battery update event like a real robot would
+                this.bleController.emit('batteryUpdate', {
+                    level: batteryLevel,
+                    voltage: 8.2 - (100 - batteryLevel) * 0.02 // Simulate voltage drop
+                });
+                
+                // Slowly decrease battery (very slowly for demo purposes)
+                if (Math.random() < 0.1) { // 10% chance each interval
+                    batteryLevel = Math.max(20, batteryLevel - 1);
+                }
+            }
+        }, 10000); // Update every 10 seconds
+    }
+
+    stopSimulatedBatteryMonitoring() {
+        if (this.simulatedBatteryInterval) {
+            clearInterval(this.simulatedBatteryInterval);
+            this.simulatedBatteryInterval = null;
         }
     }
 
@@ -1820,6 +1932,8 @@ class FLLRoboticsApp extends EventEmitter {
             } else if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
                 await this.bleController.sendCommand(compensatedCommand);
             } else if (this.bleController.isSimulatingConnection) {
+                // Send to visual simulator if available
+                this.robotSimulator?.updateCommand(compensatedCommand);
                 this.logger.log(`SIMULATED: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
             }
             
@@ -1915,6 +2029,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.bleController.isSimulatingConnection = true;
             this.bleController.connected = true;
             this.updateConnectionUI('connected', 'Simulated Robot');
+            this.startSimulatedBatteryMonitoring();
             this.toastManager.show('Simulated connection established', 'success');
             this.logger.log('Simulated connection established', 'success');
             return;
@@ -1923,6 +2038,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.bleController.isSimulatingConnection = false;
             this.bleController.connected = false;
             this.updateConnectionUI('disconnected');
+            this.stopSimulatedBatteryMonitoring();
             this.toastManager.show('Simulated connection terminated', 'info');
             this.logger.log('Simulated connection terminated', 'info');
             return;
@@ -2039,9 +2155,19 @@ class FLLRoboticsApp extends EventEmitter {
                 break;
                 
             case 'connected':
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Disconnect Hub';
+                // Show different button text for simulation vs real connection
+                if (this.bleController.isSimulatingConnection) {
+                    connectBtn.innerHTML = '<i class="fas fa-robot" aria-hidden="true"></i> Stop Simulation';
+                } else {
+                    connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Disconnect Hub';
+                }
                 connectBtn.disabled = false;
-                hubStatus.className = 'status-indicator connected';
+                // Use simulation styling if in simulation mode
+                if (this.bleController.isSimulatingConnection) {
+                    hubStatus.className = 'status-indicator connected simulated';
+                } else {
+                    hubStatus.className = 'status-indicator connected';
+                }
                 hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Connected${deviceName ? ` - ${deviceName}` : ''}</span>`;
                 if (connectionStatus) connectionStatus.textContent = `Connected${deviceName ? ` - ${deviceName}` : ''}`;
                 this.enableRecordingControls(true);
@@ -2050,7 +2176,12 @@ class FLLRoboticsApp extends EventEmitter {
             case 'error':
             case 'disconnected':
             default:
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                // Show different button text based on simulation config
+                if (this.config.simulateConnected) {
+                    connectBtn.innerHTML = '<i class="fas fa-robot" aria-hidden="true"></i> Start Simulation';
+                } else {
+                    connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                }
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator disconnected';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
@@ -2110,7 +2241,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!simulatorSection) return;
         
-        if (this.isDeveloperMode) {
+        // Show simulator in developer mode OR when simulation mode is active
+        if (this.isDeveloperMode || this.bleController.isSimulatingConnection) {
             simulatorSection.classList.remove('hidden');
             
             // Give the DOM time to update before starting simulator
@@ -3281,6 +3413,8 @@ function saveConfiguration() {
         
         if (errors.length === 0) {
             window.app.saveUserData();
+            // Apply simulation state immediately after saving config
+            window.app.applySimulationState();
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');
             window.app.logger.log('Configuration updated', 'success');
