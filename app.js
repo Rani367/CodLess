@@ -1564,24 +1564,18 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     startSimulatedBatteryMonitoring() {
-        // Simulate battery updates
+        // Simulate battery updates - keep at 100% for testing purposes
         if (this.simulatedBatteryInterval) {
             clearInterval(this.simulatedBatteryInterval);
         }
         
-        let batteryLevel = 85; // Start at 85%
         this.simulatedBatteryInterval = setInterval(() => {
             if (this.bleController.isSimulatingConnection) {
-                // Emit battery update event like a real robot would
+                // Emit battery update event - always 100% for testing
                 this.bleController.emit('batteryUpdate', {
-                    level: batteryLevel,
-                    voltage: 8.2 - (100 - batteryLevel) * 0.02 // Simulate voltage drop
+                    level: 100,
+                    voltage: 8.4 // Full battery voltage
                 });
-                
-                // Slowly decrease battery (very slowly for demo purposes)
-                if (Math.random() < 0.1) { // 10% chance each interval
-                    batteryLevel = Math.max(20, batteryLevel - 1);
-                }
             }
         }, 10000); // Update every 10 seconds
     }
