@@ -2375,7 +2375,6 @@ while True:
 
         return codeLines.join('\n');
     }
-    }
 
     uploadToHub() {
         this.toastManager.show('Upload to Hub functionality coming soon! For now, download the code and upload it using the Pybricks desktop app or any MicroPython editor.', 'info');
