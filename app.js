@@ -429,9 +429,16 @@ class BLEController extends EventEmitter {
                 maxAttempts: this.maxConnectionAttempts
             });
 
-            if (this.connectionAttempts < this.maxConnectionAttempts) {
+            if (this.connectionAttempts < this.maxConnectionAttempts && 
+                !error.message.includes('User cancelled') && 
+                !error.message.includes('access was denied')) {
                 const retryDelay = Math.min(2000 * Math.pow(2, this.connectionAttempts - 1), 10000);
                 setTimeout(() => this.connect(), retryDelay);
+            } else {
+                // Reset connection attempts for next manual try
+                setTimeout(() => {
+                    this.connectionAttempts = 0;
+                }, 10000);
             }
 
             return false;
@@ -497,11 +504,42 @@ class BLEController extends EventEmitter {
             this.emit('programDownloaded');
             
             return true;
-        } catch (error) {
-            this.emit('programError', error.message);
-            throw error;
-        }
+            } catch (error) {
+        this.emit('programError', error.message);
+        throw error;
     }
+}
+
+async requestHubInfo() {
+    if (!this.connected || !this.hubCapabilitiesChar) return;
+    
+    try {
+        const infoCommand = new Uint8Array([0x04]);
+        await this.characteristic.writeValue(infoCommand);
+    } catch (error) {
+        console.error('Error requesting hub info:', error);
+    }
+}
+
+async requestBatteryLevel() {
+    if (!this.connected) return;
+    
+    try {
+        const batteryCommand = new Uint8Array([0x06]);
+        await this.characteristic.writeValue(batteryCommand);
+    } catch (error) {
+        console.error('Error requesting battery level:', error);
+    }
+}
+
+emergencyStop() {
+    if (this.connected) {
+        const stopCommand = new Uint8Array([0x07]);
+        this.characteristic.writeValue(stopCommand).catch(error => {
+            console.error('Error sending emergency stop:', error);
+        });
+    }
+}
 
     async stopProgram() {
         if (!this.connected) {
@@ -1227,66 +1265,167 @@ class FLLRoboticsApp extends EventEmitter {
 
     async loadUserData() {
         try {
-            // Load configuration
+            // Load configuration with validation
             const savedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
             if (savedConfig) {
-                this.config = RobotConfig.fromJSON(JSON.parse(savedConfig));
+                try {
+                    const configData = JSON.parse(savedConfig);
+                    this.config = RobotConfig.fromJSON(configData);
+                    
+                    // Validate configuration
+                    const errors = this.config.validate();
+                    if (errors.length > 0) {
+                        console.warn('Invalid config detected, using defaults for invalid values:', errors);
+                        this.config = new RobotConfig({ ...configData });
+                    }
+                } catch (parseError) {
+                    console.warn('Invalid config data, using defaults:', parseError);
+                    this.config = new RobotConfig();
+                    localStorage.removeItem(STORAGE_KEYS.CONFIG);
+                }
             }
             
-            // Load saved runs
+            // Load saved runs with validation
             const savedRuns = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
             if (savedRuns) {
-                const runsData = JSON.parse(savedRuns);
-                this.savedRuns = new Map(Object.entries(runsData));
+                try {
+                    const runsData = JSON.parse(savedRuns);
+                    if (runsData && typeof runsData === 'object') {
+                        this.savedRuns = new Map();
+                        Object.entries(runsData).forEach(([key, run]) => {
+                            if (run && run.id && run.name && Array.isArray(run.commands)) {
+                                this.savedRuns.set(key, run);
+                            }
+                        });
+                    }
+                } catch (parseError) {
+                    console.warn('Invalid runs data, clearing:', parseError);
+                    this.savedRuns = new Map();
+                    localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
+                }
             }
             
-            // Load calibration data
+            // Load calibration data with validation
             const calibrationData = localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA);
             if (calibrationData) {
-                const data = JSON.parse(calibrationData);
-                Object.assign(this.config, data);
-                this.isCalibrated = true;
+                try {
+                    const data = JSON.parse(calibrationData);
+                    if (data && typeof data === 'object') {
+                        Object.assign(this.config, data);
+                        this.isCalibrated = true;
+                    }
+                } catch (parseError) {
+                    console.warn('Invalid calibration data, ignoring:', parseError);
+                    localStorage.removeItem(STORAGE_KEYS.CALIBRATION_DATA);
+                }
             }
             
-            // Load user preferences
+            // Load user preferences with validation
             const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
             if (preferences) {
-                const prefs = JSON.parse(preferences);
-                this.isDeveloperMode = prefs.developerMode || false;
+                try {
+                    const prefs = JSON.parse(preferences);
+                    if (prefs && typeof prefs === 'object') {
+                        this.isDeveloperMode = Boolean(prefs.developerMode);
+                    }
+                } catch (parseError) {
+                    console.warn('Invalid preferences data, using defaults:', parseError);
+                    localStorage.removeItem(STORAGE_KEYS.USER_PREFERENCES);
+                }
             }
             
         } catch (error) {
             console.error('Error loading user data:', error);
+            this.logger.log('Failed to load saved data, using defaults', 'warning');
+            
+            // Use safe defaults
+            this.config = new RobotConfig();
+            this.isDeveloperMode = false;
+            this.savedRuns = new Map();
+            this.isCalibrated = false;
         }
     }
 
     saveUserData() {
         try {
-            localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config));
-            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(Object.fromEntries(this.savedRuns)));
-            localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
-                developerMode: this.isDeveloperMode
-            }));
-            
-            if (this.isCalibrated) {
-                const calibrationData = {
-                    motorDelay: this.config.motorDelay,
-                    motorDelayConfidence: this.config.motorDelayConfidence,
-                    straightTrackingBias: this.config.straightTrackingBias,
-                    straightTrackingConfidence: this.config.straightTrackingConfidence,
-                    turnBias: this.config.turnBias,
-                    turnConfidence: this.config.turnConfidence,
-                    motorBalanceDifference: this.config.motorBalanceDifference,
-                    motorBalanceConfidence: this.config.motorBalanceConfidence,
-                    gyroDriftRate: this.config.gyroDriftRate,
-                    gyroConfidence: this.config.gyroConfidence
-                };
-                localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(calibrationData));
+            // Check storage quota before saving
+            if (this.checkStorageQuota()) {
+                localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config));
+                localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(Object.fromEntries(this.savedRuns)));
+                localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
+                    developerMode: this.isDeveloperMode
+                }));
+                
+                if (this.isCalibrated) {
+                    const calibrationData = {
+                        motorDelay: this.config.motorDelay,
+                        motorDelayConfidence: this.config.motorDelayConfidence,
+                        straightTrackingBias: this.config.straightTrackingBias,
+                        straightTrackingConfidence: this.config.straightTrackingConfidence,
+                        turnBias: this.config.turnBias,
+                        turnConfidence: this.config.turnConfidence,
+                        motorBalanceDifference: this.config.motorBalanceDifference,
+                        motorBalanceConfidence: this.config.motorBalanceConfidence,
+                        gyroDriftRate: this.config.gyroDriftRate,
+                        gyroConfidence: this.config.gyroConfidence
+                    };
+                    localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(calibrationData));
+                }
             }
             
         } catch (error) {
             console.error('Error saving user data:', error);
-            this.toastManager.show('Failed to save user data', 'error');
+            
+            if (error.name === 'QuotaExceededError') {
+                this.handleStorageQuotaExceeded();
+            } else {
+                this.toastManager.show('Failed to save user data', 'error');
+            }
+        }
+    }
+
+    checkStorageQuota() {
+        try {
+            // Estimate storage usage
+            const testData = JSON.stringify(Object.fromEntries(this.savedRuns));
+            const estimatedSize = new Blob([testData]).size;
+            
+            // Check if we're approaching the storage limit (typically 5-10MB)
+            if (estimatedSize > 4 * 1024 * 1024) { // 4MB threshold
+                this.logger.log('Storage usage high, consider cleaning up old runs', 'warning');
+                return true; // Still allow saving
+            }
+            
+            return true;
+        } catch (error) {
+            console.warn('Could not check storage quota:', error);
+            return true; // Assume it's okay
+        }
+    }
+
+    handleStorageQuotaExceeded() {
+        this.toastManager.show('Storage quota exceeded. Cleaning up old runs...', 'warning');
+        
+        // Remove oldest runs if we have more than 20
+        if (this.savedRuns.size > 20) {
+            const sortedRuns = [...this.savedRuns.entries()]
+                .sort(([,a], [,b]) => new Date(a.created) - new Date(b.created));
+            
+            // Remove oldest 5 runs
+            for (let i = 0; i < 5 && i < sortedRuns.length; i++) {
+                this.savedRuns.delete(sortedRuns[i][0]);
+            }
+            
+            // Try saving again
+            try {
+                localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(Object.fromEntries(this.savedRuns)));
+                this.updateRunsList();
+                this.toastManager.show('Cleaned up old runs. Data saved successfully.', 'success');
+            } catch (retryError) {
+                this.toastManager.show('Unable to save data even after cleanup', 'error');
+            }
+        } else {
+            this.toastManager.show('Storage full. Please manually delete some runs.', 'error');
         }
     }
 
@@ -1341,9 +1480,12 @@ class FLLRoboticsApp extends EventEmitter {
                 return;
             }
             
-            this.setupHighDPICanvas(canvas);
-            this.robotSimulator = new RobotSimulator(canvas);
-            this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
+                    this.setupHighDPICanvas(canvas);
+        this.robotSimulator = new RobotSimulator(canvas);
+        this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
+        
+        // Enable simulator buttons
+        this.enableSimulatorButtons();
         }
     }
 
@@ -1457,7 +1599,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.pressedKeys.add(key);
             this.processMovementKeys();
             
-            if (this.isRecording) {
+            if (this.isRecording && !this.isRecordingPaused) {
                 this.recordKeyEvent('keydown', key);
             }
         }
@@ -1472,7 +1614,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.pressedKeys.delete(key);
             this.processMovementKeys();
             
-            if (this.isRecording) {
+            if (this.isRecording && !this.isRecordingPaused) {
                 this.recordKeyEvent('keyup', key);
             }
         }
@@ -1518,10 +1660,10 @@ class FLLRoboticsApp extends EventEmitter {
                 await this.bleController.sendCommand(compensatedCommand);
             }
             
-            // Record if recording
-            if (this.isRecording) {
-                this.recordCommand(compensatedCommand);
-            }
+                    // Record if recording and not paused
+        if (this.isRecording && !this.isRecordingPaused) {
+            this.recordCommand(compensatedCommand);
+        }
             
         } catch (error) {
             this.logger.log(`Command error: ${error.message}`, 'error');
@@ -1625,6 +1767,8 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
         this.updateDeveloperModeCheckbox();
+        this.updateRecordingButtonStates();
+        this.updateRecordingUI();
     }
 
     updateConnectionStatus(status = 'disconnected', deviceName = '') {
@@ -1872,10 +2016,141 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    // Placeholder methods for features to be implemented
     toggleRecording() {
-        // Implementation for recording toggle
-        this.toastManager.show('Recording feature implementation in progress', 'info');
+        if (this.isRecording) {
+            this.stopRecording();
+        } else {
+            this.startRecording();
+        }
+    }
+
+    startRecording() {
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Connect to hub or enable simulation mode to record', 'warning');
+            return;
+        }
+
+        const runName = document.getElementById('runNameInput')?.value?.trim() || 'Untitled Run';
+        
+        this.isRecording = true;
+        this.recordedCommands = [];
+        this.recordingStartTime = Date.now();
+        
+        this.updateRecordingUI();
+        this.startRecordingTimer();
+        
+        this.logger.log(`Recording started: ${runName}`, 'success');
+        this.toastManager.show(`Recording started: ${runName}`, 'success');
+    }
+
+    stopRecording() {
+        if (!this.isRecording) return;
+        
+        this.isRecording = false;
+        this.stopRecordingTimer();
+        this.updateRecordingUI();
+        
+        const runName = document.getElementById('runNameInput')?.value?.trim() || 'Untitled Run';
+        const duration = (Date.now() - this.recordingStartTime) / 1000;
+        
+        this.logger.log(`Recording stopped: ${runName} (${duration.toFixed(1)}s)`, 'success');
+        this.toastManager.show(`Recording stopped: ${runName} (${duration.toFixed(1)}s)`, 'success');
+        
+        // Enable save button
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.disabled = false;
+    }
+
+    startRecordingTimer() {
+        const timerElement = document.getElementById('recordingTimer');
+        if (timerElement) {
+            timerElement.classList.remove('hidden');
+            
+            this.recordingTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+    }
+
+    stopRecordingTimer() {
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+        
+        const timerElement = document.getElementById('recordingTimer');
+        if (timerElement) {
+            timerElement.classList.add('hidden');
+            timerElement.textContent = '00:00';
+        }
+    }
+
+    updateRecordingUI() {
+        const recordBtn = document.getElementById('recordBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        
+        if (recordBtn) {
+            if (this.isRecording) {
+                recordBtn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i> Stop Recording';
+                recordBtn.className = 'btn btn-danger';
+            } else {
+                recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Record Run';
+                recordBtn.className = 'btn btn-danger';
+            }
+        }
+        
+        if (pauseBtn) {
+            pauseBtn.classList.toggle('hidden', !this.isRecording);
+        }
+        
+        if (saveBtn) {
+            saveBtn.disabled = this.isRecording || this.recordedCommands.length === 0;
+        }
+    }
+
+    saveCurrentRun() {
+        if (this.recordedCommands.length === 0) {
+            this.toastManager.show('No commands to save', 'warning');
+            return;
+        }
+
+        const runName = document.getElementById('runNameInput')?.value?.trim() || 'Untitled Run';
+        const runId = Date.now().toString();
+        
+        const runData = {
+            id: runId,
+            name: runName,
+            commands: this.recordedCommands,
+            duration: this.recordedCommands.length > 0 ? 
+                     Math.max(...this.recordedCommands.map(cmd => cmd.timestamp)) : 0,
+            created: new Date().toISOString(),
+            config: { ...this.config }
+        };
+        
+        this.savedRuns.set(runId, runData);
+        this.saveUserData();
+        this.updateRunsList();
+        
+        // Clear current recording
+        this.recordedCommands = [];
+        this.updateRecordingUI();
+        
+        // Auto-increment run name
+        const match = runName.match(/^(.+?)(\d+)$/);
+        if (match) {
+            const baseName = match[1];
+            const number = parseInt(match[2]) + 1;
+            document.getElementById('runNameInput').value = `${baseName}${number}`;
+        } else {
+            document.getElementById('runNameInput').value = `${runName} 2`;
+        }
+        
+        this.logger.log(`Run saved: ${runName}`, 'success');
+        this.toastManager.show(`Run saved: ${runName}`, 'success');
     }
 
     openConfigModal() {
@@ -1894,6 +2169,474 @@ class FLLRoboticsApp extends EventEmitter {
         }).catch(() => {
             this.toastManager.show('Failed to copy code to clipboard', 'error');
         });
+    }
+
+    updateRunsList() {
+        const savedRunsList = document.getElementById('savedRunsList');
+        if (!savedRunsList) return;
+        
+        savedRunsList.innerHTML = '';
+        
+        if (this.savedRuns.size === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No saved runs';
+            savedRunsList.appendChild(option);
+        } else {
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Select a run...';
+            savedRunsList.appendChild(defaultOption);
+            
+            [...this.savedRuns.values()]
+                .sort((a, b) => new Date(b.created) - new Date(a.created))
+                .forEach(run => {
+                    const option = document.createElement('option');
+                    option.value = run.id;
+                    option.textContent = `${run.name} (${(run.duration / 1000).toFixed(1)}s)`;
+                    savedRunsList.appendChild(option);
+                });
+        }
+        
+        this.updateRunButtonStates();
+    }
+
+    selectRun(runId) {
+        this.selectedRunId = runId;
+        this.updateRunButtonStates();
+    }
+
+    updateRunButtonStates() {
+        const hasSelection = this.selectedRunId && this.savedRuns.has(this.selectedRunId);
+        
+        const playBtn = document.getElementById('playBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        
+        if (playBtn) playBtn.disabled = !hasSelection;
+        if (deleteBtn) deleteBtn.disabled = !hasSelection;
+        if (exportBtn) exportBtn.disabled = !hasSelection;
+    }
+
+    async playSelectedRun() {
+        if (!this.selectedRunId || !this.savedRuns.has(this.selectedRunId)) {
+            this.toastManager.show('No run selected', 'warning');
+            return;
+        }
+
+        const run = this.savedRuns.get(this.selectedRunId);
+        
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Connect to hub or enable simulation mode to play runs', 'warning');
+            return;
+        }
+
+        this.logger.log(`Playing run: ${run.name}`, 'info');
+        this.toastManager.show(`Playing run: ${run.name}`, 'info');
+
+        // Execute commands with proper timing
+        let lastTimestamp = 0;
+        
+        for (const command of run.commands) {
+            if (command.eventType === 'robot') {
+                const delay = command.timestamp - lastTimestamp;
+                if (delay > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+                
+                await this.sendRobotCommand(command.command);
+                lastTimestamp = command.timestamp;
+            }
+        }
+
+        this.logger.log(`Run completed: ${run.name}`, 'success');
+        this.toastManager.show(`Run completed: ${run.name}`, 'success');
+    }
+
+    deleteSelectedRun() {
+        if (!this.selectedRunId || !this.savedRuns.has(this.selectedRunId)) {
+            this.toastManager.show('No run selected', 'warning');
+            return;
+        }
+
+        const run = this.savedRuns.get(this.selectedRunId);
+        
+        if (confirm(`Delete run "${run.name}"? This cannot be undone.`)) {
+            this.savedRuns.delete(this.selectedRunId);
+            this.selectedRunId = null;
+            this.saveUserData();
+            this.updateRunsList();
+            
+            this.logger.log(`Run deleted: ${run.name}`, 'info');
+            this.toastManager.show(`Run deleted: ${run.name}`, 'info');
+        }
+    }
+
+    exportSelectedRun() {
+        if (!this.selectedRunId || !this.savedRuns.has(this.selectedRunId)) {
+            this.toastManager.show('No run selected', 'warning');
+            return;
+        }
+
+        const run = this.savedRuns.get(this.selectedRunId);
+        const blob = new Blob([JSON.stringify(run, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${run.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.logger.log(`Run exported: ${run.name}`, 'info');
+        this.toastManager.show(`Run exported: ${run.name}`, 'success');
+    }
+
+    importRun() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const runData = JSON.parse(e.target.result);
+                    
+                    // Validate run data
+                    if (!runData.name || !runData.commands || !Array.isArray(runData.commands)) {
+                        throw new Error('Invalid run file format');
+                    }
+                    
+                    // Generate new ID and update creation date
+                    runData.id = Date.now().toString();
+                    runData.imported = new Date().toISOString();
+                    
+                    this.savedRuns.set(runData.id, runData);
+                    this.saveUserData();
+                    this.updateRunsList();
+                    
+                    this.logger.log(`Run imported: ${runData.name}`, 'success');
+                    this.toastManager.show(`Run imported: ${runData.name}`, 'success');
+                    
+                } catch (error) {
+                    this.logger.log(`Import failed: ${error.message}`, 'error');
+                    this.toastManager.show(`Import failed: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        
+        input.click();
+    }
+
+    pauseRecording() {
+        // Toggle pause state
+        this.isRecordingPaused = !this.isRecordingPaused;
+        
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (pauseBtn) {
+            if (this.isRecordingPaused) {
+                pauseBtn.innerHTML = '<i class="fas fa-play" aria-hidden="true"></i> Resume';
+                pauseBtn.className = 'btn btn-success';
+            } else {
+                pauseBtn.innerHTML = '<i class="fas fa-pause" aria-hidden="true"></i> Pause';
+                pauseBtn.className = 'btn btn-warning';
+            }
+        }
+        
+        const action = this.isRecordingPaused ? 'paused' : 'resumed';
+        this.logger.log(`Recording ${action}`, 'info');
+        this.toastManager.show(`Recording ${action}`, 'info');
+    }
+
+    // Additional functionality methods
+    openPybricksIDE() {
+        window.open('https://pybricks.com', '_blank');
+        this.logger.log('Opened Pybricks IDE', 'info');
+    }
+
+    async downloadCompetitionCodeToRobot() {
+        if (!this.bleController.connected) {
+            this.toastManager.show('Connect to hub first', 'warning');
+            return;
+        }
+
+        try {
+            const competitionCode = this.generateCompetitionCode();
+            await this.bleController.downloadAndRunProgram(competitionCode);
+            this.logger.log('Competition code downloaded to robot', 'success');
+            this.toastManager.show('Competition code downloaded successfully!', 'success');
+        } catch (error) {
+            this.logger.log(`Failed to download code: ${error.message}`, 'error');
+            this.toastManager.show(`Failed to download code: ${error.message}`, 'error');
+        }
+    }
+
+    generateCompetitionCode() {
+        const runs = [...this.savedRuns.values()];
+        const codeLines = [];
+        
+        codeLines.push('#!/usr/bin/env pybricks-micropython');
+        codeLines.push('# Competition code generated by CodLess FLL Control Center');
+        codeLines.push('');
+        codeLines.push('from pybricks.hubs import PrimeHub');
+        codeLines.push('from pybricks.pupdevices import Motor');
+        codeLines.push('from pybricks.parameters import Port, Direction, Button');
+        codeLines.push('from pybricks.tools import wait');
+        codeLines.push('');
+        codeLines.push('hub = PrimeHub()');
+        codeLines.push('');
+        codeLines.push('# Motor configuration');
+        codeLines.push(`left_motor = Motor(Port.${this.config.leftMotorPort})`);
+        codeLines.push(`right_motor = Motor(Port.${this.config.rightMotorPort})`);
+        codeLines.push(`arm1_motor = Motor(Port.${this.config.arm1MotorPort})`);
+        codeLines.push(`arm2_motor = Motor(Port.${this.config.arm2MotorPort})`);
+        codeLines.push('');
+        
+        // Generate function for each run
+        runs.forEach((run, index) => {
+            const funcName = `run_${index + 1}`;
+            codeLines.push(`def ${funcName}():`);
+            codeLines.push(`    """${run.name}"""`);
+            codeLines.push('    hub.light.on_for(500, [0, 100, 0])');
+            
+            let lastTimestamp = 0;
+            run.commands.forEach(command => {
+                if (command.eventType === 'robot') {
+                    const delay = command.timestamp - lastTimestamp;
+                    if (delay > 10) {
+                        codeLines.push(`    wait(${Math.round(delay)})`);
+                    }
+                    
+                    const cmd = command.command;
+                    if (cmd.type === 'drive') {
+                        const leftSpeed = (cmd.speed || 0) - (cmd.turn_rate || 0);
+                        const rightSpeed = (cmd.speed || 0) + (cmd.turn_rate || 0);
+                        codeLines.push(`    left_motor.run(${leftSpeed})`);
+                        codeLines.push(`    right_motor.run(${rightSpeed})`);
+                    } else if (cmd.type === 'arm1') {
+                        if (cmd.speed === 0) {
+                            codeLines.push('    arm1_motor.stop()');
+                        } else {
+                            codeLines.push(`    arm1_motor.run(${cmd.speed})`);
+                        }
+                    } else if (cmd.type === 'arm2') {
+                        if (cmd.speed === 0) {
+                            codeLines.push('    arm2_motor.stop()');
+                        } else {
+                            codeLines.push(`    arm2_motor.run(${cmd.speed})`);
+                        }
+                    }
+                    lastTimestamp = command.timestamp;
+                }
+            });
+            
+            codeLines.push('    # Stop all motors');
+            codeLines.push('    left_motor.stop()');
+            codeLines.push('    right_motor.stop()');
+            codeLines.push('    arm1_motor.stop()');
+            codeLines.push('    arm2_motor.stop()');
+            codeLines.push('    hub.light.on_for(500, [100, 100, 0])');
+            codeLines.push('');
+        });
+        
+        // Main program
+        codeLines.push('def main():');
+        codeLines.push('    selected_run = 1');
+        codeLines.push('    hub.display.char(str(selected_run))');
+        codeLines.push('    hub.light.on_for(1000, [0, 0, 100])');
+        codeLines.push('    ');
+        codeLines.push('    while True:');
+        codeLines.push('        if hub.buttons.pressed():');
+        codeLines.push('            pressed = hub.buttons.pressed()');
+        codeLines.push('            if [hub.buttons.center] == pressed:');
+        codeLines.push('                break');
+        codeLines.push('            elif [hub.buttons.left] == pressed:');
+        codeLines.push('                selected_run = max(1, selected_run - 1)');
+        codeLines.push('                hub.display.char(str(selected_run))');
+        codeLines.push('                wait(200)');
+        codeLines.push('            elif [hub.buttons.right] == pressed:');
+        codeLines.push(`                selected_run = min(${runs.length}, selected_run + 1)`);
+        codeLines.push('                hub.display.char(str(selected_run))');
+        codeLines.push('                wait(200)');
+        codeLines.push('        wait(50)');
+        codeLines.push('    ');
+        codeLines.push('    # Execute selected run');
+        codeLines.push('    hub.light.on_for(1000, [100, 100, 0])');
+        
+        runs.forEach((run, index) => {
+            const runNumber = index + 1;
+            if (runNumber === 1) {
+                codeLines.push(`    if selected_run == ${runNumber}:`);
+            } else {
+                codeLines.push(`    elif selected_run == ${runNumber}:`);
+            }
+            codeLines.push(`        run_${runNumber}()`);
+        });
+        
+        codeLines.push('    ');
+        codeLines.push('    wait(1000)');
+        codeLines.push('');
+        codeLines.push('if __name__ == "__main__":');
+        codeLines.push('    main()');
+
+        return codeLines.join('\n');
+    }
+
+    uploadMap() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    if (this.robotSimulator) {
+                        this.robotSimulator.setBackgroundMap(img);
+                        this.logger.log('Map uploaded successfully', 'success');
+                        this.toastManager.show('Map uploaded successfully', 'success');
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+        
+        input.click();
+    }
+
+    resetSimulator() {
+        if (this.robotSimulator) {
+            this.robotSimulator.reset();
+            this.logger.log('Simulator reset', 'info');
+            this.toastManager.show('Simulator reset', 'info');
+        }
+    }
+
+    toggleSimulatorFullscreen() {
+        const canvas = document.getElementById('robotSimulator');
+        if (canvas) {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                canvas.requestFullscreen();
+            }
+        }
+    }
+
+    clearLog() {
+        this.logger.clear();
+        const statusDisplay = document.getElementById('statusDisplay');
+        if (statusDisplay) {
+            statusDisplay.innerHTML = '';
+        }
+        this.toastManager.show('Log cleared', 'info');
+    }
+
+    exportLog() {
+        const logs = this.logger.exportLogs();
+        const blob = new Blob([logs], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `codless_logs_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.toastManager.show('Log exported', 'success');
+    }
+
+    startCalibration() {
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Connect to hub or enable simulation mode to calibrate', 'warning');
+            return;
+        }
+
+        this.logger.log('Starting calibration process', 'info');
+        this.toastManager.show('Calibration feature coming soon', 'info');
+        
+        // Show calibration progress UI
+        const progressContainer = document.getElementById('calibrationProgress');
+        if (progressContainer) {
+            progressContainer.classList.remove('hidden');
+        }
+    }
+
+    minimizeWindow() {
+        this.toastManager.show('Window minimize not available in web version', 'info');
+    }
+
+    toggleMaximize() {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            document.documentElement.requestFullscreen();
+        }
+    }
+
+    closeWindow() {
+        if (confirm('Close CodLess Robotics Control Center?')) {
+            window.close();
+        }
+    }
+
+    cleanup() {
+        // Clean up resources
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+        }
+        
+        if (this.autoSaveTimer) {
+            clearInterval(this.autoSaveTimer);
+        }
+        
+        if (this.robotSimulator) {
+            this.robotSimulator.stop();
+        }
+        
+        if (this.bleController.connected) {
+            this.bleController.disconnect();
+        }
+        
+        this.saveUserData();
+    }
+
+    onSimulatorUpdate(data) {
+        // Handle simulator position updates
+        if (this.config.debugMode && data) {
+            this.logger.log(`Sim position: x=${data.x?.toFixed(1)}, y=${data.y?.toFixed(1)}, heading=${data.heading?.toFixed(1)}°`, 'info');
+        }
+    }
+
+    enableSimulatorButtons() {
+        const uploadMapBtn = document.getElementById('uploadMapBtn');
+        const resetSimBtn = document.getElementById('resetSimBtn');
+        
+        if (uploadMapBtn) uploadMapBtn.disabled = false;
+        if (resetSimBtn) resetSimBtn.disabled = false;
+    }
+
+    updateRecordingButtonStates() {
+        const recordBtn = document.getElementById('recordBtn');
+        const isConnectedOrSim = this.bleController.connected || this.isDeveloperMode;
+        
+        if (recordBtn) {
+            recordBtn.disabled = !isConnectedOrSim;
+        }
     }
 
     generatePybricksCode() {
