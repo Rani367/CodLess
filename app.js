@@ -2291,12 +2291,10 @@ while True:
             ...runsDict,
             "}",
             "",
-            `# Use hub buttons to run missions directly (1-${savedRuns.length} runs available)`,
+            `# Use hub buttons to run missions (${savedRuns.length} runs available)`,
             savedRuns.length <= 3 ? 
                 `# LEFT=Run1, CENTER=Run2, RIGHT=Run3` :
-                savedRuns.length <= 7 ?
-                    `# L=Run1, C=Run2, R=Run3, LC=Run4, LR=Run5, CR=Run6, LCR=Run7` :
-                    `# L=Run1, C=Run2, R=Run3, LC=Run4, LR=Run5, CR=Run6, LCR=Run7, then sequential presses for Run8+`,
+                `# LEFT=Previous, RIGHT=Next, CENTER=Execute (hub shows selected run number)`,
             "hub.light.on(Color.WHITE)",
             "",
             "while True:",
@@ -2329,80 +2327,44 @@ while True:
                 );
             });
         } else {
-            // Direct run system for 4+ runs using button combinations
+            // Simple menu system for 4+ runs - much more reliable
             codeLines.push(
-                "    # Direct run system - press button combinations to run specific missions",
+                "    # Menu navigation system for multiple runs",
+                "    if not hasattr(hub, '_selected_run'):",
+                "        hub._selected_run = 1",
+                "        hub._last_button_time = 0",
                 "    ",
-                "    # Single button presses for runs 1-3",
-                "    if pressed_buttons == {Button.LEFT}:",
-                "        hub.light.on(Color.BLUE)",
-                "        runs[1]()  # Run 1",
-                "        hub.light.on(Color.GREEN)",
-                "        wait(1000)",
-                "",
-                "    elif pressed_buttons == {Button.CENTER}:",
-                "        hub.light.on(Color.BLUE)",
-                "        runs[2]()  # Run 2", 
-                "        hub.light.on(Color.GREEN)",
-                "        wait(1000)",
-                "",
-                "    elif pressed_buttons == {Button.RIGHT}:",
-                "        hub.light.on(Color.BLUE)",
-                "        runs[3]()  # Run 3",
-                "        hub.light.on(Color.GREEN)", 
-                "        wait(1000)",
+                "    current_time = hub.system.time()",
+                "    ",
+                "    # Only process button presses if enough time has passed (debounce)",
+                "    if current_time - hub._last_button_time > 300:",
+                "        if Button.LEFT in pressed_buttons:",
+                "            # Previous run",
+                `            hub._selected_run = max(1, hub._selected_run - 1)`,
+                "            hub.display.number(hub._selected_run)",
+                "            hub._last_button_time = current_time",
+                "            hub.light.on(Color.YELLOW)",
+                "            wait(200)",
+                "            hub.light.on(Color.WHITE)",
+                "        ",
+                "        elif Button.RIGHT in pressed_buttons:",
+                "            # Next run", 
+                `            hub._selected_run = min(${savedRuns.length}, hub._selected_run + 1)`,
+                "            hub.display.number(hub._selected_run)",
+                "            hub._last_button_time = current_time",
+                "            hub.light.on(Color.YELLOW)",
+                "            wait(200)",
+                "            hub.light.on(Color.WHITE)",
+                "        ",
+                "        elif Button.CENTER in pressed_buttons:",
+                "            # Execute selected run",
+                "            hub.light.on(Color.BLUE)",
+                "            runs[hub._selected_run]()",
+                "            hub.light.on(Color.GREEN)",
+                "            wait(1000)",
+                "            hub._last_button_time = current_time",
                 ""
             );
-
-            // Add button combinations for runs 4+
-            for (let i = 4; i <= savedRuns.length; i++) {
-                const runName = savedRuns[i-1].name;
-                let buttonCombo;
-                
-                if (i === 4) {
-                    buttonCombo = "elif pressed_buttons == {Button.LEFT, Button.CENTER}:";
-                } else if (i === 5) {
-                    buttonCombo = "elif pressed_buttons == {Button.LEFT, Button.RIGHT}:";
-                } else if (i === 6) {
-                    buttonCombo = "elif pressed_buttons == {Button.CENTER, Button.RIGHT}:";
-                } else if (i === 7) {
-                    buttonCombo = "elif pressed_buttons == {Button.LEFT, Button.CENTER, Button.RIGHT}:";
-                } else {
-                    // For runs 8+, use sequential button presses with timing
-                    const pressCount = i - 7;
-                    buttonCombo = `elif len(pressed_buttons) == 1 and hub._press_count == ${pressCount}:`;
-                    
-                    // Add press counting logic before the button checks
-                    if (i === 8) {
-                        codeLines.splice(-7, 0, 
-                            "    # Sequential press system for runs 8+",
-                            "    if not hasattr(hub, '_press_count'):",
-                            "        hub._press_count = 0",
-                            "        hub._last_press_time = 0",
-                            "    ",
-                            "    current_time = hub.system.time()",
-                            "    if current_time - hub._last_press_time > 2000:  # Reset after 2 seconds",
-                            "        hub._press_count = 0",
-                            "    ",
-                            "    if len(pressed_buttons) == 1:",
-                            "        hub._press_count += 1",
-                            "        hub._last_press_time = current_time",
-                            "        hub.display.number(hub._press_count + 7)  # Show which run will execute",
-                            "        wait(300)  # Debounce",
-                            "    ",
-                        );
-                    }
-                }
-
-                codeLines.push(
-                    `    ${buttonCombo}`,
-                    `        hub.light.on(Color.BLUE)`,
-                    `        runs[${i}]()  # ${runName}`,
-                    `        hub.light.on(Color.GREEN)`,
-                    `        wait(1000)`,
-                    ""
-                );
-            }
         }
 
         codeLines.push(
