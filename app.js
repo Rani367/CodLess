@@ -1454,6 +1454,25 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
 
+    // Helper function to get saved runs as array (handles both Map and array formats)
+    getSavedRunsArray() {
+        const savedRunsData = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
+        let savedRuns = [];
+        
+        if (savedRunsData) {
+            const parsedData = JSON.parse(savedRunsData);
+            // Handle both Map-like object structure and array structure
+            if (Array.isArray(parsedData)) {
+                savedRuns = parsedData;
+            } else if (typeof parsedData === 'object' && parsedData !== null) {
+                // Convert object entries to array format
+                savedRuns = Object.values(parsedData);
+            }
+        }
+        
+        return savedRuns;
+    }
+
     saveUserData() {
         try {
             localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config));
@@ -1952,7 +1971,7 @@ class FLLRoboticsApp extends EventEmitter {
         const runsList = document.getElementById('savedRunsList');
         if (!runsList) return;
 
-        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const savedRuns = this.getSavedRunsArray();
         
         runsList.innerHTML = '<option value="">Select a saved run...</option>';
         
@@ -2189,7 +2208,7 @@ class FLLRoboticsApp extends EventEmitter {
         };
 
         // Save to localStorage
-        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const savedRuns = this.getSavedRunsArray();
         savedRuns.push(run);
         localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
 
@@ -2441,7 +2460,7 @@ class FLLRoboticsApp extends EventEmitter {
 
     generateHubCode() {
         // Get saved runs for competition code generation
-        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const savedRuns = this.getSavedRunsArray();
         
         // Get calibration data
         const calibrationData = this.calibrationData || JSON.parse(localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA) || 'null');
@@ -2942,7 +2961,7 @@ while True:
             return;
         }
 
-        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const savedRuns = this.getSavedRunsArray();
         const selectedRun = savedRuns.find(run => run.id === runsList.value);
         
         if (!selectedRun) {
@@ -2977,7 +2996,7 @@ while True:
             return;
         }
 
-        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const savedRuns = this.getSavedRunsArray();
         const selectedRun = savedRuns.find(run => run.id === runsList.value);
         
         if (!selectedRun) {
@@ -3020,7 +3039,7 @@ while True:
                         throw new Error('Invalid run file format');
                     }
 
-                    const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+                    const savedRuns = this.getSavedRunsArray();
                     
                     // Create a new run with imported data
                     const newRun = {
@@ -3074,7 +3093,7 @@ while True:
             return;
         }
 
-        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const savedRuns = this.getSavedRunsArray();
         const selectedRun = savedRuns.find(run => run.id === runsList.value);
         
         if (!selectedRun) {
