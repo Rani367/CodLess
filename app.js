@@ -1460,13 +1460,20 @@ class FLLRoboticsApp extends EventEmitter {
         let savedRuns = [];
         
         if (savedRunsData) {
-            const parsedData = JSON.parse(savedRunsData);
-            // Handle both Map-like object structure and array structure
-            if (Array.isArray(parsedData)) {
-                savedRuns = parsedData;
-            } else if (typeof parsedData === 'object' && parsedData !== null) {
-                // Convert object entries to array format
-                savedRuns = Object.values(parsedData);
+            try {
+                const parsedData = JSON.parse(savedRunsData);
+                // Handle both Map-like object structure and array structure
+                if (Array.isArray(parsedData)) {
+                    savedRuns = parsedData;
+                } else if (typeof parsedData === 'object' && parsedData !== null) {
+                    // Convert object entries to array format
+                    savedRuns = Object.values(parsedData);
+                }
+            } catch (error) {
+                console.error('Error parsing saved runs data:', error);
+                // Clear corrupted data and return empty array
+                localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
+                savedRuns = [];
             }
         }
         
@@ -1975,12 +1982,15 @@ class FLLRoboticsApp extends EventEmitter {
         
         runsList.innerHTML = '<option value="">Select a saved run...</option>';
         
-        savedRuns.forEach(run => {
-            const option = document.createElement('option');
-            option.value = run.id;
-            option.textContent = `${run.name} (${new Date(run.createdAt).toLocaleDateString()})`;
-            runsList.appendChild(option);
-        });
+        // Safety check: ensure savedRuns is an array
+        if (Array.isArray(savedRuns)) {
+            savedRuns.forEach(run => {
+                const option = document.createElement('option');
+                option.value = run.id;
+                option.textContent = `${run.name} (${new Date(run.createdAt).toLocaleDateString()})`;
+                runsList.appendChild(option);
+            });
+        }
     }
 
     updateSimulatorVisibility() {
@@ -2465,7 +2475,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Get calibration data
         const calibrationData = this.calibrationData || JSON.parse(localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA) || 'null');
         
-        if (savedRuns.length === 0) {
+        if (!Array.isArray(savedRuns) || savedRuns.length === 0) {
             // Generate basic hub control code if no saved runs
             return `from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor
@@ -2685,7 +2695,9 @@ while True:
         const runFunctions = [];
         const runsDict = [];
 
-        savedRuns.forEach((run, index) => {
+        // Safety check: ensure savedRuns is an array
+        if (Array.isArray(savedRuns)) {
+            savedRuns.forEach((run, index) => {
             const funcName = `run_${index + 1}`;
             const funcLines = [`def ${funcName}():`];
             funcLines.push(`    # ${run.name}`);
@@ -2745,6 +2757,7 @@ while True:
             runFunctions.push(...funcLines, "");
             runsDict.push(`    ${index + 1}: ${funcName},  # ${run.name}`);
         });
+        }
 
         codeLines.push(...runFunctions);
 
@@ -2755,8 +2768,8 @@ while True:
             ...runsDict,
             "}",
             "",
-            `# Use hub buttons to run missions (${savedRuns.length} runs available)`,
-            savedRuns.length <= 3 ? 
+            `# Use hub buttons to run missions (${Array.isArray(savedRuns) ? savedRuns.length : 0} runs available)`,
+            (Array.isArray(savedRuns) && savedRuns.length <= 3) ? 
                 `# LEFT=Run1, CENTER=Run2, RIGHT=Run3` :
                 `# LEFT=Previous, RIGHT=Next, CENTER=Execute (hub shows selected run number)`,
             "hub.light.on(Color.WHITE)",
@@ -2767,7 +2780,7 @@ while True:
         );
 
         // Add button selection logic
-        if (savedRuns.length <= 3) {
+        if (Array.isArray(savedRuns) && savedRuns.length <= 3) {
             // Simple button mapping for 1-3 runs
             savedRuns.forEach((run, index) => {
                 const runNumber = index + 1;
@@ -2813,7 +2826,7 @@ while True:
                 "        ",
                 "        elif Button.RIGHT in pressed_buttons:",
                 "            # Next run", 
-                `            hub._selected_run = min(${savedRuns.length}, hub._selected_run + 1)`,
+                `            hub._selected_run = min(${Array.isArray(savedRuns) ? savedRuns.length : 0}, hub._selected_run + 1)`,
                 "            hub.display.number(hub._selected_run)",
                 "            hub._last_button_time = current_time",
                 "            hub.light.on(Color.YELLOW)",
