@@ -35,6 +35,41 @@
     <!-- Preload critical resources -->
     <link rel="preload" href="app.js?v=3.0.1" as="script">
     <link rel="preload" href="styles.css" as="style">
+    
+    <!-- Immediate Browser Check - Must run before anything else -->
+    <script>
+        // Immediate check for Bluetooth API support
+        function immediateBluetoothCheck() {
+            // Check if browser supports Bluetooth API
+            if (!navigator.bluetooth || !window.isSecureContext) {
+                // Show the browser not supported screen immediately
+                document.addEventListener('DOMContentLoaded', function() {
+                    const appContainer = document.getElementById('appContainer');
+                    const loadingScreen = document.getElementById('loadingScreen');
+                    const browserNotSupported = document.getElementById('browserNotSupported');
+                    
+                    // Hide app and loading screen
+                    if (appContainer) appContainer.style.display = 'none';
+                    if (loadingScreen) loadingScreen.style.display = 'none';
+                    
+                    // Show browser not supported screen
+                    if (browserNotSupported) {
+                        browserNotSupported.style.display = 'flex';
+                    }
+                });
+                
+                // Prevent main app from loading
+                window.BROWSER_BLOCKED = true;
+                
+                // Block any attempts to load the main application
+                return false;
+            }
+            return true;
+        }
+        
+        // Run the check immediately
+        immediateBluetoothCheck();
+    </script>
 </head>
 <body>
     <!-- Browser Compatibility Check -->
@@ -44,33 +79,31 @@
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <h1>Browser Not Supported</h1>
-            <p>This application requires a modern browser with advanced web technologies.</p>
-            <p><strong>Safari is not supported.</strong></p>
+            <p>This application requires <strong>Web Bluetooth API support</strong> to connect to robotics hardware.</p>
+            <p><strong>Your browser does not support the required Bluetooth functionality.</strong></p>
+            <p class="blocked-message">Access to this application is blocked for your security and the best user experience.</p>
             <div class="supported-browsers">
-                <h3>Please use one of these supported browsers:</h3>
+                <h3>Please use one of these supported browsers with HTTPS:</h3>
                 <div class="browser-list">
                     <div class="browser-item">
                         <i class="fab fa-chrome"></i>
-                        <span>Google Chrome</span>
-                    </div>
-                    <div class="browser-item">
-                        <i class="fab fa-firefox-browser"></i>
-                        <span>Mozilla Firefox</span>
+                        <span>Google Chrome 56+</span>
                     </div>
                     <div class="browser-item">
                         <i class="fab fa-edge"></i>
-                        <span>Microsoft Edge</span>
+                        <span>Microsoft Edge 79+</span>
                     </div>
                 </div>
             </div>
             <div class="technical-details">
-                <p>This application requires support for:</p>
+                <p><strong>Required technologies:</strong></p>
                 <ul>
-                    <li>Web Bluetooth API</li>
+                    <li><strong>Web Bluetooth API</strong> (Critical - Not supported in Safari, Firefox)</li>
+                    <li>HTTPS Secure Context</li>
                     <li>Service Workers</li>
                     <li>Modern JavaScript (ES2020+)</li>
-                    <li>WebAssembly</li>
                 </ul>
+                <p class="note">Note: This application cannot function without Web Bluetooth API support.</p>
             </div>
         </div>
     </div>
