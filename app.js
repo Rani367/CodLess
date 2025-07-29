@@ -1400,7 +1400,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.recordedCommands = [];
         this.recordingStartTime = 0;
         this.recordingTimer = null;
-        this.keyPressTimes = new Map(); // Track when keys were pressed for duration calculation
         this.savedRuns = new Map();
         
         // Control state
@@ -2000,12 +1999,6 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!this.pressedKeys.has(key)) {
             this.pressedKeys.add(key);
-            
-            // Record key press time for duration calculation
-            if (this.isRecording) {
-                this.keyPressTimes.set(key, Date.now() - this.recordingStartTime);
-            }
-            
             this.processMovementKeys();
         }
     }
@@ -2017,12 +2010,6 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (this.pressedKeys.has(key)) {
             this.pressedKeys.delete(key);
-            
-            // Record command with duration when key is released
-            if (this.isRecording && this.keyPressTimes.has(key)) {
-                this.recordKeyWithDuration(key);
-            }
-            
             this.processMovementKeys();
         }
     }
@@ -2030,7 +2017,7 @@ class FLLRoboticsApp extends EventEmitter {
     processMovementKeys() {
         if (this.emergencyStopActive) return;
         
-        // Calculate drive command
+        // Calculate drive command based on currently pressed keys
         let speed = 0;
         let turn = 0;
         
@@ -2039,9 +2026,10 @@ class FLLRoboticsApp extends EventEmitter {
         if (this.pressedKeys.has('a')) turn -= 100;
         if (this.pressedKeys.has('d')) turn += 100;
         
+        // Send drive command (this will be 0,0 if no keys pressed = stop)
         this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
         
-        // Calculate arm commands
+        // Calculate arm commands based on currently pressed keys
         let arm1Speed = 0;
         let arm2Speed = 0;
         
@@ -2050,6 +2038,7 @@ class FLLRoboticsApp extends EventEmitter {
         if (this.pressedKeys.has('r')) arm2Speed = 200;
         if (this.pressedKeys.has('f')) arm2Speed = -200;
         
+        // Send arm commands (this will be 0 if no keys pressed = stop)
         this.sendRobotCommand({ type: 'arm1', speed: arm1Speed });
         this.sendRobotCommand({ type: 'arm2', speed: arm2Speed });
     }
@@ -2513,79 +2502,19 @@ class FLLRoboticsApp extends EventEmitter {
         }, 1000);
     }
 
-    recordKeyWithDuration(key) {
-        if (!this.isRecording || !this.keyPressTimes.has(key)) return;
-        
-        const pressTime = this.keyPressTimes.get(key);
-        const releaseTime = Date.now() - this.recordingStartTime;
-        const duration = releaseTime - pressTime;
-        
-        // Create command based on key, similar to Python implementation
-        let command = null;
-        
-        if (['w', 'a', 's', 'd'].includes(key)) {
-            let speed = 0;
-            let turn = 0;
-            
-            if (key === 'w') speed = 200;
-            else if (key === 's') speed = -200;
-            else if (key === 'a') turn = -100;
-            else if (key === 'd') turn = 100;
-            
-            command = {
-                type: 'drive',
-                speed: speed,
-                turn_rate: turn,
-                duration: duration
-            };
-        } else if (['q', 'e', 'r', 'f'].includes(key)) {
-            let speed = 200;
-            let armType = '';
-            
-            if (key === 'q') {
-                armType = 'arm1';
-                speed = 200;
-            } else if (key === 'e') {
-                armType = 'arm1';
-                speed = -200;
-            } else if (key === 'r') {
-                armType = 'arm2';
-                speed = 200;
-            } else if (key === 'f') {
-                armType = 'arm2';
-                speed = -200;
-            }
-            
-            command = {
-                type: armType,
-                speed: speed,
-                duration: duration
-            };
-        }
-        
-        if (command) {
-            this.recordedCommands.push({
-                timestamp: pressTime,
-                command_type: command.type,
-                parameters: command,
-                eventType: 'robot'
-            });
-        }
-        
-        // Remove the key press time
-        this.keyPressTimes.delete(key);
-    }
-
+    // Simple command recording - just record what was sent
     recordCommand(command) {
         if (!this.isRecording) return;
         
         this.recordedCommands.push({
             timestamp: Date.now() - this.recordingStartTime,
-            type: 'command',
-            command,
+            command_type: command.type,
+            parameters: command,
             eventType: 'robot'
         });
     }
+
+
 
     toggleRecording() {
         if (this.isRecording) {
@@ -2599,7 +2528,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.isRecording = true;
         this.recordedCommands = [];
         this.recordingStartTime = Date.now();
-        this.keyPressTimes.clear(); // Clear any existing key press times
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -2619,12 +2547,6 @@ class FLLRoboticsApp extends EventEmitter {
 
     stopRecording() {
         this.isRecording = false;
-        
-        // Complete any ongoing key presses with duration
-        for (const [key, pressTime] of this.keyPressTimes.entries()) {
-            this.recordKeyWithDuration(key);
-        }
-        this.keyPressTimes.clear();
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -3509,34 +3431,9 @@ while True:
                 await new Promise(resolve => setTimeout(resolve, targetTime - currentTime));
             }
             
-            // Execute the command if it has duration and parameters
-            if (recordedCommand.parameters && recordedCommand.parameters.duration) {
-                const cmd = recordedCommand.parameters;
-                const duration = cmd.duration;
-                
-                // Start the movement
-                await this.sendRobotCommand({
-                    type: cmd.type,
-                    speed: cmd.speed,
-                    turn_rate: cmd.turn_rate
-                });
-                
-                // Wait for the duration
-                await new Promise(resolve => setTimeout(resolve, duration));
-                
-                // Stop the movement
-                if (cmd.type === 'drive') {
-                    await this.sendRobotCommand({
-                        type: 'drive',
-                        speed: 0,
-                        turn_rate: 0
-                    });
-                } else if (cmd.type === 'arm1' || cmd.type === 'arm2') {
-                    await this.sendRobotCommand({
-                        type: cmd.type,
-                        speed: 0
-                    });
-                }
+            // Execute the recorded command
+            if (recordedCommand.parameters) {
+                await this.sendRobotCommand(recordedCommand.parameters);
             }
         }
         
