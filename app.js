@@ -1174,6 +1174,9 @@ class FLLRoboticsApp extends EventEmitter {
             // Setup keyboard controls
             this.setupKeyboardControls();
             
+            // Remove any status bar elements
+            this.removeStatusBar();
+            
             // Initialize UI
             this.updateUI();
             
@@ -2707,6 +2710,11 @@ print("Turn test complete")
             this.bleController.disconnect();
         }
         
+        if (this.statusBarObserver) {
+            this.statusBarObserver.disconnect();
+            this.statusBarObserver = null;
+        }
+        
         this.saveUserData();
     }
 
@@ -3067,6 +3075,62 @@ if __name__ == "__main__":
 
                   return codeLines.join('\n');
       }
+
+    removeStatusBar() {
+        // Remove any elements that might be status bars
+        const statusSelectors = [
+            '.status-bar',
+            '.status-display',
+            '[class*="status-bar"]',
+            '[class*="status-display"]',
+            '[id*="status-bar"]',
+            '[id*="status-display"]'
+        ];
+        
+        statusSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+                element.remove();
+            });
+        });
+        
+        // Remove any bottom-positioned fixed elements that might be status bars
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(element => {
+            const style = window.getComputedStyle(element);
+            if (style.position === 'fixed' && 
+                (style.bottom === '0px' || parseInt(style.bottom) < 50) &&
+                element.textContent.includes('Status')) {
+                element.remove();
+            }
+        });
+        
+        // Set up mutation observer to catch any dynamically created status bars
+        if (!this.statusBarObserver) {
+            this.statusBarObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const element = node;
+                            if (element.className && 
+                                (element.className.includes('status-bar') || 
+                                 element.className.includes('status-display') ||
+                                 element.textContent.includes('Status:') ||
+                                 element.textContent.includes('Connection:') ||
+                                 element.textContent.includes('Battery:'))) {
+                                element.remove();
+                            }
+                        }
+                    });
+                });
+            });
+            
+            this.statusBarObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    }
 }
 
 // ============================

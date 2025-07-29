@@ -1139,3 +1139,51 @@ kbd:hover {
         width: 100%;
     }
 }
+
+/* Hide any status bar elements */
+.status-bar,
+.status-display,
+[class*="status-bar"],
+[class*="status-display"],
+[id*="status-bar"],
+[id*="status-display"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Hide any bottom positioned status elements */
+*[style*="position: fixed"][style*="bottom"],
+*[style*="position: absolute"][style*="bottom"] {
+    display: none !important;
+}
+
+/* Hide specific status-related text containers */
+*:contains("Status:"),
+*:contains("Connection:"),
+*:contains("Battery:") {
+    display: none !important;
+}
+
+/* Hide any elements with status-related content */
+*[data-status],
+*[data-connection],
+*[data-battery],
+.connection-status,
+.battery-status,
+.robot-status {
+    display: none !important;
+}
+
+/* Hide bottom status overlays */
+.bottom-bar,
+.status-overlay,
+.debug-panel,
+.info-panel {
+    display: none !important;
+}
+
+/* Force hide any bottom positioned elements that might be external status bars */
+body > div[style*="position: fixed"][style*="bottom"],
+body > div[style*="position: absolute"][style*="bottom"] {
+    display: none !important;
+}
