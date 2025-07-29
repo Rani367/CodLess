@@ -1538,9 +1538,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.logger.log(`Hub: ${message}`, 'info');
         });
 
-        this.bleController.on('batteryUpdate', (level) => {
-            this.logger.log(`Battery: ${level}%`, 'info');
-        });
+        // Battery logging removed
 
         this.bleController.on('hubInfoUpdate', (info) => {
             this.logger.log(`Hub info: ${JSON.stringify(info)}`, 'info');
@@ -1773,16 +1771,12 @@ class FLLRoboticsApp extends EventEmitter {
 
     updateConnectionStatus(status = 'disconnected', deviceName = '') {
         const connectBtn = document.getElementById('connectBtn');
-        const hubStatus = document.getElementById('hubStatus');
         
-        if (!connectBtn || !hubStatus) return;
+        if (!connectBtn) return;
 
         if (!navigator.bluetooth || !window.isSecureContext) {
             connectBtn.innerHTML = 'Bluetooth Unavailable';
             connectBtn.disabled = true;
-            hubStatus.className = 'status-indicator error';
-            const reason = !navigator.bluetooth ? 'Browser not supported' : 'HTTPS required';
-            hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Bluetooth Unavailable - ${reason}</span>`;
             return;
         }
         
@@ -1790,15 +1784,11 @@ class FLLRoboticsApp extends EventEmitter {
             case 'connecting':
                 connectBtn.innerHTML = 'Connecting...';
                 connectBtn.disabled = true;
-                hubStatus.className = 'status-indicator connecting';
-                hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Connecting...</span>';
                 break;
                 
             case 'connected':
                 connectBtn.innerHTML = 'Disconnect Hub';
                 connectBtn.disabled = false;
-                hubStatus.className = 'status-indicator connected';
-                hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Connected${deviceName ? ` - ${deviceName}` : ''}</span>`;
                 break;
                 
             case 'error':
@@ -1806,8 +1796,6 @@ class FLLRoboticsApp extends EventEmitter {
             default:
                 connectBtn.innerHTML = 'Connect to Pybricks Hub';
                 connectBtn.disabled = false;
-                hubStatus.className = 'status-indicator disconnected';
-                hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
                 break;
         }
     }
@@ -1829,16 +1817,7 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     updateCalibrationUI() {
-        const calibrationStatus = document.getElementById('calibrationStatus');
-        if (!calibrationStatus) return;
-        
-        if (this.isCalibrated) {
-            calibrationStatus.className = 'calibration-status completed';
-            calibrationStatus.innerHTML = '<i class="fas fa-check-circle" aria-hidden="true"></i><span>Calibration Complete</span>';
-        } else {
-            calibrationStatus.className = 'calibration-status';
-            calibrationStatus.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>Calibration Required</span>';
-        }
+        // Calibration status UI removed
     }
 
 
@@ -1906,16 +1885,7 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     updatePerformanceUI(metrics) {
-        const fpsCounter = document.getElementById('fpsCounter');
-        const latencyCounter = document.getElementById('latencyCounter');
-        
-        if (fpsCounter) {
-            fpsCounter.textContent = `FPS: ${metrics.fps}`;
-        }
-        
-        if (latencyCounter) {
-            latencyCounter.textContent = `Latency: ${metrics.latency}ms`;
-        }
+        // Performance stats UI removed
     }
 
     displayLogEntry(entry) {
@@ -1939,27 +1909,11 @@ class FLLRoboticsApp extends EventEmitter {
         statusDisplay.appendChild(logLine);
         statusDisplay.scrollTop = statusDisplay.scrollHeight;
         
-        // Update status label
-        const statusLabel = document.getElementById('statusLabel');
-        if (statusLabel) {
-            statusLabel.textContent = entry.message;
-        }
+        // Status label removed
     }
 
     startBatteryMonitoring() {
-        // Request battery level every 30 seconds
-        setInterval(() => {
-            if (this.bleController.connected) {
-                this.bleController.requestBatteryLevel();
-            }
-        }, 30000);
-        
-        // Request initial battery level
-        setTimeout(() => {
-            if (this.bleController.connected) {
-                this.bleController.requestBatteryLevel();
-            }
-        }, 1000);
+        // Battery monitoring removed
     }
 
     recordKeyEvent(type, key) {

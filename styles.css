@@ -280,34 +280,7 @@ body {
     cursor: pointer;
 }
 
-.status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
 
-.status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #dc3545;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
-    animation: pulse 2s infinite;
-}
-
-.status-indicator.connected .status-dot {
-    background: #28a745;
-    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
 
 .select-box {
     padding: 10px 12px;
@@ -944,25 +917,7 @@ kbd:hover {
     border-left: 4px solid #00a8ff;
 }
 
-/* Calibration Status */
-.calibration-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: rgba(255, 193, 7, 0.1);
-    border-radius: 8px;
-    border-left: 4px solid #ffc107;
-    font-size: 12px;
-    color: #ffc107;
-    margin-top: 8px;
-}
 
-.calibration-status.completed {
-    background: rgba(40, 167, 69, 0.1);
-    border-left-color: #28a745;
-    color: #28a745;
-}
 
 /* Recording Timer */
 .recording-timer {
@@ -977,14 +932,7 @@ kbd:hover {
     animation: pulse 1s infinite;
 }
 
-/* Performance Stats */
-.performance-stats {
-    display: flex;
-    gap: 16px;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 11px;
-    color: #888;
-}
+
 
 .simulator-info {
     flex: 1;
@@ -1000,14 +948,7 @@ kbd:hover {
     margin: 0;
 }
 
-.simulator-info .performance-stats {
-    display: flex;
-    gap: 16px;
-    font-size: 12px;
-    color: rgba(0, 168, 255, 0.9);
-    font-weight: 500;
-    font-family: 'SF Mono', Monaco, monospace;
-}
+
 
 /* Toast Notifications */
 .toast-container {
@@ -1156,10 +1097,7 @@ kbd:hover {
         height: 300px;
     }
     
-    .simulator-info .performance-stats {
-        flex-direction: column;
-        gap: 8px;
-    }
+
     
 
 }
@@ -1206,9 +1144,7 @@ kbd:hover {
         border: 2px solid currentColor;
     }
     
-    .status-indicator {
-        border: 2px solid currentColor;
-    }
+
     
     .modal-content {
         border: 2px solid #ffffff;
