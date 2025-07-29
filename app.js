@@ -414,7 +414,7 @@ class BLEController extends EventEmitter {
             
             // Handle specific Bluetooth errors with user-friendly messages
             if (error.name === 'NotFoundError') {
-                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running the provided code.';
+                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and in range.';
             } else if (error.name === 'NotAllowedError') {
                 errorMessage = 'Bluetooth access was denied. Please allow Bluetooth access and try again.';
             } else if (error.name === 'SecurityError') {
@@ -2428,12 +2428,12 @@ class FLLRoboticsApp extends EventEmitter {
             recordBtn.classList.add('btn-primary');
         }
         
+        // Keep save button disabled until recording stops with commands
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.disabled = true;
+        
         this.toastManager.show('🔴 Recording started - all robot movements will be captured', 'info');
         this.logger.log('Recording started');
-        
-        // Enable save button for when recording stops
-        const saveBtn = document.getElementById('saveBtn');
-        if (saveBtn) saveBtn.disabled = false;
     }
 
     stopRecording() {
@@ -2445,6 +2445,12 @@ class FLLRoboticsApp extends EventEmitter {
             recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Record Run';
             recordBtn.classList.remove('btn-primary');
             recordBtn.classList.add('btn-danger');
+        }
+        
+        // Enable save button only if there are commands to save
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) {
+            saveBtn.disabled = this.recordedCommands.length === 0;
         }
         
         const duration = (Date.now() - this.recordingStartTime) / 1000;
@@ -2486,21 +2492,52 @@ class FLLRoboticsApp extends EventEmitter {
         const run = {
             id: Date.now().toString(),
             name: name,
-            commands: this.recordedCommands.map(cmd => ({
-                command_type: cmd.command.type,
-                parameters: {
-                    ...cmd.command,
-                    duration: cmd.timestamp / 1000 // Convert to seconds
+            commands: this.recordedCommands.map(cmd => {
+                if (cmd.eventType === 'keyboard') {
+                    // Handle keyboard events
+                    return {
+                        command_type: cmd.type, // 'keydown' or 'keyup'
+                        parameters: {
+                            key: cmd.key,
+                            eventType: cmd.eventType,
+                            duration: cmd.timestamp / 1000 // Convert to seconds
+                        }
+                    };
+                } else if (cmd.eventType === 'robot') {
+                    // Handle robot commands
+                    return {
+                        command_type: cmd.command.type,
+                        parameters: {
+                            ...cmd.command,
+                            duration: cmd.timestamp / 1000 // Convert to seconds
+                        }
+                    };
+                } else {
+                    // Fallback for unknown types
+                    console.warn('Unknown event type:', cmd);
+                    return {
+                        command_type: cmd.type || 'unknown',
+                        parameters: {
+                            ...cmd,
+                            duration: cmd.timestamp / 1000 // Convert to seconds
+                        }
+                    };
                 }
-            })),
+            }),
             createdAt: new Date().toISOString(),
             duration: this.recordedCommands.length > 0 ? 
                 this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
         };
 
         // Save to localStorage
-        savedRuns.push(run);
-        localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+        try {
+            savedRuns.push(run);
+            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+        } catch (error) {
+            console.error('Error saving to localStorage:', error);
+            this.toastManager.show('Failed to save run - storage error', 'error');
+            return;
+        }
 
         // Update UI
         this.updateRunsList();
