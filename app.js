@@ -1457,8 +1457,7 @@ class FLLRoboticsApp extends EventEmitter {
         
         document.getElementById('startCalibrationBtn')?.addEventListener('click', () => this.startCalibration());
         
-        document.getElementById('clearLogBtn')?.addEventListener('click', () => this.clearLog());
-        document.getElementById('exportLogBtn')?.addEventListener('click', () => this.exportLog());
+        // Log button event listeners removed
         
         document.querySelector('.minimize-btn')?.addEventListener('click', () => this.minimizeWindow());
         document.querySelector('.maximize-btn')?.addEventListener('click', () => this.toggleMaximize());
@@ -1889,27 +1888,7 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     displayLogEntry(entry) {
-        const statusDisplay = document.getElementById('statusDisplay');
-        if (!statusDisplay) return;
-        
-        const timestamp = entry.timestamp.toLocaleTimeString();
-        const colorMap = {
-            info: '#ffffff',
-            success: '#28a745',
-            warning: '#ffc107',
-            error: '#dc3545'
-        };
-        
-        const color = colorMap[entry.level] || '#ffffff';
-        const logLine = document.createElement('div');
-        logLine.style.color = color;
-        logLine.style.marginBottom = '4px';
-        logLine.textContent = `[${timestamp}] ${entry.message}`;
-        
-        statusDisplay.appendChild(logLine);
-        statusDisplay.scrollTop = statusDisplay.scrollHeight;
-        
-        // Status label removed
+        // Status display removed
     }
 
     startBatteryMonitoring() {
@@ -2458,28 +2437,11 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     clearLog() {
-        this.logger.clear();
-        const statusDisplay = document.getElementById('statusDisplay');
-        if (statusDisplay) {
-            statusDisplay.innerHTML = '';
-        }
-        this.toastManager.show('Log cleared', 'info');
+        // Log clearing functionality removed
     }
 
     exportLog() {
-        const logs = this.logger.exportLogs();
-        const blob = new Blob([logs], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `codless_logs_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        this.toastManager.show('Log exported', 'success');
+        // Log export functionality removed
     }
 
     async startCalibration() {
@@ -2860,24 +2822,11 @@ if __name__ == "__main__":
     }
 
     clearLog() {
-        this.logger.clear();
-        const statusDisplay = document.getElementById('statusDisplay');
-        if (statusDisplay) {
-            statusDisplay.innerHTML = '';
-        }
-        this.toastManager.show('Log cleared', 'info');
+        // Log clearing functionality removed
     }
 
     exportLog() {
-        const logData = this.logger.exportLogs();
-        const blob = new Blob([logData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `codless-robotics-log-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        this.toastManager.show('Log exported', 'success');
+        // Log export functionality removed
     }
 
     minimizeWindow() {
