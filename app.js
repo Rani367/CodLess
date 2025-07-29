@@ -1397,10 +1397,22 @@ class FLLRoboticsApp extends EventEmitter {
                     setTimeout(() => {
                         loadingScreen.style.display = 'none';
                         if (appContainer) appContainer.style.display = 'flex';
+                        
+                        // Now that the app is visible, set up the robot simulator if it wasn't initialized
+                        if (!this.robotSimulator) {
+                            setTimeout(() => this.setupRobotSimulator(), 100);
+                        }
+                        
                         resolve();
                     }, 500);
                 } else {
                     if (appContainer) appContainer.style.display = 'flex';
+                    
+                    // Now that the app is visible, set up the robot simulator if it wasn't initialized
+                    if (!this.robotSimulator) {
+                        setTimeout(() => this.setupRobotSimulator(), 100);
+                    }
+                    
                     resolve();
                 }
             }, 2000); // Show loading for at least 2 seconds
@@ -1524,10 +1536,12 @@ class FLLRoboticsApp extends EventEmitter {
         if (canvas) {
             const rect = canvas.getBoundingClientRect();
             
-            // Ensure canvas has proper initial dimensions
+            // Check if the canvas is visible and has dimensions
+            // If not, we'll set it up later when the app container becomes visible
             if (rect.width === 0 || rect.height === 0) {
-                // Wait for the element to have dimensions
-                setTimeout(() => this.setupRobotSimulator(), 100);
+                console.log('Canvas not ready yet, will initialize simulator later');
+                // Don't set up infinite retry loop during initialization
+                // The simulator will be set up when the app becomes visible
                 return;
             }
             
