@@ -724,8 +724,7 @@ class RobotSimulator extends EventEmitter {
     
     updateCanvasSize() {
         const rect = this.canvas.getBoundingClientRect();
-        // Use full device pixel ratio for crisp high-resolution displays
-        const devicePixelRatio = window.devicePixelRatio || 1;
+        const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         
         const newWidth = Math.floor(rect.width * devicePixelRatio);
         const newHeight = Math.floor(rect.height * devicePixelRatio);
@@ -740,14 +739,10 @@ class RobotSimulator extends EventEmitter {
             this.ctx.setTransform(1, 0, 0, 1, 0, 0);
             this.ctx.scale(devicePixelRatio, devicePixelRatio);
             
-            // Enhanced rendering quality settings
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
             this.ctx.textRenderingOptimization = 'optimizeQuality';
-            this.ctx.lineCap = 'round';
-            this.ctx.lineJoin = 'round';
             
-            // Store pixel ratio for use in rendering
             this.pixelRatio = devicePixelRatio;
         }
     }
@@ -841,9 +836,8 @@ class RobotSimulator extends EventEmitter {
         const rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
         
-        // Performance optimization: only clear visible area
-        this.ctx.clearRect(0, 0, rect.width, rect.height);
-        this.ctx.fillStyle = '#0a0a0a';
+        // Clear with a slight performance optimization
+        this.ctx.fillStyle = '#0f0f0f';
         this.ctx.fillRect(0, 0, rect.width, rect.height);
         
         this.ctx.save();
@@ -912,12 +906,10 @@ class RobotSimulator extends EventEmitter {
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
         
-        if (!this.trailGradient) {
-            this.trailGradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-            this.trailGradient.addColorStop(0, 'rgba(0, 196, 255, 0.6)');
-            this.trailGradient.addColorStop(1, 'rgba(0, 196, 255, 0.2)');
-        }
-        this.ctx.strokeStyle = this.trailGradient;
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, 'rgba(0, 196, 255, 0.6)');
+        gradient.addColorStop(1, 'rgba(0, 196, 255, 0.2)');
+        this.ctx.strokeStyle = gradient;
         
         this.ctx.beginPath();
         
@@ -963,15 +955,13 @@ class RobotSimulator extends EventEmitter {
         }
         this.ctx.fill();
 
-        // Robot body gradient (cached for performance)
-        if (!this.robotGradient) {
-            this.robotGradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
-            this.robotGradient.addColorStop(0, '#00c4ff');
-            this.robotGradient.addColorStop(0.5, '#0099cc');
-            this.robotGradient.addColorStop(1, '#006ba3');
-        }
+        // Robot body gradient
+        const gradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
+        gradient.addColorStop(0, '#00c4ff');
+        gradient.addColorStop(0.5, '#0099cc');
+        gradient.addColorStop(1, '#006ba3');
         
-        this.ctx.fillStyle = this.robotGradient;
+        this.ctx.fillStyle = gradient;
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         this.ctx.lineWidth = 1;
         this.ctx.beginPath();
@@ -1026,16 +1016,12 @@ class RobotSimulator extends EventEmitter {
         this.ctx.fill();
         this.ctx.stroke();
 
-        // Arm shaft with gradient (cached for performance)
-        const gradientKey = `arm_${color}`;
-        if (!this.armGradients) this.armGradients = {};
-        if (!this.armGradients[gradientKey]) {
-            this.armGradients[gradientKey] = this.ctx.createLinearGradient(0, -2, 0, 2);
-            this.armGradients[gradientKey].addColorStop(0, color);
-            this.armGradients[gradientKey].addColorStop(1, this.darkenColor(color, 0.7));
-        }
+        // Arm shaft with gradient
+        const armGradient = this.ctx.createLinearGradient(0, -2, 0, 2);
+        armGradient.addColorStop(0, color);
+        armGradient.addColorStop(1, this.darkenColor(color, 0.7));
         
-        this.ctx.strokeStyle = this.armGradients[gradientKey];
+        this.ctx.strokeStyle = armGradient;
         this.ctx.lineWidth = 4;
         this.ctx.lineCap = 'round';
         this.ctx.beginPath();

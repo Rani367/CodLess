@@ -382,42 +382,43 @@ body {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    background: rgba(15, 15, 15, 0.8);
-    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
     padding: 24px;
-    backdrop-filter: blur(30px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
     margin-bottom: 24px;
-    position: relative;
-    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.simulator-container:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(0, 168, 255, 0.3);
+    box-shadow: 0 12px 30px rgba(0, 168, 255, 0.1);
 }
 
 #robotSimulator {
     width: 100%;
-    height: min(70vh, 800px);
-    min-height: 500px;
-    border: 2px solid rgba(0, 168, 255, 0.4);
-    border-radius: 16px;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    height: min(60vh, 600px);
+    min-height: 400px;
+    border: 1px solid rgba(0, 168, 255, 0.3);
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
     box-shadow: 
-        0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 20px rgba(0, 168, 255, 0.1),
-        inset 0 2px 0 rgba(255, 255, 255, 0.08);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    image-rendering: pixelated;
+        0 4px 20px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    image-rendering: auto;
     cursor: grab;
     touch-action: none;
-    position: relative;
-    overflow: hidden;
 }
 
 #robotSimulator:hover {
-    border-color: rgba(0, 168, 255, 0.7);
+    border-color: rgba(0, 168, 255, 0.5);
     box-shadow: 
-        0 12px 40px rgba(0, 0, 0, 0.7),
-        0 0 30px rgba(0, 168, 255, 0.2),
-        inset 0 2px 0 rgba(255, 255, 255, 0.12);
-    transform: translateY(-2px);
+        0 6px 24px rgba(0, 0, 0, 0.5),
+        0 0 12px rgba(0, 168, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 #robotSimulator:active {
@@ -1169,8 +1170,8 @@ kbd:hover {
     }
     
     #robotSimulator {
-        height: min(60vh, 600px);
-        min-height: 400px;
+        height: min(50vh, 500px);
+        min-height: 350px;
     }
 }
 
@@ -1203,8 +1204,8 @@ kbd:hover {
     }
     
     #robotSimulator {
-        height: min(50vh, 500px);
-        min-height: 350px;
+        height: min(45vh, 450px);
+        min-height: 300px;
     }
     
     .simulator-info .performance-stats {
