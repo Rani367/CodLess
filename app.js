@@ -1567,7 +1567,6 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
-        document.getElementById('calibrateBtn')?.addEventListener('click', () => this.startCalibration());
         
         // Competition code
         document.getElementById('downloadCompetitionCodeBtn')?.addEventListener('click', () => this.downloadCompetitionCode());
@@ -1957,7 +1956,6 @@ class FLLRoboticsApp extends EventEmitter {
 
     updateUI() {
         this.updateConnectionUI();
-        this.updateCalibrationUI();
         this.updateRunsList();
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
@@ -2011,18 +2009,7 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
 
-    updateCalibrationUI() {
-        const calibrationStatus = document.getElementById('calibrationStatus');
-        if (!calibrationStatus) return;
-        
-        if (this.isCalibrated) {
-            calibrationStatus.className = 'calibration-status completed';
-            calibrationStatus.innerHTML = '<i class="fas fa-check-circle" aria-hidden="true"></i><span>Calibration Complete</span>';
-        } else {
-            calibrationStatus.className = 'calibration-status';
-            calibrationStatus.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>Calibration Required</span>';
-        }
-    }
+
 
     updateRunsList() {
         try {
@@ -2315,170 +2302,15 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
 
-    async startCalibration() {
-        if (!this.bleController.connected && !this.isDeveloperMode) {
-            this.toastManager.show('Please connect to your robot or enable developer mode to start calibration', 'warning');
-            return;
-        }
 
-        this.toastManager.show('🔧 Starting robot calibration...', 'info');
-        this.logger.log('Calibration started');
 
-        // Initialize calibration data
-        this.calibrationData = {
-            straightDrift: { x: 0, y: 0 },
-            turnAccuracy: 1.0,
-            speedAccuracy: 1.0,
-            measurements: [],
-            isCalibrating: true
-        };
 
-        try {
-            // Run calibration sequence
-            await this.runCalibrationSequence();
-            
-            // Calculate calibration factors
-            this.calculateCalibrationFactors();
-            
-            // Apply calibration to simulator
-            this.syncSimulatorWithCalibration();
-            
-            // Mark as calibrated
-            this.isCalibrated = true;
-            
-            // Save calibration data
-            this.saveCalibrationData();
-            
-            this.toastManager.show('✅ Calibration completed! Robot and simulator are now synchronized', 'success');
-            this.logger.log('Calibration completed successfully');
-            
-        } catch (error) {
-            this.toastManager.show(`❌ Calibration failed: ${error.message}`, 'error');
-            this.logger.log(`Calibration failed: ${error.message}`, 'error');
-        }
-    }
 
-    async runCalibrationSequence() {
-        const tests = [
-            { name: 'Forward Movement Test', command: { type: 'drive', speed: 200, turn_rate: 0 }, duration: 2000 },
-            { name: 'Turn Right Test', command: { type: 'drive', speed: 0, turn_rate: 90 }, duration: 1000 },
-            { name: 'Turn Left Test', command: { type: 'drive', speed: 0, turn_rate: -90 }, duration: 1000 },
-            { name: 'Backward Movement Test', command: { type: 'drive', speed: -200, turn_rate: 0 }, duration: 2000 }
-        ];
 
-        for (const test of tests) {
-            this.toastManager.show(`Running: ${test.name}`, 'info');
-            
-            // Record starting position (simulator or estimated)
-            const startPos = this.getCurrentPosition();
-            
-            // Execute movement
-            await this.executeCalibrationMove(test.command, test.duration);
-            
-            // Wait for movement to complete
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Record ending position
-            const endPos = this.getCurrentPosition();
-            
-            // Store measurement
-            this.calibrationData.measurements.push({
-                test: test.name,
-                command: test.command,
-                duration: test.duration,
-                startPos,
-                endPos,
-                actualMovement: {
-                    x: endPos.x - startPos.x,
-                    y: endPos.y - startPos.y,
-                    angle: endPos.angle - startPos.angle
-                }
-            });
-            
-            // Stop movement
-            await this.executeCalibrationMove({ type: 'drive', speed: 0, turn_rate: 0 }, 100);
-        }
-    }
 
-    getCurrentPosition() {
-        if (this.isDeveloperMode && this.robotSimulator) {
-            return {
-                x: this.robotSimulator.robotX,
-                y: this.robotSimulator.robotY,
-                angle: this.robotSimulator.robotAngle
-            };
-        } else {
-            // For real robot, we estimate based on commands (could be enhanced with sensors)
-            return this.estimatedPosition || { x: 0, y: 0, angle: 0 };
-        }
-    }
 
-    async executeCalibrationMove(command, duration) {
-        if (this.isDeveloperMode) {
-            this.robotSimulator?.updateCommand(command);
-        } else if (this.bleController.connected) {
-            await this.bleController.sendCommand(command);
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, duration));
-    }
 
-    calculateCalibrationFactors() {
-        const measurements = this.calibrationData.measurements;
-        
-        // Analyze forward movement
-        const forwardTest = measurements.find(m => m.test === 'Forward Movement Test');
-        if (forwardTest) {
-            const expectedDistance = (forwardTest.command.speed * forwardTest.duration) / 1000; // mm/s * ms / 1000
-            const actualDistance = Math.sqrt(
-                Math.pow(forwardTest.actualMovement.x, 2) + 
-                Math.pow(forwardTest.actualMovement.y, 2)
-            );
-            
-            this.calibrationData.speedAccuracy = expectedDistance / actualDistance;
-            
-            // Calculate drift (deviation from straight line)
-            const expectedAngle = 0;
-            this.calibrationData.straightDrift.x = forwardTest.actualMovement.x - actualDistance;
-            this.calibrationData.straightDrift.y = forwardTest.actualMovement.y;
-        }
-        
-        // Analyze turn accuracy
-        const rightTurn = measurements.find(m => m.test === 'Turn Right Test');
-        const leftTurn = measurements.find(m => m.test === 'Turn Left Test');
-        
-        if (rightTurn && leftTurn) {
-            const expectedRightTurn = 90; // degrees
-            const expectedLeftTurn = -90; // degrees
-            
-            const rightAccuracy = expectedRightTurn / rightTurn.actualMovement.angle;
-            const leftAccuracy = expectedLeftTurn / leftTurn.actualMovement.angle;
-            
-            this.calibrationData.turnAccuracy = (rightAccuracy + leftAccuracy) / 2;
-        }
-        
-        this.logger.log(`Calibration factors: Speed=${this.calibrationData.speedAccuracy.toFixed(3)}, Turn=${this.calibrationData.turnAccuracy.toFixed(3)}`);
-    }
 
-    syncSimulatorWithCalibration() {
-        if (!this.robotSimulator || !this.calibrationData) return;
-        
-        // Update simulator physics to match real robot behavior
-        this.robotSimulator.calibrationFactors = {
-            speedMultiplier: this.calibrationData.speedAccuracy,
-            turnMultiplier: this.calibrationData.turnAccuracy,
-            driftCompensation: this.calibrationData.straightDrift
-        };
-        
-        this.logger.log('Simulator synchronized with calibration data');
-    }
-
-    saveCalibrationData() {
-        if (this.calibrationData) {
-            localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(this.calibrationData));
-            this.logger.log('Calibration data saved');
-        }
-    }
 
     generateCalibrationCode(calibrationData) {
         if (!calibrationData) {
