@@ -625,6 +625,17 @@ class RobotSimulator extends EventEmitter {
         this.arm1Angle = 0;
         this.arm2Angle = 0;
         
+        // Camera state for zoom and pan
+        this.camera = {
+            x: 0,
+            y: 0,
+            zoom: 1,
+            minZoom: 0.25,
+            maxZoom: 4,
+            smoothZoom: 1,
+            targetZoom: 1
+        };
+        
         // Physics state
         this.velocity = { x: 0, y: 0, angular: 0 };
         this.acceleration = { x: 0, y: 0, angular: 0 };
@@ -679,9 +690,9 @@ class RobotSimulator extends EventEmitter {
                 const dx = e.clientX - lastMousePos.x;
                 const dy = e.clientY - lastMousePos.y;
                 
-                // Pan the view
-                this.robotX += dx;
-                this.robotY += dy;
+                // Pan the camera view
+                this.camera.x -= dx / this.camera.zoom;
+                this.camera.y -= dy / this.camera.zoom;
                 
                 lastMousePos = { x: e.clientX, y: e.clientY };
             }
@@ -699,17 +710,88 @@ class RobotSimulator extends EventEmitter {
         this.wheelHandler = (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            const rect = this.canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Calculate world coordinates before zoom
+            const worldXBefore = (mouseX + this.camera.x) / this.camera.zoom;
+            const worldYBefore = (mouseY + this.camera.y) / this.camera.zoom;
+            
+            // Apply zoom
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            this.camera.targetZoom = Math.max(this.camera.minZoom, 
+                Math.min(this.camera.maxZoom, this.camera.targetZoom * zoomFactor));
+            
+            // Calculate world coordinates after zoom
+            const worldXAfter = (mouseX + this.camera.x) / this.camera.targetZoom;
+            const worldYAfter = (mouseY + this.camera.y) / this.camera.targetZoom;
+            
+            // Adjust camera position to zoom towards mouse cursor
+            this.camera.x += (worldXBefore - worldXAfter) * this.camera.targetZoom;
+            this.camera.y += (worldYBefore - worldYAfter) * this.camera.targetZoom;
         };
         
-        this.touchHandler = (e) => {
-            if (e.touches.length > 1) {
+        let lastTouchDistance = 0;
+        let touchCenter = { x: 0, y: 0 };
+        
+        this.touchStartHandler = (e) => {
+            if (e.touches.length === 2) {
                 e.preventDefault();
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                lastTouchDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                touchCenter = {
+                    x: (touch1.clientX + touch2.clientX) / 2,
+                    y: (touch1.clientY + touch2.clientY) / 2
+                };
+            }
+        };
+        
+        this.touchMoveHandler = (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const newDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                
+                if (lastTouchDistance > 0) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const zoomFactor = newDistance / lastTouchDistance;
+                    const centerX = touchCenter.x - rect.left;
+                    const centerY = touchCenter.y - rect.top;
+                    
+                    // Calculate world coordinates before zoom
+                    const worldXBefore = (centerX + this.camera.x) / this.camera.zoom;
+                    const worldYBefore = (centerY + this.camera.y) / this.camera.zoom;
+                    
+                    // Apply zoom
+                    this.camera.targetZoom = Math.max(this.camera.minZoom, 
+                        Math.min(this.camera.maxZoom, this.camera.targetZoom * zoomFactor));
+                    
+                    // Calculate world coordinates after zoom
+                    const worldXAfter = (centerX + this.camera.x) / this.camera.targetZoom;
+                    const worldYAfter = (centerY + this.camera.y) / this.camera.targetZoom;
+                    
+                    // Adjust camera position
+                    this.camera.x += (worldXBefore - worldXAfter) * this.camera.targetZoom;
+                    this.camera.y += (worldYBefore - worldYAfter) * this.camera.targetZoom;
+                }
+                
+                lastTouchDistance = newDistance;
             }
         };
         
         this.canvas.addEventListener('wheel', this.wheelHandler, { passive: false });
-        this.canvas.addEventListener('touchstart', this.touchHandler, { passive: false });
-        this.canvas.addEventListener('touchmove', this.touchHandler, { passive: false });
+        this.canvas.addEventListener('touchstart', this.touchStartHandler, { passive: false });
+        this.canvas.addEventListener('touchmove', this.touchMoveHandler, { passive: false });
     }
 
     setupResizeHandler() {
@@ -722,7 +804,8 @@ class RobotSimulator extends EventEmitter {
     
     updateCanvasSize() {
         const rect = this.canvas.getBoundingClientRect();
-        const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        // Use full device pixel ratio for crisp high-resolution displays
+        const devicePixelRatio = window.devicePixelRatio || 1;
         
         const newWidth = Math.floor(rect.width * devicePixelRatio);
         const newHeight = Math.floor(rect.height * devicePixelRatio);
@@ -737,9 +820,15 @@ class RobotSimulator extends EventEmitter {
             this.ctx.setTransform(1, 0, 0, 1, 0, 0);
             this.ctx.scale(devicePixelRatio, devicePixelRatio);
             
+            // Enhanced rendering quality settings
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
             this.ctx.textRenderingOptimization = 'optimizeQuality';
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            
+            // Store pixel ratio for use in rendering
+            this.pixelRatio = devicePixelRatio;
         }
     }
 
@@ -770,6 +859,11 @@ class RobotSimulator extends EventEmitter {
     }
 
     updatePhysics(dt) {
+        // Update camera zoom smoothly
+        const zoomLerpSpeed = 8;
+        this.camera.smoothZoom += (this.camera.targetZoom - this.camera.smoothZoom) * zoomLerpSpeed * dt;
+        this.camera.zoom = this.camera.smoothZoom;
+        
         // Update drive physics
         const speedError = this.targetSpeed - this.velocity.x;
         const turnError = this.targetTurn - this.velocity.angular;
@@ -832,16 +926,25 @@ class RobotSimulator extends EventEmitter {
         const rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
         
-        // Clear with a slight performance optimization
-        this.ctx.fillStyle = '#0f0f0f';
+        // Performance optimization: only clear visible area
+        this.ctx.clearRect(0, 0, rect.width, rect.height);
+        this.ctx.fillStyle = '#0a0a0a';
         this.ctx.fillRect(0, 0, rect.width, rect.height);
         
         this.ctx.save();
+        
+        // Apply camera transformations
+        this.ctx.translate(-this.camera.x, -this.camera.y);
+        this.ctx.scale(this.camera.zoom, this.camera.zoom);
 
         // Draw background map
         if (this.backgroundMap) {
             this.ctx.globalAlpha = 0.3;
-            this.ctx.drawImage(this.backgroundMap, 0, 0, rect.width, rect.height);
+            this.ctx.drawImage(this.backgroundMap, 
+                this.camera.x / this.camera.zoom, 
+                this.camera.y / this.camera.zoom, 
+                rect.width / this.camera.zoom, 
+                rect.height / this.camera.zoom);
             this.ctx.globalAlpha = 1.0;
         }
 
@@ -858,35 +961,48 @@ class RobotSimulator extends EventEmitter {
             this.drawObstacles();
         }
         
-        // Draw robot
-        this.drawRobot();
+        // Draw robot with viewport culling
+        if (this.isRobotVisible(rect)) {
+            this.drawRobot();
+        }
         
-        // Draw UI overlays
-        this.drawInfo();
-
         this.ctx.restore();
+        
+        // Draw UI overlays in screen space
+        this.drawInfo();
     }
 
     drawGrid() {
         const rect = this.canvas.getBoundingClientRect();
         const gridSize = 50;
-        const pixelRatio = window.devicePixelRatio || 1;
+        const pixelRatio = this.pixelRatio || 1;
         
         this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.08)';
-        this.ctx.lineWidth = 0.5;
+        
+        // Calculate visible grid area considering camera position and zoom
+        const startX = Math.floor((this.camera.x / this.camera.zoom) / gridSize) * gridSize;
+        const endX = startX + Math.ceil(rect.width / this.camera.zoom / gridSize) * gridSize + gridSize;
+        const startY = Math.floor((this.camera.y / this.camera.zoom) / gridSize) * gridSize;
+        const endY = startY + Math.ceil(rect.height / this.camera.zoom / gridSize) * gridSize + gridSize;
+        
+        // Adjust opacity based on zoom level
+        const opacity = Math.min(0.15, 0.05 + (this.camera.zoom - 1) * 0.1);
+        this.ctx.strokeStyle = `rgba(0, 168, 255, ${opacity})`;
+        this.ctx.lineWidth = 1 / pixelRatio;
         this.ctx.globalCompositeOperation = 'multiply';
 
         this.ctx.beginPath();
         
-        for (let x = 0.5; x <= rect.width; x += gridSize) {
-            this.ctx.moveTo(Math.floor(x) + 0.5, 0);
-            this.ctx.lineTo(Math.floor(x) + 0.5, rect.height);
+        // Draw vertical lines
+        for (let x = startX; x <= endX; x += gridSize) {
+            this.ctx.moveTo(x, startY);
+            this.ctx.lineTo(x, endY);
         }
 
-        for (let y = 0.5; y <= rect.height; y += gridSize) {
-            this.ctx.moveTo(0, Math.floor(y) + 0.5);
-            this.ctx.lineTo(rect.width, Math.floor(y) + 0.5);
+        // Draw horizontal lines
+        for (let y = startY; y <= endY; y += gridSize) {
+            this.ctx.moveTo(startX, y);
+            this.ctx.lineTo(endX, y);
         }
         
         this.ctx.stroke();
@@ -902,10 +1018,12 @@ class RobotSimulator extends EventEmitter {
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
         
-        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        gradient.addColorStop(0, 'rgba(0, 196, 255, 0.6)');
-        gradient.addColorStop(1, 'rgba(0, 196, 255, 0.2)');
-        this.ctx.strokeStyle = gradient;
+        if (!this.trailGradient) {
+            this.trailGradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+            this.trailGradient.addColorStop(0, 'rgba(0, 196, 255, 0.6)');
+            this.trailGradient.addColorStop(1, 'rgba(0, 196, 255, 0.2)');
+        }
+        this.ctx.strokeStyle = this.trailGradient;
         
         this.ctx.beginPath();
         
@@ -951,13 +1069,15 @@ class RobotSimulator extends EventEmitter {
         }
         this.ctx.fill();
 
-        // Robot body gradient
-        const gradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
-        gradient.addColorStop(0, '#00c4ff');
-        gradient.addColorStop(0.5, '#0099cc');
-        gradient.addColorStop(1, '#006ba3');
+        // Robot body gradient (cached for performance)
+        if (!this.robotGradient) {
+            this.robotGradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
+            this.robotGradient.addColorStop(0, '#00c4ff');
+            this.robotGradient.addColorStop(0.5, '#0099cc');
+            this.robotGradient.addColorStop(1, '#006ba3');
+        }
         
-        this.ctx.fillStyle = gradient;
+        this.ctx.fillStyle = this.robotGradient;
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         this.ctx.lineWidth = 1;
         this.ctx.beginPath();
@@ -1012,12 +1132,16 @@ class RobotSimulator extends EventEmitter {
         this.ctx.fill();
         this.ctx.stroke();
 
-        // Arm shaft with gradient
-        const armGradient = this.ctx.createLinearGradient(0, -2, 0, 2);
-        armGradient.addColorStop(0, color);
-        armGradient.addColorStop(1, this.darkenColor(color, 0.7));
+        // Arm shaft with gradient (cached for performance)
+        const gradientKey = `arm_${color}`;
+        if (!this.armGradients) this.armGradients = {};
+        if (!this.armGradients[gradientKey]) {
+            this.armGradients[gradientKey] = this.ctx.createLinearGradient(0, -2, 0, 2);
+            this.armGradients[gradientKey].addColorStop(0, color);
+            this.armGradients[gradientKey].addColorStop(1, this.darkenColor(color, 0.7));
+        }
         
-        this.ctx.strokeStyle = armGradient;
+        this.ctx.strokeStyle = this.armGradients[gradientKey];
         this.ctx.lineWidth = 4;
         this.ctx.lineCap = 'round';
         this.ctx.beginPath();
@@ -1052,7 +1176,7 @@ class RobotSimulator extends EventEmitter {
     drawInfo() {
         // Info panel background
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(10, 10, 220, 120);
+        this.ctx.fillRect(10, 10, 220, 135);
 
         // Info text
         this.ctx.fillStyle = '#ffffff';
@@ -1067,6 +1191,7 @@ class RobotSimulator extends EventEmitter {
             `Turn Rate: ${Math.round(this.velocity.angular)}`,
             `Arm 1: ${Math.round(this.arm1Angle)}°`,
             `Arm 2: ${Math.round(this.arm2Angle)}°`,
+            `Zoom: ${Math.round(this.camera.zoom * 100)}%`,
             `Trail: ${this.showTrail ? 'ON' : 'OFF'}`
         ];
 
@@ -1127,10 +1252,32 @@ class RobotSimulator extends EventEmitter {
         this.targetArm1Speed = 0;
         this.targetArm2Speed = 0;
         this.trail = [];
+        
+        // Reset camera
+        this.camera.x = 0;
+        this.camera.y = 0;
+        this.camera.zoom = 1;
+        this.camera.smoothZoom = 1;
+        this.camera.targetZoom = 1;
     }
 
     clamp(value, min, max) {
         return Math.min(Math.max(value, min), max);
+    }
+
+    isRobotVisible(rect) {
+        const margin = 100;
+        const robotSize = 40;
+        
+        // Transform robot world position to screen position
+        const screenX = (this.robotX * this.camera.zoom) - this.camera.x;
+        const screenY = (this.robotY * this.camera.zoom) - this.camera.y;
+        
+        // Check if robot is within visible area (with margin for performance)
+        return (screenX + robotSize >= -margin && 
+                screenX - robotSize <= rect.width + margin &&
+                screenY + robotSize >= -margin && 
+                screenY - robotSize <= rect.height + margin);
     }
 
     destroy() {
@@ -1142,8 +1289,8 @@ class RobotSimulator extends EventEmitter {
             this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
             this.canvas.removeEventListener('mouseup', this.mouseUpHandler);
             this.canvas.removeEventListener('wheel', this.wheelHandler);
-            this.canvas.removeEventListener('touchstart', this.touchHandler);
-            this.canvas.removeEventListener('touchmove', this.touchHandler);
+            this.canvas.removeEventListener('touchstart', this.touchStartHandler);
+            this.canvas.removeEventListener('touchmove', this.touchMoveHandler);
         }
         
         // Clean up resize observer
@@ -1399,6 +1546,9 @@ class FLLRoboticsApp extends EventEmitter {
         document.getElementById('uploadMapBtn')?.addEventListener('click', () => this.uploadMap());
         document.getElementById('resetSimBtn')?.addEventListener('click', () => this.resetSimulator());
         document.getElementById('fullscreenSimBtn')?.addEventListener('click', () => this.toggleSimulatorFullscreen());
+        document.getElementById('zoomInBtn')?.addEventListener('click', () => this.zoomSimulator(1.5));
+        document.getElementById('zoomOutBtn')?.addEventListener('click', () => this.zoomSimulator(1/1.5));
+        document.getElementById('zoomResetBtn')?.addEventListener('click', () => this.resetSimulatorZoom());
         
         // Emergency controls
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
@@ -1839,11 +1989,30 @@ class FLLRoboticsApp extends EventEmitter {
                     // Re-setup simulator if it doesn't exist
                     this.setupRobotSimulator();
                 }
+                this.enableSimulatorControls(true);
             }, 10);
         } else {
             simulatorSection.classList.add('hidden');
             this.robotSimulator?.stop();
+            this.enableSimulatorControls(false);
         }
+    }
+
+    enableSimulatorControls(enabled) {
+        const controls = [
+            'resetSimBtn',
+            'uploadMapBtn',
+            'zoomInBtn',
+            'zoomOutBtn',
+            'zoomResetBtn'
+        ];
+        
+        controls.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.disabled = !enabled;
+            }
+        });
     }
 
     updateConfigurationUI() {
@@ -2122,6 +2291,44 @@ if __name__ == "__main__":
                 this.toastManager.show(`Fullscreen not supported: ${err.message}`, 'error');
             });
         }
+    }
+
+    resetSimulator() {
+        if (!this.robotSimulator) {
+            this.toastManager.show('Simulator not available', 'warning');
+            return;
+        }
+        
+        this.robotSimulator.reset();
+        this.toastManager.show('Simulator reset', 'success');
+        this.logger.log('Simulator position reset');
+    }
+
+    zoomSimulator(factor) {
+        if (!this.robotSimulator) {
+            this.toastManager.show('Simulator not available', 'warning');
+            return;
+        }
+        
+        const newZoom = this.robotSimulator.camera.targetZoom * factor;
+        const clampedZoom = Math.max(this.robotSimulator.camera.minZoom, 
+            Math.min(this.robotSimulator.camera.maxZoom, newZoom));
+        
+        this.robotSimulator.camera.targetZoom = clampedZoom;
+        this.logger.log(`Simulator zoom set to ${Math.round(clampedZoom * 100)}%`);
+    }
+
+    resetSimulatorZoom() {
+        if (!this.robotSimulator) {
+            this.toastManager.show('Simulator not available', 'warning');
+            return;
+        }
+        
+        this.robotSimulator.camera.targetZoom = 1;
+        this.robotSimulator.camera.x = 0;
+        this.robotSimulator.camera.y = 0;
+        this.toastManager.show('Zoom reset to 100%', 'success');
+        this.logger.log('Simulator zoom and camera reset');
     }
 
     closeWindow() {
