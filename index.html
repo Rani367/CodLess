@@ -359,7 +359,6 @@
                 <div class="config-tabs" role="tablist">
                     <button class="tab-btn active" onclick="showTab('physical')" role="tab" aria-controls="physicalTab" aria-selected="true">Physical Parameters</button>
                     <button class="tab-btn" onclick="showTab('movement')" role="tab" aria-controls="movementTab" aria-selected="false">Movement Settings</button>
-                    <button class="tab-btn" onclick="showTab('calibration')" role="tab" aria-controls="calibrationTab" aria-selected="false">Calibration</button>
                     <button class="tab-btn" onclick="showTab('advanced')" role="tab" aria-controls="advancedTab" aria-selected="false">Advanced</button>
                 </div>
 
@@ -438,29 +437,6 @@
                         <div class="config-row">
                             <label for="turnAccel">Turn Acceleration (deg/s²):</label>
                             <input type="number" id="turnAccel" value="300" min="100" max="600" class="config-input">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="calibrationTab" class="tab-content" role="tabpanel">
-                    <div class="config-group">
-                        <h3>Calibration Control</h3>
-                        <p class="calibration-info">
-                            Calibration improves robot accuracy by measuring and compensating for hardware variations.
-                        </p>
-                        <button id="startCalibrationBtn" class="btn btn-warning">
-                            <i class="fas fa-sync" aria-hidden="true"></i>
-                            Start Calibration
-                        </button>
-                        <div id="calibrationProgress" class="progress-container hidden">
-                            <div class="progress-bar">
-                                <div id="progressFill" class="progress-fill"></div>
-                            </div>
-                            <div id="calibrationStep" class="calibration-step">Starting calibration...</div>
-                        </div>
-                        <div id="calibrationResults" class="calibration-results hidden">
-                            <h4>Calibration Results</h4>
-                            <div id="calibrationData"></div>
                         </div>
                     </div>
                 </div>
