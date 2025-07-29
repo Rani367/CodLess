@@ -555,29 +555,7 @@ kbd:hover {
     text-align: center;
 }
 
-.status-bar {
-    height: 40px;
-    background: linear-gradient(135deg, #232323 0%, #1a1a1a 100%);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0 20px;
-    display: flex;
-    align-items: center;
-    backdrop-filter: blur(10px);
-}
 
-.status-content {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    font-size: 12px;
-}
-
-.status-content span:first-child {
-    color: #b0b0b0;
-}
-
-.status-content span:last-child {
-    color: #ffffff;
     font-weight: 500;
 }
 
@@ -808,6 +786,18 @@ kbd:hover {
     color: #28a745;
     margin-bottom: 12px;
     font-size: 14px;
+}
+
+.calibration-metric {
+    margin-bottom: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.calibration-metric strong {
+    color: #00a8ff;
 }
 
 .modal-footer {
@@ -1118,33 +1108,7 @@ kbd:hover {
     }
 }
 
-/* Enhanced Status Bar */
-.status-bar {
-    height: 40px;
-    background: linear-gradient(135deg, #232323 0%, #1a1a1a 100%);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    backdrop-filter: blur(10px);
-}
 
-.status-content {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    font-size: 12px;
-}
-
-.status-content span:first-child {
-    color: #b0b0b0;
-}
-
-.status-content span:last-child {
-    color: #ffffff;
-    font-weight: 500;
-}
 
 /* Responsive Design */
 @media (max-width: 1200px) {
@@ -1197,12 +1161,7 @@ kbd:hover {
         gap: 8px;
     }
     
-    .status-bar {
-        flex-direction: column;
-        height: auto;
-        padding: 8px 20px;
-        gap: 4px;
-    }
+
 }
 
 @media (max-width: 480px) {
