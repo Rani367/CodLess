@@ -535,6 +535,11 @@ class BLEController extends EventEmitter {
     }
 
     async sendRawCommand(command) {
+        // Handle simulation mode
+        if (this.isSimulatingConnection) {
+            return this.simulateCommand(command);
+        }
+        
         if (!this.characteristic) {
             throw new Error('No characteristic available');
         }
@@ -547,6 +552,40 @@ class BLEController extends EventEmitter {
         buffer.set(data, 1);
 
         await this.characteristic.writeValue(buffer);
+    }
+
+    simulateCommand(command) {
+        // Simulate command execution with realistic delay
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                // Simulate different command responses
+                switch (command.type) {
+                    case 'get_info':
+                        this.emit('hubMessage', { message: 'Simulated Pybricks Hub v3.2.0' });
+                        break;
+                    case 'get_battery':
+                        // Battery info is handled by the simulated battery monitoring
+                        break;
+                    case 'emergency_stop':
+                        this.emit('hubMessage', { message: 'Emergency stop activated (simulated)' });
+                        break;
+                    case 'drive_straight':
+                    case 'turn':
+                    case 'stop':
+                    case 'arm_move':
+                        // Simulate movement commands with realistic execution time
+                        const duration = command.distance ? Math.abs(command.distance) * 2 : 100;
+                        setTimeout(() => {
+                            this.emit('hubMessage', { message: 'ok' });
+                        }, Math.min(duration, 3000)); // Cap at 3 seconds
+                        break;
+                    default:
+                        this.emit('hubMessage', { message: 'ok' });
+                        break;
+                }
+                resolve();
+            }, 10 + Math.random() * 40); // 10-50ms delay to simulate network latency
+        });
     }
 
     handleIncomingData(event) {
@@ -1247,6 +1286,9 @@ class FLLRoboticsApp extends EventEmitter {
         // Auto-save
         this.autoSaveTimer = null;
         
+        // Simulation
+        this.simulatedBatteryInterval = null;
+        
         // Note: init() will be called explicitly after construction
     }
 
@@ -1479,6 +1521,70 @@ class FLLRoboticsApp extends EventEmitter {
             // If there's a critical error, offer to reset all data
             this.clearCorruptedData();
         }
+        
+        // Apply simulation state after loading config
+        this.applySimulationState();
+    }
+
+    applySimulationState() {
+        // Apply simulation state based on current config
+        if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // Start simulation
+            this.bleController.isSimulatingConnection = true;
+            this.bleController.connected = true;
+            this.updateConnectionUI('connected', 'Simulated Robot');
+            this.toastManager.show('Simulation mode activated', 'info');
+            this.logger.log('Simulation mode activated', 'info');
+            
+            // Start simulated battery monitoring
+            this.startSimulatedBatteryMonitoring();
+            
+            // Show visual simulator
+            this.updateSimulatorVisibility();
+        } else if (!this.config.simulateConnected && this.bleController.isSimulatingConnection) {
+            // Stop simulation
+            this.bleController.isSimulatingConnection = false;
+            this.bleController.connected = false;
+            this.updateConnectionUI('disconnected');
+            this.toastManager.show('Simulation mode deactivated', 'info');
+            this.logger.log('Simulation mode deactivated', 'info');
+            
+            // Stop simulated battery monitoring
+            this.stopSimulatedBatteryMonitoring();
+            
+            // Hide visual simulator if not in developer mode
+            this.updateSimulatorVisibility();
+        } else if (this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // User wants simulation but is connected to real robot - show warning
+            this.toastManager.show('Disconnect from real robot first to enable simulation mode', 'warning');
+        } else if (!this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // Real robot connected, simulation disabled - just update UI to reflect current state
+            this.updateConnectionUI('connected', this.bleController.device?.name || 'Pybricks Hub');
+        }
+    }
+
+    startSimulatedBatteryMonitoring() {
+        // Simulate battery updates - keep at 100% for testing purposes
+        if (this.simulatedBatteryInterval) {
+            clearInterval(this.simulatedBatteryInterval);
+        }
+        
+        this.simulatedBatteryInterval = setInterval(() => {
+            if (this.bleController.isSimulatingConnection) {
+                // Emit battery update event - always 100% for testing
+                this.bleController.emit('batteryUpdate', {
+                    level: 100,
+                    voltage: 8.4 // Full battery voltage
+                });
+            }
+        }, 10000); // Update every 10 seconds
+    }
+
+    stopSimulatedBatteryMonitoring() {
+        if (this.simulatedBatteryInterval) {
+            clearInterval(this.simulatedBatteryInterval);
+            this.simulatedBatteryInterval = null;
+        }
     }
 
     // Helper method to clear potentially corrupted localStorage data
@@ -1672,12 +1778,24 @@ class FLLRoboticsApp extends EventEmitter {
             this.updateConnectionUI('disconnected');
             this.toastManager.show('Hub disconnected', 'warning');
             this.logger.log('Hub disconnected', 'warning');
+            
+            // Stop recording if in progress when disconnected
+            if (this.isRecording) {
+                this.stopRecording();
+                this.toastManager.show('Recording stopped due to disconnection', 'warning');
+            }
         });
 
         this.bleController.on('connectionError', (data) => {
             this.updateConnectionUI('error');
             this.toastManager.show(`Connection failed: ${data.error}`, 'error');
             this.logger.log(`Connection failed: ${data.error}`, 'error');
+            
+            // Stop recording if in progress when connection fails
+            if (this.isRecording) {
+                this.stopRecording();
+                this.toastManager.show('Recording stopped due to connection error', 'warning');
+            }
             
             // Show troubleshooting help after multiple failed attempts
             if (data.attempt >= 3) {
@@ -1808,6 +1926,8 @@ class FLLRoboticsApp extends EventEmitter {
             } else if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
                 await this.bleController.sendCommand(compensatedCommand);
             } else if (this.bleController.isSimulatingConnection) {
+                // Send to visual simulator if available
+                this.robotSimulator?.updateCommand(compensatedCommand);
                 this.logger.log(`SIMULATED: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
             }
             
@@ -1903,6 +2023,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.bleController.isSimulatingConnection = true;
             this.bleController.connected = true;
             this.updateConnectionUI('connected', 'Simulated Robot');
+            this.startSimulatedBatteryMonitoring();
             this.toastManager.show('Simulated connection established', 'success');
             this.logger.log('Simulated connection established', 'success');
             return;
@@ -1911,6 +2032,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.bleController.isSimulatingConnection = false;
             this.bleController.connected = false;
             this.updateConnectionUI('disconnected');
+            this.stopSimulatedBatteryMonitoring();
             this.toastManager.show('Simulated connection terminated', 'info');
             this.logger.log('Simulated connection terminated', 'info');
             return;
@@ -1993,6 +2115,8 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
         this.updateDeveloperModeCheckbox();
+        // Initialize recording controls based on current connection status
+        this.enableRecordingControls(this.isRobotConnected());
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
@@ -2010,6 +2134,7 @@ class FLLRoboticsApp extends EventEmitter {
             const reason = !navigator.bluetooth ? 'Browser not supported' : 'HTTPS required';
             hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Bluetooth Unavailable - ${reason}</span>`;
             if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}`;
+            this.enableRecordingControls(false);
             return;
         }
         
@@ -2020,29 +2145,61 @@ class FLLRoboticsApp extends EventEmitter {
                 hubStatus.className = 'status-indicator connecting';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Connecting...</span>';
                 if (connectionStatus) connectionStatus.textContent = 'Connecting';
+                this.enableRecordingControls(false);
                 break;
                 
             case 'connected':
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Disconnect Hub';
+                // Show different button text for simulation vs real connection
+                if (this.bleController.isSimulatingConnection) {
+                    connectBtn.innerHTML = '<i class="fas fa-robot" aria-hidden="true"></i> Stop Simulation';
+                } else {
+                    connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Disconnect Hub';
+                }
                 connectBtn.disabled = false;
-                hubStatus.className = 'status-indicator connected';
+                // Use simulation styling if in simulation mode
+                if (this.bleController.isSimulatingConnection) {
+                    hubStatus.className = 'status-indicator connected simulated';
+                } else {
+                    hubStatus.className = 'status-indicator connected';
+                }
                 hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Connected${deviceName ? ` - ${deviceName}` : ''}</span>`;
                 if (connectionStatus) connectionStatus.textContent = `Connected${deviceName ? ` - ${deviceName}` : ''}`;
+                this.enableRecordingControls(true);
                 break;
                 
             case 'error':
             case 'disconnected':
             default:
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                // Show different button text based on simulation config
+                if (this.config.simulateConnected) {
+                    connectBtn.innerHTML = '<i class="fas fa-robot" aria-hidden="true"></i> Start Simulation';
+                } else {
+                    connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                }
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator disconnected';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
                 if (connectionStatus) connectionStatus.textContent = 'Disconnected';
+                this.enableRecordingControls(false);
                 break;
         }
     }
 
-
+    enableRecordingControls(enabled) {
+        const recordBtn = document.getElementById('recordBtn');
+        const runNameInput = document.getElementById('runNameInput');
+        
+        if (recordBtn) {
+            recordBtn.disabled = !enabled;
+        }
+        
+        if (runNameInput) {
+            runNameInput.disabled = !enabled;
+        }
+        
+        // Note: saveBtn is managed separately based on recording state
+        // pauseBtn is managed separately and is hidden by default
+    }
 
     updateRunsList() {
         try {
@@ -2078,7 +2235,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!simulatorSection) return;
         
-        if (this.isDeveloperMode) {
+        // Show simulator in developer mode OR when simulation mode is active
+        if (this.isDeveloperMode || this.bleController.isSimulatingConnection) {
             simulatorSection.classList.remove('hidden');
             
             // Give the DOM time to update before starting simulator
@@ -2252,8 +2410,8 @@ class FLLRoboticsApp extends EventEmitter {
         const recordBtn = document.getElementById('recordBtn');
         if (recordBtn) {
             recordBtn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i> Stop Recording';
-            recordBtn.classList.remove('btn-primary');
-            recordBtn.classList.add('btn-danger');
+            recordBtn.classList.remove('btn-danger');
+            recordBtn.classList.add('btn-primary');
         }
         
         this.toastManager.show('🔴 Recording started - all robot movements will be captured', 'info');
@@ -2270,9 +2428,9 @@ class FLLRoboticsApp extends EventEmitter {
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
         if (recordBtn) {
-            recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Start Recording';
-            recordBtn.classList.remove('btn-danger');
-            recordBtn.classList.add('btn-primary');
+            recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Record Run';
+            recordBtn.classList.remove('btn-primary');
+            recordBtn.classList.add('btn-danger');
         }
         
         const duration = (Date.now() - this.recordingStartTime) / 1000;
@@ -3249,6 +3407,8 @@ function saveConfiguration() {
         
         if (errors.length === 0) {
             window.app.saveUserData();
+            // Apply simulation state immediately after saving config
+            window.app.applySimulationState();
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');
             window.app.logger.log('Configuration updated', 'success');
