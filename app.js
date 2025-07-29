@@ -2014,190 +2014,325 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     generateHubCode() {
-        return `#!/usr/bin/env micropython
-# CodLess FLL Competition Robot Code v${APP_CONFIG.VERSION}
-# Generated: ${new Date().toISOString()}
-# Compatible with Pybricks firmware
-
-from pybricks.hubs import PrimeHub
+        // Get saved runs for competition code generation
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        
+        if (savedRuns.length === 0) {
+            // Generate basic hub control code if no saved runs
+            return `from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor
-from pybricks.parameters import Port, Direction, Stop, Color, Button
+from pybricks.parameters import Port, Color
+from pybricks.robotics import DriveBase
 from pybricks.tools import wait
-from pybricks.media.ev3dev import SoundFile, ImageFile
-import json
+from usys import stdin, stdout
+from uselect import poll
+import ujson
 
-# Initialize the hub
 hub = PrimeHub()
 
-# Robot Configuration - Update these ports to match your robot
-LEFT_MOTOR = Motor(Port.${this.config.leftMotorPort})
-RIGHT_MOTOR = Motor(Port.${this.config.rightMotorPort})
-ARM1_MOTOR = Motor(Port.${this.config.arm1MotorPort})
-ARM2_MOTOR = Motor(Port.${this.config.arm2MotorPort})
+hub.display.icon([
+    [100, 100, 100, 100, 100],
+    [100, 0, 100, 0, 100], 
+    [100, 100, 100, 100, 100],
+    [100, 0, 0, 0, 100],
+    [100, 100, 100, 100, 100]
+])
 
-# Competition mission functions
-def run_mission_1():
-    """Mission 1: Forward and back"""
-    print("Running Mission 1")
-    hub.light.on(Color.BLUE)
+motors = {}
+drive_base = None
+
+left_motor_port = Port.${this.config.leftMotorPort}
+right_motor_port = Port.${this.config.rightMotorPort}
+arm1_motor_port = Port.${this.config.arm1MotorPort}
+arm2_motor_port = Port.${this.config.arm2MotorPort}
+
+try:
+    left_motor = Motor(left_motor_port)
+    right_motor = Motor(right_motor_port)
+    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})
     
-    # Drive forward
-    LEFT_MOTOR.run(300)
-    RIGHT_MOTOR.run(300)
-    wait(2000)
+    drive_base.settings(
+        straight_speed=${this.config.straightSpeed},
+        straight_acceleration=${this.config.straightAcceleration},
+        turn_rate=${this.config.turnRate},
+        turn_acceleration=${this.config.turnAcceleration}
+    )
     
-    # Drive backward
-    LEFT_MOTOR.run(-300)
-    RIGHT_MOTOR.run(-300)
-    wait(2000)
-    
-    # Stop
-    LEFT_MOTOR.stop()
-    RIGHT_MOTOR.stop()
     hub.light.on(Color.GREEN)
-    print("Mission 1 Complete")
-
-def run_mission_2():
-    """Mission 2: Turn and arm movement"""
-    print("Running Mission 2")
+except:
     hub.light.on(Color.YELLOW)
-    
-    # Turn left
-    LEFT_MOTOR.run(-200)
-    RIGHT_MOTOR.run(200)
-    wait(1000)
-    
-    # Stop turning
-    LEFT_MOTOR.stop()
-    RIGHT_MOTOR.stop()
-    
-    # Move arm 1
-    ARM1_MOTOR.run_angle(200, 180)
-    wait(500)
-    
-    # Move arm 2
-    ARM2_MOTOR.run_angle(200, -180)
-    wait(500)
-    
-    # Return arms to starting position
-    ARM1_MOTOR.run_angle(200, -180)
-    ARM2_MOTOR.run_angle(200, 180)
-    
-    hub.light.on(Color.GREEN)
-    print("Mission 2 Complete")
 
-def run_mission_3():
-    """Mission 3: Custom mission - Add your own code here"""
-    print("Running Mission 3")
-    hub.light.on(Color.MAGENTA)
-    
-    # Add your custom mission code here
-    # Example: Precision movement
-    LEFT_MOTOR.run_angle(150, 360)  # One full rotation
-    RIGHT_MOTOR.run_angle(150, 360)
-    
-    hub.light.on(Color.GREEN)
-    print("Mission 3 Complete")
+try:
+    motors['arm1'] = Motor(arm1_motor_port)
+except:
+    pass
 
-def emergency_stop():
-    """Emergency stop all motors"""
-    print("Emergency Stop!")
-    hub.light.on(Color.RED)
-    
-    LEFT_MOTOR.stop(Stop.BRAKE)
-    RIGHT_MOTOR.stop(Stop.BRAKE)
-    ARM1_MOTOR.stop(Stop.BRAKE)
-    ARM2_MOTOR.stop(Stop.BRAKE)
-    
-    # Sound alert
-    hub.speaker.beep(frequency=880, duration=200)
+try:
+    motors['arm2'] = Motor(arm2_motor_port)
+except:
+    pass
 
-# Bluetooth communication handler for remote control
-def handle_remote_command(command_data):
-    """Handle commands from the remote control app"""
+keyboard = poll()
+keyboard.register(stdin)
+
+hub.display.icon([
+    [0, 100, 0, 100, 0],
+    [100, 100, 100, 100, 100],
+    [0, 100, 100, 100, 0],
+    [0, 0, 100, 0, 0],
+    [0, 0, 100, 0, 0]
+])
+
+while True:
+    stdout.buffer.write(b"rdy")
+    
+    while not keyboard.poll(10):
+        wait(1)
+    
     try:
-        command = json.loads(command_data.decode())
-        cmd_type = command.get("type", "")
-        
-        if cmd_type == "mission1":
-            run_mission_1()
-        elif cmd_type == "mission2":
-            run_mission_2()
-        elif cmd_type == "mission3":
-            run_mission_3()
-        elif cmd_type == "emergency_stop":
-            emergency_stop()
-        elif cmd_type == "drive":
-            speed = command.get("speed", 0)
-            turn_rate = command.get("turn_rate", 0)
-            left_speed = speed - turn_rate
-            right_speed = speed + turn_rate
-            LEFT_MOTOR.run(left_speed)
-            RIGHT_MOTOR.run(right_speed)
-        elif cmd_type == "arm1":
-            speed = command.get("speed", 0)
-            if speed == 0:
-                ARM1_MOTOR.stop()
-            else:
-                ARM1_MOTOR.run(speed)
-        elif cmd_type == "arm2":
-            speed = command.get("speed", 0)
-            if speed == 0:
-                ARM2_MOTOR.stop()
-            else:
-                ARM2_MOTOR.run(speed)
+        data = stdin.buffer.read()
+        if data:
+            command_str = data.decode('utf-8')
+            command = ujson.loads(command_str)
+            
+            cmd_type = command.get('type', '')
+            
+            if cmd_type == 'drive' and drive_base:
+                speed = command.get('speed', 0)
+                turn_rate = command.get('turn_rate', 0)
+                drive_base.drive(speed, turn_rate)
+                stdout.buffer.write(b"DRIVE_OK")
                 
-        return "ok"
+            elif cmd_type in ['arm1', 'arm2'] and cmd_type in motors:
+                motor = motors[cmd_type]
+                speed = command.get('speed', 0)
+                if speed == 0:
+                    motor.stop()
+                else:
+                    motor.run(speed)
+                stdout.buffer.write(b"ARM_OK")
+                
+            elif cmd_type == 'config':
+                try:
+                    axle_track = command.get('axle_track', ${this.config.axleTrack})
+                    wheel_diameter = command.get('wheel_diameter', ${this.config.wheelDiameter})
+                    if drive_base:
+                        drive_base = DriveBase(left_motor, right_motor, 
+                                             wheel_diameter=wheel_diameter, 
+                                             axle_track=axle_track)
+                        
+                        straight_speed = command.get('straight_speed', ${this.config.straightSpeed})
+                        straight_acceleration = command.get('straight_acceleration', ${this.config.straightAcceleration})
+                        turn_rate = command.get('turn_rate', ${this.config.turnRate})
+                        turn_acceleration = command.get('turn_acceleration', ${this.config.turnAcceleration})
+                        
+                        drive_base.settings(
+                            straight_speed=straight_speed,
+                            straight_acceleration=straight_acceleration,
+                            turn_rate=turn_rate,
+                            turn_acceleration=turn_acceleration
+                        )
+                        
+                    stdout.buffer.write(b"CONFIG_OK")
+                except:
+                    stdout.buffer.write(b"CONFIG_ERROR")
+            else:
+                stdout.buffer.write(b"UNKNOWN_CMD")
+                
     except Exception as e:
-        return f"error: {str(e)}"
+        stdout.buffer.write(b"ERROR")
+    
+    wait(10)`;
+        }
 
-# Main program
-def main():
-    print("CodLess FLL Robot Ready!")
-    hub.light.on(Color.WHITE)
-    
-    # Send ready signal for Bluetooth communication
-    if hub.ble.char_write:
-        hub.ble.char_write(b"ready")
-    
-    print("Press hub buttons to run missions:")
-    print("Left button: Mission 1")
-    print("Center button: Mission 2") 
-    print("Right button: Mission 3")
-    print("Connect via Bluetooth for remote control")
-    
-    while True:
-        # Check for button presses on the hub
-        pressed_buttons = hub.buttons.pressed()
-        
-        if Button.LEFT in pressed_buttons:
-            run_mission_1()
-            wait(500)  # Debounce
-            
-        elif Button.CENTER in pressed_buttons:
-            run_mission_2()
-            wait(500)  # Debounce
-            
-        elif Button.RIGHT in pressed_buttons:
-            run_mission_3()
-            wait(500)  # Debounce
-            
-        # Check for Bluetooth commands
-        if hub.ble.char_read:
-            try:
-                data = hub.ble.char_read()
-                if data:
-                    response = handle_remote_command(data)
-                    hub.ble.char_write(response.encode())
-            except:
-                pass  # Continue if Bluetooth not connected
-        
-        wait(50)  # Small delay to prevent excessive CPU usage
+        // Generate competition code with saved runs
+                 const codeLines = [
+             "from pybricks.hubs import PrimeHub",
+             "from pybricks.pupdevices import Motor",
+             "from pybricks.parameters import Port, Color, Button",
+             "from pybricks.robotics import DriveBase",
+             "from pybricks.tools import wait",
+             "",
+             "# --- ROBOT SETUP ---",
+             "hub = PrimeHub()",
+            "",
+            "# Initialize motors and drive base",
+            `left_motor = Motor(Port.${this.config.leftMotorPort})`,
+            `right_motor = Motor(Port.${this.config.rightMotorPort})`,
+            `drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})`,
+            "",
+            "# Configure drive base settings",
+            "drive_base.settings(",
+            `    straight_speed=${this.config.straightSpeed},`,
+            `    straight_acceleration=${this.config.straightAcceleration},`,
+            `    turn_rate=${this.config.turnRate},`,
+            `    turn_acceleration=${this.config.turnAcceleration}`,
+            ")",
+            "",
+            "# Initialize arm motors",
+            `arm1_motor = Motor(Port.${this.config.arm1MotorPort})`,
+            `arm2_motor = Motor(Port.${this.config.arm2MotorPort})`,
+            "",
+            "# --- HELPER FUNCTIONS ---",
+            "def move_forward(speed, duration_ms):",
+            "    drive_base.drive(speed, 0)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def move_backward(speed, duration_ms):",
+            "    drive_base.drive(-speed, 0)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def turn_left(angle, duration_ms):",
+            "    drive_base.drive(0, -angle)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def turn_right(angle, duration_ms):",
+            "    drive_base.drive(0, angle)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def arm1_up(speed, duration_ms):",
+            "    arm1_motor.run(speed)",
+            "    wait(duration_ms)",
+            "    arm1_motor.stop()",
+            "",
+            "def arm1_down(speed, duration_ms):",
+            "    arm1_motor.run(-speed)",
+            "    wait(duration_ms)",
+            "    arm1_motor.stop()",
+            "",
+            "def arm2_up(speed, duration_ms):",
+            "    arm2_motor.run(speed)",
+            "    wait(duration_ms)",
+            "    arm2_motor.stop()",
+            "",
+            "def arm2_down(speed, duration_ms):",
+            "    arm2_motor.run(-speed)",
+            "    wait(duration_ms)",
+            "    arm2_motor.stop()",
+            "",
+            "# --- RUN FUNCTIONS ---"
+        ];
 
-# Run the main program
-if __name__ == "__main__":
-    main()
-`;
+        // Generate run functions from saved runs
+        const runFunctions = [];
+        const runsDict = [];
+
+        savedRuns.forEach((run, index) => {
+            const funcName = `run_${index + 1}`;
+            const funcLines = [`def ${funcName}():`];
+            funcLines.push(`    # ${run.name}`);
+            
+            if (run.commands && run.commands.length > 0) {
+                run.commands.forEach(cmd => {
+                    const cmdType = cmd.command_type || cmd.type;
+                    const params = cmd.parameters || cmd;
+                    const duration = params.duration ? Math.round(params.duration * 1000) : 0;
+
+                    if (cmdType === "drive") {
+                        const speed = params.speed || 0;
+                        const turnRate = params.turn_rate || 0;
+
+                        if (speed !== 0 || turnRate !== 0) {
+                            funcLines.push(`    drive_base.drive(${speed}, ${turnRate})`);
+                            if (duration > 0) {
+                                funcLines.push(`    wait(${duration})`);
+                            }
+                            funcLines.push("    drive_base.stop()");
+                        } else {
+                            funcLines.push("    drive_base.stop()");
+                        }
+
+                    } else if (cmdType === "arm1") {
+                        const speed = params.speed || 0;
+                        if (speed !== 0) {
+                            funcLines.push(`    arm1_motor.run(${speed})`);
+                            if (duration > 0) {
+                                funcLines.push(`    wait(${duration})`);
+                            }
+                            funcLines.push("    arm1_motor.stop()");
+                        } else {
+                            funcLines.push("    arm1_motor.stop()");
+                        }
+
+                    } else if (cmdType === "arm2") {
+                        const speed = params.speed || 0;
+                        if (speed !== 0) {
+                            funcLines.push(`    arm2_motor.run(${speed})`);
+                            if (duration > 0) {
+                                funcLines.push(`    wait(${duration})`);
+                            }
+                            funcLines.push("    arm2_motor.stop()");
+                        } else {
+                            funcLines.push("    arm2_motor.stop()");
+                        }
+                    }
+                });
+            } else {
+                funcLines.push("    # No commands recorded for this run");
+                funcLines.push("    pass");
+            }
+
+            funcLines.push("    wait(100)");
+
+            runFunctions.push(...funcLines, "");
+            runsDict.push(`    ${index + 1}: ${funcName},  # ${run.name}`);
+        });
+
+        codeLines.push(...runFunctions);
+
+        codeLines.push(
+            "# --- MAIN EXECUTION ---",
+            "",
+            "runs = {",
+            ...runsDict,
+            "}",
+            "",
+            `# Use hub buttons to select runs (1-${savedRuns.length})`,
+            "hub.light.on(Color.WHITE)",
+            "",
+            "while True:",
+            "    pressed_buttons = hub.buttons.pressed()",
+            ""
+        );
+
+        // Add button selection logic
+        savedRuns.forEach((run, index) => {
+            const runNumber = index + 1;
+            let buttonCheck;
+            
+            if (runNumber === 1) {
+                buttonCheck = "if Button.LEFT in pressed_buttons:";
+            } else if (runNumber === 2) {
+                buttonCheck = "elif Button.CENTER in pressed_buttons:";
+            } else if (runNumber === 3) {
+                buttonCheck = "elif Button.RIGHT in pressed_buttons:";
+            } else {
+                // For more than 3 runs, use multiple button presses
+                buttonCheck = `elif len(pressed_buttons) == ${Math.min(runNumber - 3, 3)}:  # ${runNumber} button presses`;
+            }
+
+            codeLines.push(
+                `    ${buttonCheck}`,
+                `        hub.light.on(Color.BLUE)`,
+                `        runs[${runNumber}]()  # ${run.name}`,
+                `        hub.light.on(Color.GREEN)`,
+                `        wait(1000)  # Prevent multiple runs`,
+                ""
+            );
+        });
+
+        codeLines.push(
+            "    wait(50)  # Small delay for button polling",
+            "",
+            "# --- END OF COMPETITION CODE ---"
+        );
+
+        return codeLines.join('\n');
+    }
     }
 
     uploadToHub() {
