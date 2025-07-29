@@ -414,7 +414,7 @@ class BLEController extends EventEmitter {
             
             // Handle specific Bluetooth errors with user-friendly messages
             if (error.name === 'NotFoundError') {
-                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running the provided code.';
+                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and in range.';
             } else if (error.name === 'NotAllowedError') {
                 errorMessage = 'Bluetooth access was denied. Please allow Bluetooth access and try again.';
             } else if (error.name === 'SecurityError') {
