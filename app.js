@@ -1282,6 +1282,8 @@ class FLLRoboticsApp extends EventEmitter {
         // Control state
         this.pressedKeys = new Set();
         this.emergencyStopActive = false;
+        this.lastArm1Speed = 0;
+        this.lastArm2Speed = 0;
         
         // Auto-save
         this.autoSaveTimer = null;
@@ -1902,7 +1904,7 @@ class FLLRoboticsApp extends EventEmitter {
     processMovementKeys() {
         if (this.emergencyStopActive) return;
         
-        // Calculate drive command
+        // Process drive commands - always send to handle both movement and stopping
         let speed = 0;
         let turn = 0;
         
@@ -1913,7 +1915,7 @@ class FLLRoboticsApp extends EventEmitter {
         
         this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
         
-        // Calculate arm commands
+        // Process arm commands independently - only send when there's a change
         let arm1Speed = 0;
         let arm2Speed = 0;
         
@@ -1922,8 +1924,16 @@ class FLLRoboticsApp extends EventEmitter {
         if (this.pressedKeys.has('r')) arm2Speed = 200;
         if (this.pressedKeys.has('f')) arm2Speed = -200;
         
-        this.sendRobotCommand({ type: 'arm1', speed: arm1Speed });
-        this.sendRobotCommand({ type: 'arm2', speed: arm2Speed });
+        // Only send arm commands when their speed actually changes
+        if (this.lastArm1Speed !== arm1Speed) {
+            this.sendRobotCommand({ type: 'arm1', speed: arm1Speed });
+            this.lastArm1Speed = arm1Speed;
+        }
+        
+        if (this.lastArm2Speed !== arm2Speed) {
+            this.sendRobotCommand({ type: 'arm2', speed: arm2Speed });
+            this.lastArm2Speed = arm2Speed;
+        }
     }
 
     async sendRobotCommand(command) {
@@ -2106,6 +2116,10 @@ class FLLRoboticsApp extends EventEmitter {
     emergencyStop() {
         this.emergencyStopActive = true;
         this.pressedKeys.clear();
+        
+        // Reset arm speed tracking
+        this.lastArm1Speed = 0;
+        this.lastArm2Speed = 0;
         
         // Send emergency stop command
         this.sendRobotCommand({ type: 'emergency_stop' });
