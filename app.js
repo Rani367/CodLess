@@ -1651,7 +1651,9 @@ class FLLRoboticsApp extends EventEmitter {
     saveUserData() {
         try {
             localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config));
-            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(Object.fromEntries(this.savedRuns)));
+            // Use array format for consistency
+            const savedRunsArray = this.getSavedRunsArray();
+            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRunsArray));
             localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
                 developerMode: this.isDeveloperMode
             }));
@@ -2456,12 +2458,34 @@ class FLLRoboticsApp extends EventEmitter {
             return;
         }
 
-        const name = prompt('Enter a name for this run:');
-        if (!name) return;
+        // Get name from input field instead of prompt
+        const runNameInput = document.getElementById('runNameInput');
+        if (!runNameInput) {
+            this.toastManager.show('Run name input not found', 'error');
+            return;
+        }
+
+        const name = runNameInput.value.trim();
+        if (!name) {
+            this.toastManager.show('Please enter a run name', 'warning');
+            runNameInput.focus();
+            return;
+        }
+
+        // Check for duplicate names
+        const savedRuns = this.getSavedRunsArray();
+        const isDuplicate = savedRuns.some(run => run.name.toLowerCase() === name.toLowerCase());
+        
+        if (isDuplicate) {
+            this.toastManager.show(`A run named "${name}" already exists. Please choose a different name.`, 'warning');
+            runNameInput.focus();
+            runNameInput.select();
+            return;
+        }
 
         const run = {
             id: Date.now().toString(),
-            name: name.trim(),
+            name: name,
             commands: this.recordedCommands.map(cmd => ({
                 command_type: cmd.command.type,
                 parameters: {
@@ -2475,7 +2499,6 @@ class FLLRoboticsApp extends EventEmitter {
         };
 
         // Save to localStorage
-        const savedRuns = this.getSavedRunsArray();
         savedRuns.push(run);
         localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
 
@@ -2486,6 +2509,10 @@ class FLLRoboticsApp extends EventEmitter {
         // Disable save button until next recording
         const saveBtn = document.getElementById('saveBtn');
         if (saveBtn) saveBtn.disabled = true;
+
+        // Generate next run name
+        const nextRunNumber = savedRuns.length + 1;
+        runNameInput.value = `Run ${nextRunNumber}`;
 
         this.toastManager.show(`✅ Run "${name}" saved successfully!`, 'success');
         this.logger.log(`Run saved: ${name}`);
@@ -3169,10 +3196,20 @@ while True:
 
                     const savedRuns = this.getSavedRunsArray();
                     
+                    // Generate a unique name for the imported run
+                    let importedName = importData.name + ' (Imported)';
+                    let counter = 1;
+                    
+                    // Check for duplicates and increment counter if needed
+                    while (savedRuns.some(run => run.name.toLowerCase() === importedName.toLowerCase())) {
+                        counter++;
+                        importedName = `${importData.name} (Imported ${counter})`;
+                    }
+                    
                     // Create a new run with imported data
                     const newRun = {
                         id: 'run_' + Date.now(),
-                        name: importData.name + ' (Imported)',
+                        name: importedName,
                         description: importData.description || '',
                         commands: importData.commands,
                         duration: importData.duration || 0,
@@ -3475,10 +3512,88 @@ function closeWindow() {
 }
 
 // ============================
+// BROWSER COMPATIBILITY CHECK
+// ============================
+
+function checkBrowserCompatibility() {
+    const userAgent = navigator.userAgent;
+    const isChrome = userAgent.includes('Chrome') && !userAgent.includes('Edge');
+    const isEdge = userAgent.includes('Edge');
+    const isChromiumBased = isChrome || isEdge;
+    
+    // Check for required features
+    const hasBluetoothSupport = !!navigator.bluetooth;
+    const isSecureContext = window.isSecureContext;
+    
+    return {
+        isSupported: isChromiumBased && hasBluetoothSupport && isSecureContext,
+        browserName: isChrome ? 'Chrome' : isEdge ? 'Edge' : 'Unknown',
+        hasBluetoothSupport,
+        isSecureContext
+    };
+}
+
+function showBrowserNotSupportedMessage() {
+    const loadingScreen = document.getElementById('loadingScreen');
+    if (loadingScreen) {
+        const loadingContent = loadingScreen.querySelector('.loading-content');
+        if (loadingContent) {
+            loadingContent.innerHTML = `
+                <div class="loading-logo">
+                    <i class="fas fa-exclamation-triangle" style="color: #ff4757; font-size: 48px;"></i>
+                </div>
+                <h2 style="color: #ff4757; margin: 20px 0;">Browser Not Supported</h2>
+                <p style="color: #666; margin: 20px 0; max-width: 400px; text-align: center; line-height: 1.5;">
+                    This application requires Chrome or Microsoft Edge with Bluetooth support.
+                </p>
+                <p style="color: #333; margin: 20px 0; font-weight: 500;">
+                    Please visit this app using:
+                </p>
+                <div style="margin: 20px 0;">
+                    <div style="display: inline-block; margin: 0 10px; text-align: center;">
+                        <i class="fab fa-chrome" style="font-size: 32px; color: #4285f4; display: block; margin-bottom: 8px;"></i>
+                        <span style="color: #333; font-size: 14px;">Google Chrome</span>
+                    </div>
+                    <div style="display: inline-block; margin: 0 10px; text-align: center;">
+                        <i class="fab fa-edge" style="font-size: 32px; color: #0078d4; display: block; margin-bottom: 8px;"></i>
+                        <span style="color: #333; font-size: 14px;">Microsoft Edge</span>
+                    </div>
+                </div>
+                <button onclick="location.reload()" style="
+                    background: #00a8ff; 
+                    color: white; 
+                    border: none; 
+                    padding: 12px 24px; 
+                    border-radius: 6px; 
+                    cursor: pointer;
+                    font-size: 14px;
+                    margin-top: 20px;
+                ">
+                    Retry
+                </button>
+            `;
+        }
+    }
+}
+
+// ============================
 // APPLICATION INITIALIZATION
 // ============================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Check browser compatibility first
+    const browserCheck = checkBrowserCompatibility();
+    
+    if (!browserCheck.isSupported) {
+        console.warn('Browser not supported:', {
+            browser: browserCheck.browserName,
+            bluetooth: browserCheck.hasBluetoothSupport,
+            secure: browserCheck.isSecureContext
+        });
+        showBrowserNotSupportedMessage();
+        return;
+    }
+    
     try {
         window.app = new FLLRoboticsApp();
         await window.app.init();
