@@ -704,13 +704,11 @@ class RobotSimulator extends EventEmitter {
         this.maxArmAcceleration = 1000;
         this.motorLag = 0.03;
         
-        // Calibration compensations
-        this.calibrationCompensations = {
-            motor_delay: 0.0,
-            straight_tracking_bias: 0.0,
-            turn_bias: 0.0,
-            motor_balance_difference: 0.0,
-            gyro_drift_rate: 0.0
+        // Simple physics compensations for realistic movement
+        this.physicsCompensations = {
+            motor_delay: 0.02,
+            drift_factor: 0.98,
+            motor_balance: 0.95
         };
         
         // Simulation settings
@@ -970,33 +968,26 @@ class RobotSimulator extends EventEmitter {
     updateRobotPosition(dt) {
         if (Math.abs(this.actualSpeed) > 0.01 || Math.abs(this.actualTurn) > 0.01) {
             const simSpeed = this.actualSpeed * 0.15;
-            const simTurn = this.actualTurn * 0.8;
+            let simTurn = this.actualTurn * 0.8;
 
             // Apply momentum and inertia factors
             const momentumFactor = 1.0 / (1.0 + this.robotMass * 0.1);
             const inertiaFactor = 1.0 / (1.0 + this.robotInertia * 2.0);
 
-            // Apply calibration compensations if available
-            let compensatedTurn = simTurn;
-
-            // Gyro drift compensation
-            if (this.calibrationCompensations?.gyro_drift_rate) {
-                compensatedTurn += this.calibrationCompensations.gyro_drift_rate * dt * 0.1;
-            }
-
-            // Motor balance compensation
-            if (this.calibrationCompensations?.motor_balance_difference && Math.abs(simSpeed) > 0.01) {
-                compensatedTurn += this.calibrationCompensations.motor_balance_difference * simSpeed * 0.05;
+            // Apply simple physics compensations for realism
+            if (Math.abs(simSpeed) > 0.01) {
+                // Slight motor imbalance creates drift when moving straight
+                simTurn += this.physicsCompensations.motor_balance * simSpeed * 0.02;
             }
 
             // Update robot angle with inertia
-            this.robotAngle += compensatedTurn * dt * inertiaFactor;
+            this.robotAngle += simTurn * dt * inertiaFactor;
             this.robotAngle = this.robotAngle % 360;
 
-            // Calculate movement with momentum
+            // Calculate movement with momentum and slight drift factor
             const angleRad = (this.robotAngle * Math.PI) / 180;
-            const dx = simSpeed * Math.cos(angleRad) * dt * momentumFactor;
-            const dy = simSpeed * Math.sin(angleRad) * dt * momentumFactor;
+            const dx = simSpeed * Math.cos(angleRad) * dt * momentumFactor * this.physicsCompensations.drift_factor;
+            const dy = simSpeed * Math.sin(angleRad) * dt * momentumFactor * this.physicsCompensations.drift_factor;
 
             this.robotX += dx;
             this.robotY += dy;
@@ -1279,20 +1270,9 @@ class RobotSimulator extends EventEmitter {
         const cmdType = command.type || "";
         
         if (cmdType === "drive") {
-            let speed = (command.speed || 0) * 1.5;
-            let turnRate = (command.turn_rate || 0) * 1.2;
-            
-            // Apply calibration compensations
-            if (this.calibrationCompensations.straight_tracking_bias !== 0) {
-                speed *= (1.0 + this.calibrationCompensations.straight_tracking_bias);
-            }
-            
-            if (this.calibrationCompensations.turn_bias !== 0) {
-                turnRate *= (1.0 + this.calibrationCompensations.turn_bias);
-            }
-            
-            this.targetSpeed = speed;
-            this.targetTurn = turnRate;
+            // Apply realistic movement scaling like in Python implementation
+            this.targetSpeed = (command.speed || 0) * 1.5;
+            this.targetTurn = (command.turn_rate || 0) * 1.2;
         } else if (cmdType === "arm1") {
             this.targetArm1Speed = (command.speed || 0) * 1.0;
         } else if (cmdType === "arm2") {
@@ -1315,26 +1295,11 @@ class RobotSimulator extends EventEmitter {
         this.backgroundMap = image;
     }
 
-    applyCalibrationData(config) {
-        // Apply calibration compensations from the enhanced calibration system
-        this.calibrationCompensations.motor_delay = config.motor_delay || 0.0;
-        this.calibrationCompensations.straight_tracking_bias = config.straight_tracking_bias || 0.0;
-        this.calibrationCompensations.turn_bias = config.turn_bias || 0.0;
-        this.calibrationCompensations.motor_balance_difference = config.motor_balance_difference || 0.0;
-        this.calibrationCompensations.gyro_drift_rate = config.gyro_drift_rate || 0.0;
-
-        // Apply physics parameter adjustments based on calibration confidence
-        if (config.motor_delay_confidence > 0.5) {
-            this.motorLag = 0.03 + (config.motor_delay * 0.1);
-        }
-
-        if (config.motor_balance_confidence > 0.5) {
-            this.friction = 0.05 + Math.abs(config.motor_balance_difference * 0.02);
-        }
-
-        if (config.turn_confidence > 0.5) {
-            this.maxTurnAcceleration = 600 * (1.0 + config.turn_bias * 0.1);
-        }
+    adjustPhysicsSettings(motorBalance = 0.95, driftFactor = 0.98, motorLag = 0.03) {
+        // Simple method to adjust physics for different robot characteristics
+        this.physicsCompensations.motor_balance = motorBalance;
+        this.physicsCompensations.drift_factor = driftFactor;
+        this.motorLag = motorLag;
     }
 
     resetPosition() {
@@ -1409,350 +1374,6 @@ class RobotSimulator extends EventEmitter {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-    }
-}
-
-// ============================
-// CALIBRATION MANAGER CLASS
-// ============================
-
-class CalibrationManager extends EventEmitter {
-    constructor() {
-        super();
-        this.isCalibrating = false;
-        this.currentStep = 0;
-        this.currentRetry = 0;
-        this.maxRetries = 3;
-        this.timeoutDuration = 10000; // 10 seconds
-        this.calibrationResults = [];
-        this.stepTimer = null;
-        this.timeoutTimer = null;
-        this.bleController = null;
-        this.robotSimulator = null;
-        this.isDeveloperMode = false;
-    }
-
-    setBleController(controller) {
-        this.bleController = controller;
-    }
-
-    setRobotSimulator(simulator) {
-        this.robotSimulator = simulator;
-    }
-
-    setDeveloperMode(enabled) {
-        this.isDeveloperMode = enabled;
-    }
-
-    canCalibrate() {
-        return (this.bleController && this.bleController.connected) || this.isDeveloperMode;
-    }
-
-    startCalibration() {
-        if (this.isCalibrating) return;
-
-        if (!this.canCalibrate()) {
-            this.emit('calibrationFailed', 'Cannot perform calibration.\n\nPlease connect to a robot or enable simulation mode.');
-            return;
-        }
-
-        this.resetCalibration();
-        this.isCalibrating = true;
-        this.currentStep = 0;
-
-        this.emit('calibrationStarted');
-        this.emit('calibrationProgress', 0);
-
-        // Start first step after 1 second
-        this.stepTimer = setTimeout(() => this.processCalibrationStep(), 1000);
-    }
-
-    stopCalibration() {
-        if (!this.isCalibrating) return;
-
-        this.isCalibrating = false;
-        if (this.stepTimer) clearTimeout(this.stepTimer);
-        if (this.timeoutTimer) clearTimeout(this.timeoutTimer);
-
-        this.emit('calibrationFailed', 'Calibration cancelled by user');
-    }
-
-    resetCalibration() {
-        this.currentStep = 0;
-        this.currentRetry = 0;
-        this.calibrationResults = [];
-    }
-
-    processCalibrationStep() {
-        if (!this.isCalibrating) return;
-
-        this.currentStep++;
-
-        switch (this.currentStep) {
-            case 1:
-                this.emit('calibrationStepChanged', this.currentStep, 'Testing motor response time...');
-                this.emit('calibrationProgress', 10);
-                this.calibrateMotorResponseTime();
-                break;
-            case 2:
-                this.emit('calibrationStepChanged', this.currentStep, 'Testing straight line tracking...');
-                this.emit('calibrationProgress', 30);
-                this.calibrateStraightTracking();
-                break;
-            case 3:
-                this.emit('calibrationStepChanged', this.currentStep, 'Testing turn accuracy...');
-                this.emit('calibrationProgress', 50);
-                this.calibrateTurnAccuracy();
-                break;
-            case 4:
-                this.emit('calibrationStepChanged', this.currentStep, 'Calibrating gyroscope...');
-                this.emit('calibrationProgress', 70);
-                this.calibrateGyroscope();
-                break;
-            case 5:
-                this.emit('calibrationStepChanged', this.currentStep, 'Testing motor balance...');
-                this.emit('calibrationProgress', 85);
-                this.calibrateMotorBalance();
-                break;
-            case 6:
-                this.emit('calibrationStepChanged', this.currentStep, 'Finalizing calibration...');
-                this.emit('calibrationProgress', 95);
-                this.finalizeCalibration();
-                break;
-            case 7:
-                this.emit('calibrationProgress', 100);
-                this.emit('calibrationCompleted', this.getCalibrationConfig());
-                this.isCalibrating = false;
-                break;
-            default:
-                this.emit('calibrationFailed', 'Unknown calibration step');
-                this.isCalibrating = false;
-        }
-    }
-
-    calibrateMotorResponseTime() {
-        if (this.isDeveloperMode) {
-            setTimeout(() => {
-                const motorDelay = 0.12 + (Math.random() * 0.1);
-                const result = {
-                    success: true,
-                    stepName: 'Motor Response Time',
-                    measuredValue: motorDelay,
-                    units: 'seconds',
-                    description: `Motor response time measured at ${(motorDelay * 1000).toFixed(0)}ms`,
-                    confidence: 0.85
-                };
-                this.completeCurrentStep(result);
-            }, 1000);
-        } else {
-            const command = {
-                type: 'calibration',
-                calibration_type: 'motor_response',
-                speed: 200
-            };
-            this.sendCalibrationCommand(command);
-        }
-    }
-
-    calibrateStraightTracking() {
-        if (this.isDeveloperMode) {
-            setTimeout(() => {
-                const trackingBias = 0.97 + (Math.random() * 0.06);
-                const result = {
-                    success: true,
-                    stepName: 'Straight Tracking',
-                    measuredValue: trackingBias,
-                    units: 'ratio',
-                    description: `Straight tracking bias: ${((trackingBias - 1.0) * 100).toFixed(1)}%`,
-                    confidence: 0.88
-                };
-                this.completeCurrentStep(result);
-            }, 2000);
-        } else {
-            const command = {
-                type: 'calibration',
-                calibration_type: 'straight_tracking',
-                distance: 500
-            };
-            this.sendCalibrationCommand(command);
-        }
-    }
-
-    calibrateTurnAccuracy() {
-        if (this.isDeveloperMode) {
-            setTimeout(() => {
-                const turnBias = 0.94 + (Math.random() * 0.12);
-                const result = {
-                    success: true,
-                    stepName: 'Turn Accuracy',
-                    measuredValue: turnBias,
-                    units: 'ratio',
-                    description: `Turn bias: ${((turnBias - 1.0) * 100).toFixed(1)}%`,
-                    confidence: 0.82
-                };
-                this.completeCurrentStep(result);
-            }, 1000);
-        } else {
-            const command = {
-                type: 'calibration',
-                calibration_type: 'turn_accuracy',
-                angle: 90
-            };
-            this.sendCalibrationCommand(command);
-        }
-    }
-
-    calibrateGyroscope() {
-        if (this.isDeveloperMode) {
-            setTimeout(() => {
-                const gyroDrift = 0.5 + (Math.random() * 1.5);
-                const result = {
-                    success: true,
-                    stepName: 'Gyroscope',
-                    measuredValue: gyroDrift,
-                    units: 'deg/s',
-                    description: `Gyro drift rate: ${gyroDrift.toFixed(1)}°/s`,
-                    confidence: 0.79
-                };
-                this.completeCurrentStep(result);
-            }, 1000);
-        } else {
-            const command = {
-                type: 'calibration',
-                calibration_type: 'gyro_reading'
-            };
-            this.sendCalibrationCommand(command);
-        }
-    }
-
-    calibrateMotorBalance() {
-        if (this.isDeveloperMode) {
-            setTimeout(() => {
-                const balanceDiff = 0.92 + (Math.random() * 0.16);
-                const result = {
-                    success: true,
-                    stepName: 'Motor Balance',
-                    measuredValue: balanceDiff,
-                    units: 'ratio',
-                    description: `Motor balance difference: ${((balanceDiff - 1.0) * 100).toFixed(1)}%`,
-                    confidence: 0.86
-                };
-                this.completeCurrentStep(result);
-            }, 1000);
-        } else {
-            const command = {
-                type: 'calibration',
-                calibration_type: 'motor_balance'
-            };
-            this.sendCalibrationCommand(command);
-        }
-    }
-
-    finalizeCalibration() {
-        const validResults = this.calibrationResults.filter(r => r.success);
-        
-        if (validResults.length < 5) {
-            this.emit('calibrationFailed', 'Incomplete calibration - all steps required for 100% accuracy');
-            return;
-        }
-
-        // Enhanced quality calculation
-        let qualityScore = 0.0;
-        if (validResults.length > 0) {
-            const confidenceWeights = validResults.map(result => {
-                return result.confidence > 0.8 ? result.confidence * 1.2 : result.confidence * 0.8;
-            });
-            qualityScore = (confidenceWeights.reduce((a, b) => a + b, 0) / confidenceWeights.length) * 100;
-            qualityScore = Math.min(100.0, qualityScore);
-        }
-
-        if (qualityScore < 90.0) {
-            this.emit('calibrationFailed', 
-                `Calibration accuracy insufficient: ${qualityScore.toFixed(1)}%\n` +
-                '100% accuracy mode requires 90%+ quality.\n' +
-                'Please retry calibration in optimal conditions.');
-            return;
-        }
-
-        const finalQuality = qualityScore >= 95.0 ? 100.0 : qualityScore;
-        
-        const finalResult = {
-            success: true,
-            stepName: 'Calibration Complete',
-            measuredValue: finalQuality,
-            units: '%',
-            description: `Robot calibrated to ${finalQuality.toFixed(1)}% accuracy - Maximum precision achieved!`,
-            confidence: 1.0
-        };
-        
-        this.calibrationResults.push(finalResult);
-        this.emit('calibrationStepCompleted', finalResult);
-
-        // Move to next step after a delay
-        this.stepTimer = setTimeout(() => this.processCalibrationStep(), 2000);
-    }
-
-    sendCalibrationCommand(command) {
-        if (this.bleController && this.bleController.connected) {
-            this.bleController.sendCommand(command);
-        } else {
-            this.completeCurrentStep({
-                success: false,
-                stepName: `Step ${this.currentStep}`,
-                measuredValue: 0.0,
-                description: 'No robot connected - cannot perform real calibration',
-                confidence: 0.0
-            });
-        }
-    }
-
-    completeCurrentStep(result) {
-        this.calibrationResults.push(result);
-        this.emit('calibrationStepCompleted', result);
-
-        // Move to next step after a delay
-        this.stepTimer = setTimeout(() => this.processCalibrationStep(), 2000);
-    }
-
-    getCalibrationConfig() {
-        const config = {
-            motor_delay: 0.0,
-            motor_delay_confidence: 0.0,
-            straight_tracking_bias: 0.0,
-            straight_tracking_confidence: 0.0,
-            turn_bias: 0.0,
-            turn_confidence: 0.0,
-            motor_balance_difference: 0.0,
-            motor_balance_confidence: 0.0,
-            gyro_drift_rate: 0.0,
-            gyro_confidence: 0.0
-        };
-
-        this.calibrationResults.forEach(result => {
-            if (!result.success) return;
-
-            const confidenceFactor = Math.min(1.0, result.confidence * 1.1);
-            const measuredValue = result.measuredValue;
-
-            if (result.stepName.includes('Motor Response Time')) {
-                config.motor_delay = measuredValue;
-                config.motor_delay_confidence = confidenceFactor;
-            } else if (result.stepName.includes('Straight Tracking')) {
-                config.straight_tracking_bias = (measuredValue - 1.0) * 1.05;
-                config.straight_tracking_confidence = confidenceFactor;
-            } else if (result.stepName.includes('Turn Accuracy')) {
-                config.turn_bias = (measuredValue - 1.0) * 1.05;
-                config.turn_confidence = confidenceFactor;
-            } else if (result.stepName.includes('Motor Balance')) {
-                config.motor_balance_difference = (measuredValue - 1.0) * 1.1;
-                config.motor_balance_confidence = confidenceFactor;
-            } else if (result.stepName.includes('Gyroscope')) {
-                config.gyro_drift_rate = measuredValue * 0.95;
-                config.gyro_confidence = confidenceFactor;
-            }
-        });
-
-        return config;
     }
 }
 
