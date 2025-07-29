@@ -367,7 +367,11 @@ class BLEController extends EventEmitter {
             
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: APP_CONFIG.HUB_NAME_PREFIX }],
-                optionalServices: [APP_CONFIG.BLUETOOTH_SERVICE_UUID]
+                optionalServices: [
+                    APP_CONFIG.BLUETOOTH_SERVICE_UUID,
+                    'c5f50001-8280-46da-89f4-6d8051e4aeef',  // Pybricks service
+                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e'   // Nordic UART service
+                ]
             });
 
             this.device.addEventListener('gattserverdisconnected', () => {
@@ -2376,8 +2380,118 @@ while True:
         return codeLines.join('\n');
     }
 
-    uploadToHub() {
-        this.toastManager.show('Upload to Hub functionality coming soon! For now, download the code and upload it using the Pybricks desktop app or any MicroPython editor.', 'info');
+    async uploadToHub() {
+        if (!this.bleController.connected) {
+            this.toastManager.show('Please connect to your hub first before uploading code', 'warning');
+            return;
+        }
+
+        // Prevent multiple uploads at the same time
+        const uploadBtn = document.getElementById('uploadToHubBtn');
+        if (uploadBtn && uploadBtn.disabled) {
+            this.toastManager.show('Upload already in progress...', 'info');
+            return;
+        }
+
+        try {
+            // Disable the button and update UI
+            if (uploadBtn) {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Uploading...';
+            }
+            
+            this.toastManager.show('Preparing to upload code to hub...', 'info');
+            
+            // Generate the competition code
+            const code = this.generateHubCode();
+            
+            // Upload and run the code directly on the hub
+            await this.uploadAndRunCode(code);
+            
+            this.toastManager.show('Code uploaded and running on hub successfully! 🚀', 'success');
+            this.logger.log('Code uploaded to hub successfully');
+            
+        } catch (error) {
+            this.toastManager.show(`Failed to upload code: ${error.message}`, 'error');
+            this.logger.log(`Hub upload failed: ${error.message}`, 'error');
+        } finally {
+            // Re-enable the button and restore UI
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-rocket" aria-hidden="true"></i> Upload & Run on Hub';
+            }
+        }
+    }
+
+    async uploadAndRunCode(code) {
+        if (!this.bleController.device || !this.bleController.connected) {
+            throw new Error('Hub not connected');
+        }
+
+        try {
+            // Get the Pybricks command/event characteristic for program upload
+            const service = await this.bleController.server.getPrimaryService('c5f50001-8280-46da-89f4-6d8051e4aeef');
+            const commandCharacteristic = await service.getCharacteristic('c5f50002-8280-46da-89f4-6d8051e4aeef');
+
+            // Stop any currently running program
+            await this.sendPybricksCommand(commandCharacteristic, 'stop');
+            
+            // Wait a moment for the hub to stop
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Send the code to the hub
+            await this.sendPybricksProgram(commandCharacteristic, code);
+            
+            // Wait a moment for the program to load
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Start the program
+            await this.sendPybricksCommand(commandCharacteristic, 'run');
+
+        } catch (error) {
+            throw new Error(`Failed to upload program: ${error.message}`);
+        }
+    }
+
+    async sendPybricksCommand(characteristic, command) {
+        const encoder = new TextEncoder();
+        let payload;
+
+        if (command === 'stop') {
+            // Stop program command
+            payload = new Uint8Array([0x00]); // Stop command
+        } else if (command === 'run') {
+            // Run program command  
+            payload = new Uint8Array([0x01]); // Run command
+        } else {
+            throw new Error(`Unknown command: ${command}`);
+        }
+
+        await characteristic.writeValue(payload);
+    }
+
+    async sendPybricksProgram(characteristic, code) {
+        const encoder = new TextEncoder();
+        const codeBytes = encoder.encode(code);
+        
+        // Send program upload command (0x02) followed by code length
+        const header = new Uint8Array(5);
+        header[0] = 0x02; // Program upload command
+        header[1] = (codeBytes.length) & 0xFF;
+        header[2] = (codeBytes.length >> 8) & 0xFF;
+        header[3] = (codeBytes.length >> 16) & 0xFF;
+        header[4] = (codeBytes.length >> 24) & 0xFF;
+        
+        await characteristic.writeValue(header);
+        
+        // Send the code in chunks (BLE has MTU limitations)
+        const chunkSize = 20; // Conservative chunk size for BLE
+        for (let i = 0; i < codeBytes.length; i += chunkSize) {
+            const chunk = codeBytes.slice(i, i + chunkSize);
+            await characteristic.writeValue(chunk);
+            // Small delay between chunks to avoid overwhelming the hub
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
     }
 
     exportSelectedRun() {

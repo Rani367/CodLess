@@ -8,6 +8,7 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 
 ### 🤖 Robot Control
 - **Bluetooth LE connectivity** to Pybricks-compatible hubs
+- **🚀 Direct code upload and execution** - Upload your competition code wirelessly to the hub and run it instantly
 - **Real-time robot control** with keyboard input
 - **Advanced calibration system** for precision movement
 - **Emergency stop functionality** for safety
@@ -85,8 +86,9 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 ### Hub Setup
 
 1. **Flash Pybricks firmware** to your LEGO hub following the [official Pybricks installation guide](https://pybricks.com/install/)
-2. **Download the competition code** from the application (use the "Download Competition Code" button)
-3. **Upload and run the downloaded code** on your hub (you can use any MicroPython editor or the Pybricks desktop app - no need for the online IDE)
+2. **Download the competition code** from the application (use the "Download Competition Code" button), OR **upload directly to your hub** (use the "Upload & Run on Hub" button)
+3. **If downloaded**: Upload the .py file to your hub using any MicroPython editor or the Pybricks desktop app
+4. **If uploaded directly**: The code will automatically start running on your connected hub
 4. **Connect to the hub** using the application's Bluetooth connection feature
 
 ## 🎯 Usage Guide
