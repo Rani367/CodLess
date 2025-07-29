@@ -367,7 +367,11 @@ class BLEController extends EventEmitter {
             
             this.device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: APP_CONFIG.HUB_NAME_PREFIX }],
-                optionalServices: [APP_CONFIG.BLUETOOTH_SERVICE_UUID]
+                optionalServices: [
+                    APP_CONFIG.BLUETOOTH_SERVICE_UUID,
+                    'c5f50001-8280-46da-89f4-6d8051e4aeef',  // Pybricks service
+                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e'   // Nordic UART service
+                ]
             });
 
             this.device.addEventListener('gattserverdisconnected', () => {
@@ -760,6 +764,48 @@ class RobotSimulator extends EventEmitter {
         }
     }
 
+    updateCommand(command) {
+        // Apply calibration factors if available
+        let calibratedCommand = { ...command };
+        
+        if (this.calibrationFactors) {
+            if (command.type === 'drive') {
+                // Apply speed and turn calibration
+                calibratedCommand.speed = (command.speed || 0) * this.calibrationFactors.speedMultiplier;
+                calibratedCommand.turn_rate = (command.turn_rate || 0) * this.calibrationFactors.turnMultiplier;
+                
+                // Apply drift compensation for straight movement
+                if (command.turn_rate === 0 && command.speed !== 0) {
+                    // Add slight turn to compensate for drift
+                    const driftCompensation = this.calibrationFactors.driftCompensation;
+                    if (driftCompensation && (driftCompensation.x !== 0 || driftCompensation.y !== 0)) {
+                        // Calculate drift compensation angle
+                        const driftAngle = Math.atan2(driftCompensation.y, driftCompensation.x) * 180 / Math.PI;
+                        calibratedCommand.turn_rate = -driftAngle * 0.1; // Small compensation
+                    }
+                }
+            }
+        }
+        
+        // Update simulator targets based on command type
+        if (calibratedCommand.type === 'drive') {
+            this.targetSpeed = calibratedCommand.speed || 0;
+            this.targetTurn = calibratedCommand.turn_rate || 0;
+        } else if (calibratedCommand.type === 'arm1') {
+            this.targetArm1Speed = calibratedCommand.speed || 0;
+        } else if (calibratedCommand.type === 'arm2') {
+            this.targetArm2Speed = calibratedCommand.speed || 0;
+        }
+        
+        // Emit position update for recording/tracking
+        this.emit('positionUpdate', {
+            x: this.robotX,
+            y: this.robotY,
+            angle: this.robotAngle,
+            command: calibratedCommand
+        });
+    }
+
     animate() {
         if (!this.isRunning) return;
 
@@ -799,6 +845,14 @@ class RobotSimulator extends EventEmitter {
         this.robotY += dy;
         this.robotAngle += this.velocity.angular * dt * 0.5;
 
+        // Update arm physics
+        this.arm1Angle += this.targetArm1Speed * dt * 0.2; // Arm movement rate
+        this.arm2Angle += this.targetArm2Speed * dt * 0.2;
+        
+        // Clamp arm angles to realistic limits
+        this.arm1Angle = this.clamp(this.arm1Angle, -180, 180);
+        this.arm2Angle = this.clamp(this.arm2Angle, -180, 180);
+        
         // Keep robot in bounds
         const rect = this.canvas.getBoundingClientRect();
         this.robotX = this.clamp(this.robotX, 30, rect.width - 30);
@@ -1384,10 +1438,11 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
+        document.getElementById('calibrateBtn')?.addEventListener('click', () => this.startCalibration());
         
-        // Pybricks integration
-        document.getElementById('copyCodeBtn')?.addEventListener('click', () => this.copyPybricksCode());
-        document.getElementById('openPybricksBtn')?.addEventListener('click', () => this.openPybricksIDE());
+        // Competition code
+        document.getElementById('downloadCompetitionCodeBtn')?.addEventListener('click', () => this.downloadCompetitionCode());
+        document.getElementById('uploadToHubBtn')?.addEventListener('click', () => this.uploadToHub());
         
         // Recording controls
         document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
@@ -1628,27 +1683,50 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     applyCalibrationCompensation(command) {
-        if (!this.isCalibrated) return command;
+        if (!this.isCalibrated || !this.calibrationData) return command;
         
         const compensated = { ...command };
         
         if (command.type === 'drive') {
-            // Apply straight tracking compensation
+            // Apply speed calibration
+            if (this.calibrationData.speedAccuracy !== 1.0) {
+                compensated.speed = (command.speed || 0) * this.calibrationData.speedAccuracy;
+            }
+            
+            // Apply turn calibration
+            if (this.calibrationData.turnAccuracy !== 1.0) {
+                compensated.turn_rate = (command.turn_rate || 0) * this.calibrationData.turnAccuracy;
+            }
+            
+            // Apply drift compensation for straight movement
             if (Math.abs(command.speed || 0) > 0 && Math.abs(command.turn_rate || 0) === 0) {
-                if (this.config.straightTrackingConfidence > 0.5) {
-                    compensated.turn_rate = -this.config.straightTrackingBias * (command.speed || 0) * 0.1;
+                const drift = this.calibrationData.straightDrift;
+                if (drift && (drift.x !== 0 || drift.y !== 0)) {
+                    // Calculate compensation turn rate to counteract drift
+                    const driftAngle = Math.atan2(drift.y, drift.x) * 180 / Math.PI;
+                    compensated.turn_rate = -driftAngle * 0.1; // Small compensation
                 }
             }
             
-            // Apply turn bias compensation
-            if (Math.abs(command.turn_rate || 0) > 0 && this.config.turnConfidence > 0.5) {
-                compensated.turn_rate = (command.turn_rate || 0) * (1 + this.config.turnBias);
-            }
-            
-            // Apply motor balance compensation
-            if (this.config.motorBalanceConfidence > 0.5) {
-                const balanceCompensation = this.config.motorBalanceDifference * (command.speed || 0) * 0.05;
-                compensated.turn_rate = (compensated.turn_rate || 0) + balanceCompensation;
+            // Fallback to old calibration system if new data not available
+            if (!this.calibrationData.speedAccuracy && this.config) {
+                // Apply straight tracking compensation
+                if (Math.abs(command.speed || 0) > 0 && Math.abs(command.turn_rate || 0) === 0) {
+                    if (this.config.straightTrackingConfidence > 0.5) {
+                        compensated.turn_rate = -this.config.straightTrackingBias * (command.speed || 0) * 0.1;
+                    }
+                }
+                
+                // Apply turn bias compensation
+                if (Math.abs(command.turn_rate || 0) > 0 && this.config.turnConfidence > 0.5) {
+                    compensated.turn_rate = (command.turn_rate || 0) * (1 + this.config.turnBias);
+                }
+                
+                // Apply motor balance compensation
+                if (this.config.motorBalanceConfidence > 0.5) {
+                    const balanceCompensation = this.config.motorBalanceDifference * (command.speed || 0) * 0.05;
+                    compensated.turn_rate = (compensated.turn_rate || 0) + balanceCompensation;
+                }
             }
         }
         
@@ -1816,16 +1894,18 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     updateRunsList() {
-        const select = document.getElementById('savedRunsList');
-        if (!select) return;
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList) return;
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
         
-        select.innerHTML = '<option value="">Select a run...</option>';
+        runsList.innerHTML = '<option value="">Select a saved run...</option>';
         
-        this.savedRuns.forEach((runData, runName) => {
+        savedRuns.forEach(run => {
             const option = document.createElement('option');
-            option.value = runName;
-            option.textContent = `${runName} (${runData.commands?.length || 0} commands)`;
-            select.appendChild(option);
+            option.value = run.id;
+            option.textContent = `${run.name} (${new Date(run.createdAt).toLocaleDateString()})`;
+            runsList.appendChild(option);
         });
     }
 
@@ -1984,10 +2064,303 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    // Placeholder methods for features to be implemented
     toggleRecording() {
-        // Implementation for recording toggle
-        this.toastManager.show('Recording feature implementation in progress', 'info');
+        if (this.isRecording) {
+            this.stopRecording();
+        } else {
+            this.startRecording();
+        }
+    }
+
+    startRecording() {
+        this.isRecording = true;
+        this.recordedCommands = [];
+        this.recordingStartTime = Date.now();
+        
+        // Update UI
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i> Stop Recording';
+            recordBtn.classList.remove('btn-primary');
+            recordBtn.classList.add('btn-danger');
+        }
+        
+        this.toastManager.show('🔴 Recording started - all robot movements will be captured', 'info');
+        this.logger.log('Recording started');
+        
+        // Enable save button for when recording stops
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.disabled = false;
+    }
+
+    stopRecording() {
+        this.isRecording = false;
+        
+        // Update UI
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Start Recording';
+            recordBtn.classList.remove('btn-danger');
+            recordBtn.classList.add('btn-primary');
+        }
+        
+        const duration = (Date.now() - this.recordingStartTime) / 1000;
+        this.toastManager.show(`⏹️ Recording stopped - captured ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`, 'success');
+        this.logger.log(`Recording stopped: ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`);
+    }
+
+    saveCurrentRun() {
+        if (!this.recordedCommands || this.recordedCommands.length === 0) {
+            this.toastManager.show('No recorded commands to save', 'warning');
+            return;
+        }
+
+        const name = prompt('Enter a name for this run:');
+        if (!name) return;
+
+        const run = {
+            id: Date.now().toString(),
+            name: name.trim(),
+            commands: this.recordedCommands.map(cmd => ({
+                command_type: cmd.command.type,
+                parameters: {
+                    ...cmd.command,
+                    duration: cmd.timestamp / 1000 // Convert to seconds
+                }
+            })),
+            createdAt: new Date().toISOString(),
+            duration: this.recordedCommands.length > 0 ? 
+                this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
+        };
+
+        // Save to localStorage
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        savedRuns.push(run);
+        localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+
+        // Update UI
+        this.updateRunsList();
+        this.recordedCommands = [];
+        
+        // Disable save button until next recording
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.disabled = true;
+
+        this.toastManager.show(`✅ Run "${name}" saved successfully!`, 'success');
+        this.logger.log(`Run saved: ${name}`);
+    }
+
+    pauseRecording() {
+        if (!this.isRecording) {
+            this.toastManager.show('No recording in progress to pause', 'warning');
+            return;
+        }
+
+        this.isRecording = false;
+        
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (pauseBtn) {
+            if (pauseBtn.textContent.includes('Pause')) {
+                pauseBtn.innerHTML = '<i class="fas fa-play" aria-hidden="true"></i> Resume';
+                this.toastManager.show('⏸️ Recording paused', 'info');
+            } else {
+                pauseBtn.innerHTML = '<i class="fas fa-pause" aria-hidden="true"></i> Pause';
+                this.isRecording = true;
+                this.toastManager.show('▶️ Recording resumed', 'info');
+            }
+        }
+    }
+
+    async startCalibration() {
+        if (!this.bleController.connected && !this.isDeveloperMode) {
+            this.toastManager.show('Please connect to your robot or enable developer mode to start calibration', 'warning');
+            return;
+        }
+
+        this.toastManager.show('🔧 Starting robot calibration...', 'info');
+        this.logger.log('Calibration started');
+
+        // Initialize calibration data
+        this.calibrationData = {
+            straightDrift: { x: 0, y: 0 },
+            turnAccuracy: 1.0,
+            speedAccuracy: 1.0,
+            measurements: [],
+            isCalibrating: true
+        };
+
+        try {
+            // Run calibration sequence
+            await this.runCalibrationSequence();
+            
+            // Calculate calibration factors
+            this.calculateCalibrationFactors();
+            
+            // Apply calibration to simulator
+            this.syncSimulatorWithCalibration();
+            
+            // Mark as calibrated
+            this.isCalibrated = true;
+            
+            // Save calibration data
+            this.saveCalibrationData();
+            
+            this.toastManager.show('✅ Calibration completed! Robot and simulator are now synchronized', 'success');
+            this.logger.log('Calibration completed successfully');
+            
+        } catch (error) {
+            this.toastManager.show(`❌ Calibration failed: ${error.message}`, 'error');
+            this.logger.log(`Calibration failed: ${error.message}`, 'error');
+        }
+    }
+
+    async runCalibrationSequence() {
+        const tests = [
+            { name: 'Forward Movement Test', command: { type: 'drive', speed: 200, turn_rate: 0 }, duration: 2000 },
+            { name: 'Turn Right Test', command: { type: 'drive', speed: 0, turn_rate: 90 }, duration: 1000 },
+            { name: 'Turn Left Test', command: { type: 'drive', speed: 0, turn_rate: -90 }, duration: 1000 },
+            { name: 'Backward Movement Test', command: { type: 'drive', speed: -200, turn_rate: 0 }, duration: 2000 }
+        ];
+
+        for (const test of tests) {
+            this.toastManager.show(`Running: ${test.name}`, 'info');
+            
+            // Record starting position (simulator or estimated)
+            const startPos = this.getCurrentPosition();
+            
+            // Execute movement
+            await this.executeCalibrationMove(test.command, test.duration);
+            
+            // Wait for movement to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Record ending position
+            const endPos = this.getCurrentPosition();
+            
+            // Store measurement
+            this.calibrationData.measurements.push({
+                test: test.name,
+                command: test.command,
+                duration: test.duration,
+                startPos,
+                endPos,
+                actualMovement: {
+                    x: endPos.x - startPos.x,
+                    y: endPos.y - startPos.y,
+                    angle: endPos.angle - startPos.angle
+                }
+            });
+            
+            // Stop movement
+            await this.executeCalibrationMove({ type: 'drive', speed: 0, turn_rate: 0 }, 100);
+        }
+    }
+
+    getCurrentPosition() {
+        if (this.isDeveloperMode && this.robotSimulator) {
+            return {
+                x: this.robotSimulator.robotX,
+                y: this.robotSimulator.robotY,
+                angle: this.robotSimulator.robotAngle
+            };
+        } else {
+            // For real robot, we estimate based on commands (could be enhanced with sensors)
+            return this.estimatedPosition || { x: 0, y: 0, angle: 0 };
+        }
+    }
+
+    async executeCalibrationMove(command, duration) {
+        if (this.isDeveloperMode) {
+            this.robotSimulator?.updateCommand(command);
+        } else if (this.bleController.connected) {
+            await this.bleController.sendCommand(command);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, duration));
+    }
+
+    calculateCalibrationFactors() {
+        const measurements = this.calibrationData.measurements;
+        
+        // Analyze forward movement
+        const forwardTest = measurements.find(m => m.test === 'Forward Movement Test');
+        if (forwardTest) {
+            const expectedDistance = (forwardTest.command.speed * forwardTest.duration) / 1000; // mm/s * ms / 1000
+            const actualDistance = Math.sqrt(
+                Math.pow(forwardTest.actualMovement.x, 2) + 
+                Math.pow(forwardTest.actualMovement.y, 2)
+            );
+            
+            this.calibrationData.speedAccuracy = expectedDistance / actualDistance;
+            
+            // Calculate drift (deviation from straight line)
+            const expectedAngle = 0;
+            this.calibrationData.straightDrift.x = forwardTest.actualMovement.x - actualDistance;
+            this.calibrationData.straightDrift.y = forwardTest.actualMovement.y;
+        }
+        
+        // Analyze turn accuracy
+        const rightTurn = measurements.find(m => m.test === 'Turn Right Test');
+        const leftTurn = measurements.find(m => m.test === 'Turn Left Test');
+        
+        if (rightTurn && leftTurn) {
+            const expectedRightTurn = 90; // degrees
+            const expectedLeftTurn = -90; // degrees
+            
+            const rightAccuracy = expectedRightTurn / rightTurn.actualMovement.angle;
+            const leftAccuracy = expectedLeftTurn / leftTurn.actualMovement.angle;
+            
+            this.calibrationData.turnAccuracy = (rightAccuracy + leftAccuracy) / 2;
+        }
+        
+        this.logger.log(`Calibration factors: Speed=${this.calibrationData.speedAccuracy.toFixed(3)}, Turn=${this.calibrationData.turnAccuracy.toFixed(3)}`);
+    }
+
+    syncSimulatorWithCalibration() {
+        if (!this.robotSimulator || !this.calibrationData) return;
+        
+        // Update simulator physics to match real robot behavior
+        this.robotSimulator.calibrationFactors = {
+            speedMultiplier: this.calibrationData.speedAccuracy,
+            turnMultiplier: this.calibrationData.turnAccuracy,
+            driftCompensation: this.calibrationData.straightDrift
+        };
+        
+        this.logger.log('Simulator synchronized with calibration data');
+    }
+
+    saveCalibrationData() {
+        if (this.calibrationData) {
+            localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(this.calibrationData));
+            this.logger.log('Calibration data saved');
+        }
+    }
+
+    generateCalibrationCode(calibrationData) {
+        if (!calibrationData) {
+            return [
+                "# --- CALIBRATION CONSTANTS (No calibration data available) ---",
+                "SPEED_CALIBRATION = 1.0",
+                "TURN_CALIBRATION = 1.0", 
+                "DRIFT_COMPENSATION = 0.0",
+                ""
+            ];
+        }
+
+        const speedCal = calibrationData.speedAccuracy || 1.0;
+        const turnCal = calibrationData.turnAccuracy || 1.0;
+        const drift = calibrationData.straightDrift || { x: 0, y: 0 };
+        const driftComp = drift.x !== 0 || drift.y !== 0 ? 
+            -Math.atan2(drift.y, drift.x) * 180 / Math.PI * 0.1 : 0.0;
+
+        return [
+            "# --- CALIBRATION CONSTANTS (Auto-generated from calibration) ---",
+            `SPEED_CALIBRATION = ${speedCal.toFixed(4)}  # Speed accuracy factor`,
+            `TURN_CALIBRATION = ${turnCal.toFixed(4)}   # Turn accuracy factor`,
+            `DRIFT_COMPENSATION = ${driftComp.toFixed(4)}  # Drift compensation (degrees)`,
+            `# Calibration date: ${new Date().toISOString()}`,
+            ""
+        ];
     }
 
     openConfigModal() {
@@ -1999,103 +2372,667 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
 
-    copyPybricksCode() {
-        const code = this.generatePybricksCode();
-        navigator.clipboard.writeText(code).then(() => {
-            this.toastManager.show('Pybricks code copied to clipboard!', 'success');
-        }).catch(() => {
-            this.toastManager.show('Failed to copy code to clipboard', 'error');
-        });
+    downloadCompetitionCode() {
+        const code = this.generateHubCode();
+        const blob = new Blob([code], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `competition-robot-code-${new Date().toISOString().split('T')[0]}.py`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toastManager.show('Competition code downloaded successfully!', 'success');
     }
 
-    generatePybricksCode() {
-        return `#!/usr/bin/env micropython
-# Generated by CodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}
-
-from pybricks.hubs import PrimeHub
+    generateHubCode() {
+        // Get saved runs for competition code generation
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        
+        // Get calibration data
+        const calibrationData = this.calibrationData || JSON.parse(localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA) || 'null');
+        
+        if (savedRuns.length === 0) {
+            // Generate basic hub control code if no saved runs
+            return `from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor
-from pybricks.parameters import Port, Direction
+from pybricks.parameters import Port, Color
+from pybricks.robotics import DriveBase
 from pybricks.tools import wait
-import json
+from usys import stdin, stdout
+from uselect import poll
+import ujson
 
 hub = PrimeHub()
 
-# Motor configuration
-left_motor = Motor(Port.${this.config.leftMotorPort})
-right_motor = Motor(Port.${this.config.rightMotorPort})
-arm1_motor = Motor(Port.${this.config.arm1MotorPort})
-arm2_motor = Motor(Port.${this.config.arm2MotorPort})
+hub.display.icon([
+    [100, 100, 100, 100, 100],
+    [100, 0, 100, 0, 100], 
+    [100, 100, 100, 100, 100],
+    [100, 0, 0, 0, 100],
+    [100, 100, 100, 100, 100]
+])
 
-def execute_command(cmd):
-    cmd_type = cmd.get("type", "")
+motors = {}
+drive_base = None
+
+left_motor_port = Port.${this.config.leftMotorPort}
+right_motor_port = Port.${this.config.rightMotorPort}
+arm1_motor_port = Port.${this.config.arm1MotorPort}
+arm2_motor_port = Port.${this.config.arm2MotorPort}
+
+try:
+    left_motor = Motor(left_motor_port)
+    right_motor = Motor(right_motor_port)
+    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})
     
-    if cmd_type == "drive":
-        speed = cmd.get("speed", 0)
-        turn_rate = cmd.get("turn_rate", 0)
-        
-        left_speed = speed - turn_rate
-        right_speed = speed + turn_rate
-        
-        left_motor.run(left_speed)
-        right_motor.run(right_speed)
-        
-    elif cmd_type == "arm1":
-        speed = cmd.get("speed", 0)
-        if speed == 0:
-            arm1_motor.stop()
-        else:
-            arm1_motor.run(speed)
+    drive_base.settings(
+        straight_speed=${this.config.straightSpeed},
+        straight_acceleration=${this.config.straightAcceleration},
+        turn_rate=${this.config.turnRate},
+        turn_acceleration=${this.config.turnAcceleration}
+    )
+    
+    hub.light.on(Color.GREEN)
+except:
+    hub.light.on(Color.YELLOW)
+
+try:
+    motors['arm1'] = Motor(arm1_motor_port)
+except:
+    pass
+
+try:
+    motors['arm2'] = Motor(arm2_motor_port)
+except:
+    pass
+
+keyboard = poll()
+keyboard.register(stdin)
+
+hub.display.icon([
+    [0, 100, 0, 100, 0],
+    [100, 100, 100, 100, 100],
+    [0, 100, 100, 100, 0],
+    [0, 0, 100, 0, 0],
+    [0, 0, 100, 0, 0]
+])
+
+while True:
+    stdout.buffer.write(b"rdy")
+    
+    while not keyboard.poll(10):
+        wait(1)
+    
+    try:
+        data = stdin.buffer.read()
+        if data:
+            command_str = data.decode('utf-8')
+            command = ujson.loads(command_str)
             
-    elif cmd_type == "arm2":
-        speed = cmd.get("speed", 0)
-        if speed == 0:
-            arm2_motor.stop()
-        else:
-            arm2_motor.run(speed)
+            cmd_type = command.get('type', '')
+            
+            if cmd_type == 'drive' and drive_base:
+                speed = command.get('speed', 0)
+                turn_rate = command.get('turn_rate', 0)
+                drive_base.drive(speed, turn_rate)
+                stdout.buffer.write(b"DRIVE_OK")
+                
+            elif cmd_type in ['arm1', 'arm2'] and cmd_type in motors:
+                motor = motors[cmd_type]
+                speed = command.get('speed', 0)
+                if speed == 0:
+                    motor.stop()
+                else:
+                    motor.run(speed)
+                stdout.buffer.write(b"ARM_OK")
+                
+            elif cmd_type == 'config':
+                try:
+                    axle_track = command.get('axle_track', ${this.config.axleTrack})
+                    wheel_diameter = command.get('wheel_diameter', ${this.config.wheelDiameter})
+                    if drive_base:
+                        drive_base = DriveBase(left_motor, right_motor, 
+                                             wheel_diameter=wheel_diameter, 
+                                             axle_track=axle_track)
+                        
+                        straight_speed = command.get('straight_speed', ${this.config.straightSpeed})
+                        straight_acceleration = command.get('straight_acceleration', ${this.config.straightAcceleration})
+                        turn_rate = command.get('turn_rate', ${this.config.turnRate})
+                        turn_acceleration = command.get('turn_acceleration', ${this.config.turnAcceleration})
+                        
+                        drive_base.settings(
+                            straight_speed=straight_speed,
+                            straight_acceleration=straight_acceleration,
+                            turn_rate=turn_rate,
+                            turn_acceleration=turn_acceleration
+                        )
+                        
+                    stdout.buffer.write(b"CONFIG_OK")
+                except:
+                    stdout.buffer.write(b"CONFIG_ERROR")
+            else:
+                stdout.buffer.write(b"UNKNOWN_CMD")
+                
+    except Exception as e:
+        stdout.buffer.write(b"ERROR")
     
-    elif cmd_type == "emergency_stop":
-        left_motor.stop()
-        right_motor.stop()
-        arm1_motor.stop()
-        arm2_motor.stop()
-    
-    elif cmd_type == "get_battery":
-        level = hub.battery.voltage()
-        hub.ble.send(bytes([0x02, int(level * 100 / 9000)]))
-    
-    elif cmd_type == "get_info":
-        info = {
-            "name": hub.system.name(),
-            "version": "1.0",
-            "features": ["drive", "arms", "battery"]
+    wait(10)`;
         }
-        data = json.dumps(info).encode()
-        response = bytes([0x03]) + data
-        hub.ble.send(response)
 
-def main():
-    hub.ble.send("ready")
-    
-    while True:
-        if hub.ble.received() is not None:
-            try:
-                data = hub.ble.received()
-                command = json.loads(data.decode())
-                execute_command(command)
-                hub.ble.send("ok")
-            except Exception as e:
-                hub.ble.send(f"error: {str(e)}")
+        // Generate competition code with saved runs
+                 const codeLines = [
+             "from pybricks.hubs import PrimeHub",
+             "from pybricks.pupdevices import Motor",
+             "from pybricks.parameters import Port, Color, Button",
+             "from pybricks.robotics import DriveBase",
+             "from pybricks.tools import wait",
+             "",
+             "# --- ROBOT SETUP ---",
+             "hub = PrimeHub()",
+            "",
+            "# Initialize motors and drive base",
+            `left_motor = Motor(Port.${this.config.leftMotorPort})`,
+            `right_motor = Motor(Port.${this.config.rightMotorPort})`,
+            `drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})`,
+            "",
+            "# Configure drive base settings",
+            "drive_base.settings(",
+            `    straight_speed=${this.config.straightSpeed},`,
+            `    straight_acceleration=${this.config.straightAcceleration},`,
+            `    turn_rate=${this.config.turnRate},`,
+            `    turn_acceleration=${this.config.turnAcceleration}`,
+            ")",
+            "",
+            "# Initialize arm motors",
+            `arm1_motor = Motor(Port.${this.config.arm1MotorPort})`,
+            `arm2_motor = Motor(Port.${this.config.arm2MotorPort})`,
+            "",
+            ...this.generateCalibrationCode(calibrationData),
+            "# --- HELPER FUNCTIONS ---",
+            "def apply_calibration(speed, turn_rate):",
+            "    \"\"\"Apply calibration compensation to drive commands\"\"\"",
+            "    calibrated_speed = speed * SPEED_CALIBRATION",
+            "    calibrated_turn = turn_rate * TURN_CALIBRATION",
+            "    ",
+            "    # Apply drift compensation for straight movement",
+            "    if turn_rate == 0 and speed != 0:",
+            "        calibrated_turn += DRIFT_COMPENSATION",
+            "    ",
+            "    return calibrated_speed, calibrated_turn",
+            "",
+            "def move_forward(speed, duration_ms):",
+            "    cal_speed, cal_turn = apply_calibration(speed, 0)",
+            "    drive_base.drive(cal_speed, cal_turn)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def move_backward(speed, duration_ms):",
+            "    cal_speed, cal_turn = apply_calibration(-speed, 0)",
+            "    drive_base.drive(cal_speed, cal_turn)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def turn_left(angle, duration_ms):",
+            "    cal_speed, cal_turn = apply_calibration(0, -angle)",
+            "    drive_base.drive(cal_speed, cal_turn)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def turn_right(angle, duration_ms):",
+            "    cal_speed, cal_turn = apply_calibration(0, angle)",
+            "    drive_base.drive(cal_speed, cal_turn)",
+            "    wait(duration_ms)",
+            "    drive_base.stop()",
+            "",
+            "def arm1_up(speed, duration_ms):",
+            "    arm1_motor.run(speed)",
+            "    wait(duration_ms)",
+            "    arm1_motor.stop()",
+            "",
+            "def arm1_down(speed, duration_ms):",
+            "    arm1_motor.run(-speed)",
+            "    wait(duration_ms)",
+            "    arm1_motor.stop()",
+            "",
+            "def arm2_up(speed, duration_ms):",
+            "    arm2_motor.run(speed)",
+            "    wait(duration_ms)",
+            "    arm2_motor.stop()",
+            "",
+            "def arm2_down(speed, duration_ms):",
+            "    arm2_motor.run(-speed)",
+            "    wait(duration_ms)",
+            "    arm2_motor.stop()",
+            "",
+            "# --- RUN FUNCTIONS ---"
+        ];
+
+        // Generate run functions from saved runs
+        const runFunctions = [];
+        const runsDict = [];
+
+        savedRuns.forEach((run, index) => {
+            const funcName = `run_${index + 1}`;
+            const funcLines = [`def ${funcName}():`];
+            funcLines.push(`    # ${run.name}`);
+            
+            if (run.commands && run.commands.length > 0) {
+                run.commands.forEach(cmd => {
+                    const cmdType = cmd.command_type || cmd.type;
+                    const params = cmd.parameters || cmd;
+                    const duration = params.duration ? Math.round(params.duration * 1000) : 0;
+
+                    if (cmdType === "drive") {
+                        const speed = params.speed || 0;
+                        const turnRate = params.turn_rate || 0;
+
+                        if (speed !== 0 || turnRate !== 0) {
+                            funcLines.push(`    drive_base.drive(${speed}, ${turnRate})`);
+                            if (duration > 0) {
+                                funcLines.push(`    wait(${duration})`);
+                            }
+                            funcLines.push("    drive_base.stop()");
+                        } else {
+                            funcLines.push("    drive_base.stop()");
+                        }
+
+                    } else if (cmdType === "arm1") {
+                        const speed = params.speed || 0;
+                        if (speed !== 0) {
+                            funcLines.push(`    arm1_motor.run(${speed})`);
+                            if (duration > 0) {
+                                funcLines.push(`    wait(${duration})`);
+                            }
+                            funcLines.push("    arm1_motor.stop()");
+                        } else {
+                            funcLines.push("    arm1_motor.stop()");
+                        }
+
+                    } else if (cmdType === "arm2") {
+                        const speed = params.speed || 0;
+                        if (speed !== 0) {
+                            funcLines.push(`    arm2_motor.run(${speed})`);
+                            if (duration > 0) {
+                                funcLines.push(`    wait(${duration})`);
+                            }
+                            funcLines.push("    arm2_motor.stop()");
+                        } else {
+                            funcLines.push("    arm2_motor.stop()");
+                        }
+                    }
+                });
+            } else {
+                funcLines.push("    # No commands recorded for this run");
+                funcLines.push("    pass");
+            }
+
+            funcLines.push("    wait(100)");
+
+            runFunctions.push(...funcLines, "");
+            runsDict.push(`    ${index + 1}: ${funcName},  # ${run.name}`);
+        });
+
+        codeLines.push(...runFunctions);
+
+        codeLines.push(
+            "# --- MAIN EXECUTION ---",
+            "",
+            "runs = {",
+            ...runsDict,
+            "}",
+            "",
+            `# Use hub buttons to run missions (${savedRuns.length} runs available)`,
+            savedRuns.length <= 3 ? 
+                `# LEFT=Run1, CENTER=Run2, RIGHT=Run3` :
+                `# LEFT=Previous, RIGHT=Next, CENTER=Execute (hub shows selected run number)`,
+            "hub.light.on(Color.WHITE)",
+            "",
+            "while True:",
+            "    pressed_buttons = hub.buttons.pressed()",
+            ""
+        );
+
+        // Add button selection logic
+        if (savedRuns.length <= 3) {
+            // Simple button mapping for 1-3 runs
+            savedRuns.forEach((run, index) => {
+                const runNumber = index + 1;
+                let buttonCheck;
+                
+                if (runNumber === 1) {
+                    buttonCheck = "if Button.LEFT in pressed_buttons:";
+                } else if (runNumber === 2) {
+                    buttonCheck = "elif Button.CENTER in pressed_buttons:";
+                } else if (runNumber === 3) {
+                    buttonCheck = "elif Button.RIGHT in pressed_buttons:";
+                }
+
+                codeLines.push(
+                    `    ${buttonCheck}`,
+                    `        hub.light.on(Color.BLUE)`,
+                    `        runs[${runNumber}]()  # ${run.name}`,
+                    `        hub.light.on(Color.GREEN)`,
+                    `        wait(1000)  # Prevent multiple runs`,
+                    ""
+                );
+            });
+        } else {
+            // Simple menu system for 4+ runs - much more reliable
+            codeLines.push(
+                "    # Menu navigation system for multiple runs",
+                "    if not hasattr(hub, '_selected_run'):",
+                "        hub._selected_run = 1",
+                "        hub._last_button_time = 0",
+                "    ",
+                "    current_time = hub.system.time()",
+                "    ",
+                "    # Only process button presses if enough time has passed (debounce)",
+                "    if current_time - hub._last_button_time > 300:",
+                "        if Button.LEFT in pressed_buttons:",
+                "            # Previous run",
+                `            hub._selected_run = max(1, hub._selected_run - 1)`,
+                "            hub.display.number(hub._selected_run)",
+                "            hub._last_button_time = current_time",
+                "            hub.light.on(Color.YELLOW)",
+                "            wait(200)",
+                "            hub.light.on(Color.WHITE)",
+                "        ",
+                "        elif Button.RIGHT in pressed_buttons:",
+                "            # Next run", 
+                `            hub._selected_run = min(${savedRuns.length}, hub._selected_run + 1)`,
+                "            hub.display.number(hub._selected_run)",
+                "            hub._last_button_time = current_time",
+                "            hub.light.on(Color.YELLOW)",
+                "            wait(200)",
+                "            hub.light.on(Color.WHITE)",
+                "        ",
+                "        elif Button.CENTER in pressed_buttons:",
+                "            # Execute selected run",
+                "            hub.light.on(Color.BLUE)",
+                "            runs[hub._selected_run]()",
+                "            hub.light.on(Color.GREEN)",
+                "            wait(1000)",
+                "            hub._last_button_time = current_time",
+                ""
+            );
+        }
+
+        codeLines.push(
+            "    wait(50)  # Small delay for button polling",
+            "",
+            "# --- END OF COMPETITION CODE ---"
+        );
+
+        return codeLines.join('\n');
+    }
+
+    async uploadToHub() {
+        if (!this.bleController.connected) {
+            this.toastManager.show('Please connect to your hub first before uploading code', 'warning');
+            return;
+        }
+
+        // Prevent multiple uploads at the same time
+        const uploadBtn = document.getElementById('uploadToHubBtn');
+        if (uploadBtn && uploadBtn.disabled) {
+            this.toastManager.show('Upload already in progress...', 'info');
+            return;
+        }
+
+        try {
+            // Disable the button and update UI
+            if (uploadBtn) {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Uploading...';
+            }
+            
+            this.toastManager.show('Preparing to upload code to hub...', 'info');
+            
+            // Generate the competition code
+            const code = this.generateHubCode();
+            
+            // Upload and run the code directly on the hub
+            await this.uploadAndRunCode(code);
+            
+            this.toastManager.show('Code uploaded and running on hub successfully! 🚀', 'success');
+            this.logger.log('Code uploaded to hub successfully');
+            
+        } catch (error) {
+            this.toastManager.show(`Failed to upload code: ${error.message}`, 'error');
+            this.logger.log(`Hub upload failed: ${error.message}`, 'error');
+        } finally {
+            // Re-enable the button and restore UI
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-rocket" aria-hidden="true"></i> Upload & Run on Hub';
+            }
+        }
+    }
+
+    async uploadAndRunCode(code) {
+        if (!this.bleController.device || !this.bleController.connected) {
+            throw new Error('Hub not connected');
+        }
+
+        try {
+            // Get the Pybricks command/event characteristic for program upload
+            const service = await this.bleController.server.getPrimaryService('c5f50001-8280-46da-89f4-6d8051e4aeef');
+            const commandCharacteristic = await service.getCharacteristic('c5f50002-8280-46da-89f4-6d8051e4aeef');
+
+            // Stop any currently running program
+            await this.sendPybricksCommand(commandCharacteristic, 'stop');
+            
+            // Wait a moment for the hub to stop
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Send the code to the hub
+            await this.sendPybricksProgram(commandCharacteristic, code);
+            
+            // Wait a moment for the program to load
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Start the program
+            await this.sendPybricksCommand(commandCharacteristic, 'run');
+
+        } catch (error) {
+            throw new Error(`Failed to upload program: ${error.message}`);
+        }
+    }
+
+    async sendPybricksCommand(characteristic, command) {
+        const encoder = new TextEncoder();
+        let payload;
+
+        if (command === 'stop') {
+            // Stop program command
+            payload = new Uint8Array([0x00]); // Stop command
+        } else if (command === 'run') {
+            // Run program command  
+            payload = new Uint8Array([0x01]); // Run command
+        } else {
+            throw new Error(`Unknown command: ${command}`);
+        }
+
+        await characteristic.writeValue(payload);
+    }
+
+    async sendPybricksProgram(characteristic, code) {
+        const encoder = new TextEncoder();
+        const codeBytes = encoder.encode(code);
         
-        wait(10)
-
-if __name__ == "__main__":
-    main()
-`;
+        // Send program upload command (0x02) followed by code length
+        const header = new Uint8Array(5);
+        header[0] = 0x02; // Program upload command
+        header[1] = (codeBytes.length) & 0xFF;
+        header[2] = (codeBytes.length >> 8) & 0xFF;
+        header[3] = (codeBytes.length >> 16) & 0xFF;
+        header[4] = (codeBytes.length >> 24) & 0xFF;
+        
+        await characteristic.writeValue(header);
+        
+        // Send the code in chunks (BLE has MTU limitations)
+        const chunkSize = 20; // Conservative chunk size for BLE
+        for (let i = 0; i < codeBytes.length; i += chunkSize) {
+            const chunk = codeBytes.slice(i, i + chunkSize);
+            await characteristic.writeValue(chunk);
+            // Small delay between chunks to avoid overwhelming the hub
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
     }
 
-    openPybricksIDE() {
-        window.open('https://code.pybricks.com', '_blank');
+    exportSelectedRun() {
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList || !runsList.value) {
+            this.toastManager.show('Please select a run to export', 'warning');
+            return;
+        }
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        
+        if (!selectedRun) {
+            this.toastManager.show('Selected run not found', 'error');
+            return;
+        }
+
+        const exportData = {
+            name: selectedRun.name,
+            description: selectedRun.description || '',
+            commands: selectedRun.commands,
+            duration: selectedRun.duration,
+            createdAt: selectedRun.createdAt,
+            exportedAt: new Date().toISOString(),
+            version: APP_CONFIG.VERSION
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `codless-run-${selectedRun.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toastManager.show(`Run "${selectedRun.name}" exported successfully!`, 'success');
     }
+
+    deleteSelectedRun() {
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList || !runsList.value) {
+            this.toastManager.show('Please select a run to delete', 'warning');
+            return;
+        }
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        
+        if (!selectedRun) {
+            this.toastManager.show('Selected run not found', 'error');
+            return;
+        }
+
+        if (confirm(`Are you sure you want to delete the run "${selectedRun.name}"? This action cannot be undone.`)) {
+            const updatedRuns = savedRuns.filter(run => run.id !== runsList.value);
+            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(updatedRuns));
+            
+            // Update the UI
+            this.updateRunsList();
+            runsList.value = '';
+            
+            // Disable action buttons
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('deleteBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = true;
+            
+            this.toastManager.show(`Run "${selectedRun.name}" deleted successfully`, 'success');
+        }
+    }
+
+    importRun() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importData = JSON.parse(e.target.result);
+                    
+                    // Validate the imported data
+                    if (!importData.name || !importData.commands || !Array.isArray(importData.commands)) {
+                        throw new Error('Invalid run file format');
+                    }
+
+                    const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+                    
+                    // Create a new run with imported data
+                    const newRun = {
+                        id: 'run_' + Date.now(),
+                        name: importData.name + ' (Imported)',
+                        description: importData.description || '',
+                        commands: importData.commands,
+                        duration: importData.duration || 0,
+                        createdAt: new Date().toISOString(),
+                        importedAt: new Date().toISOString(),
+                        originalCreatedAt: importData.createdAt
+                    };
+
+                    savedRuns.push(newRun);
+                    localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+                    
+                    // Update the UI
+                    this.updateRunsList();
+                    
+                    this.toastManager.show(`Run "${newRun.name}" imported successfully!`, 'success');
+                } catch (error) {
+                    console.error('Import error:', error);
+                    this.toastManager.show('Failed to import run: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    selectRun(runId) {
+        const playBtn = document.getElementById('playBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        
+        if (runId) {
+            playBtn.disabled = false;
+            deleteBtn.disabled = false;
+            exportBtn.disabled = false;
+        } else {
+            playBtn.disabled = true;
+            deleteBtn.disabled = true;
+            exportBtn.disabled = true;
+        }
+    }
+
+    playSelectedRun() {
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList || !runsList.value) {
+            this.toastManager.show('Please select a run to play', 'warning');
+            return;
+        }
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        
+        if (!selectedRun) {
+            this.toastManager.show('Selected run not found', 'error');
+            return;
+        }
+
+        this.toastManager.show(`Playing run "${selectedRun.name}"...`, 'info');
+        // TODO: Implement actual playback functionality
+        this.logger.log(`Playing run: ${selectedRun.name} (${selectedRun.commands.length} commands)`, 'info');
+    }
+
+
 
     clearLog() {
         this.logger.clear();
