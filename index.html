@@ -37,6 +37,44 @@
     <link rel="preload" href="styles.css" as="style">
 </head>
 <body>
+    <!-- Browser Compatibility Check -->
+    <div id="browserNotSupported" class="browser-not-supported" style="display: none;">
+        <div class="browser-not-supported-content">
+            <div class="browser-not-supported-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h1>Browser Not Supported</h1>
+            <p>This application requires a modern browser with advanced web technologies.</p>
+            <p><strong>Safari is not supported.</strong></p>
+            <div class="supported-browsers">
+                <h3>Please use one of these supported browsers:</h3>
+                <div class="browser-list">
+                    <div class="browser-item">
+                        <i class="fab fa-chrome"></i>
+                        <span>Google Chrome</span>
+                    </div>
+                    <div class="browser-item">
+                        <i class="fab fa-firefox-browser"></i>
+                        <span>Mozilla Firefox</span>
+                    </div>
+                    <div class="browser-item">
+                        <i class="fab fa-edge"></i>
+                        <span>Microsoft Edge</span>
+                    </div>
+                </div>
+            </div>
+            <div class="technical-details">
+                <p>This application requires support for:</p>
+                <ul>
+                    <li>Web Bluetooth API</li>
+                    <li>Service Workers</li>
+                    <li>Modern JavaScript (ES2020+)</li>
+                    <li>WebAssembly</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Screen -->
     <div id="loadingScreen" class="loading-screen">
         <div class="loading-content">
@@ -484,6 +522,86 @@
                     });
             });
         }
+    </script>
+
+    <!-- Browser Detection Script -->
+    <script>
+        (function() {
+            // Detect Safari
+            function isSafari() {
+                return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            }
+            
+            // Detect other unsupported browsers
+            function isUnsupportedBrowser() {
+                // Check for Safari
+                if (isSafari()) return true;
+                
+                // Check for Internet Explorer
+                if (navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > -1) {
+                    return true;
+                }
+                
+                // Check for very old versions of browsers
+                const userAgent = navigator.userAgent;
+                
+                // Chrome versions below 80
+                const chromeMatch = userAgent.match(/Chrome\/(\d+)/);
+                if (chromeMatch && parseInt(chromeMatch[1]) < 80) return true;
+                
+                // Firefox versions below 75
+                const firefoxMatch = userAgent.match(/Firefox\/(\d+)/);
+                if (firefoxMatch && parseInt(firefoxMatch[1]) < 75) return true;
+                
+                // Edge versions below 80
+                const edgeMatch = userAgent.match(/Edg\/(\d+)/);
+                if (edgeMatch && parseInt(edgeMatch[1]) < 80) return true;
+                
+                return false;
+            }
+            
+            // Check for required APIs
+            function hasRequiredAPIs() {
+                // Check for Web Bluetooth
+                if (!navigator.bluetooth) return false;
+                
+                // Check for Service Workers
+                if (!('serviceWorker' in navigator)) return false;
+                
+                // Check for Promise support
+                if (typeof Promise === 'undefined') return false;
+                
+                // Check for async/await support (ES2017)
+                try {
+                    eval('async function test() {}');
+                } catch (e) {
+                    return false;
+                }
+                
+                return true;
+            }
+            
+            // Show browser not supported message
+            function showBrowserNotSupported() {
+                document.getElementById('browserNotSupported').style.display = 'flex';
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('appContainer').style.display = 'none';
+                
+                // Prevent any scripts from loading
+                const scripts = document.querySelectorAll('script[src]');
+                scripts.forEach(script => {
+                    if (script.src.includes('app.js')) {
+                        script.remove();
+                    }
+                });
+            }
+            
+            // Main browser compatibility check
+            if (isUnsupportedBrowser() || !hasRequiredAPIs()) {
+                showBrowserNotSupported();
+                return; // Stop execution
+            }
+        })();
     </script>
 
     <script src="app.js?v=3.0.1"></script>
