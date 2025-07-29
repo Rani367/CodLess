@@ -1245,50 +1245,91 @@ class FLLRoboticsApp extends EventEmitter {
         // Auto-save
         this.autoSaveTimer = null;
         
-        // Initialize application
-        this.init();
+        // Note: init() will be called explicitly after construction
     }
 
     async init() {
         try {
+            console.log('Starting application initialization...');
             this.showLoadingScreen();
             
+            console.log('Checking browser compatibility...');
             // Check browser compatibility
             this.checkBrowserCompatibility();
             
+            console.log('Loading user data...');
             // Load saved data
             await this.loadUserData();
             
+            console.log('Setting up event listeners...');
             // Setup event listeners
             this.setupEventListeners();
             
+            console.log('Setting up robot simulator...');
             // Setup robot simulator
             this.setupRobotSimulator();
             
+            console.log('Setting up BLE controller events...');
             // Setup BLE controller events
             this.setupBLEEvents();
             
+            console.log('Setting up performance monitoring...');
             // Setup performance monitoring
             this.setupPerformanceMonitoring();
             
+            console.log('Setting up auto-save...');
             // Setup auto-save
             this.setupAutoSave();
             
+            console.log('Setting up keyboard controls...');
             // Setup keyboard controls
             this.setupKeyboardControls();
             
+            console.log('Updating UI...');
             // Initialize UI
             this.updateUI();
             
+            console.log('Hiding loading screen...');
             // Show application
             await this.hideLoadingScreen();
             
+            console.log('Application initialized successfully!');
             this.logger.log('Application initialized successfully', 'success');
             this.toastManager.show('Welcome to CodLess Robotics Control Center!', 'success');
             
         } catch (error) {
             console.error('Failed to initialize application:', error);
-            this.toastManager.show(`Initialization failed: ${error.message}`, 'error', 0);
+            
+            // Hide loading screen and show error
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                const loadingContent = loadingScreen.querySelector('.loading-content');
+                if (loadingContent) {
+                    loadingContent.innerHTML = `
+                        <div class="loading-logo">
+                            <i class="fas fa-exclamation-triangle" style="color: #ff4757;"></i>
+                        </div>
+                        <h2>Initialization Failed</h2>
+                        <p style="color: #ff4757; margin: 20px 0;">
+                            ${error.message}
+                        </p>
+                        <button onclick="location.reload()" style="
+                            background: #00a8ff; 
+                            color: white; 
+                            border: none; 
+                            padding: 10px 20px; 
+                            border-radius: 5px; 
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">
+                            Retry
+                        </button>
+                    `;
+                }
+            }
+            
+            // Re-throw the error so it can be caught by the DOMContentLoaded handler
+            throw error;
         }
     }
 
@@ -3253,8 +3294,41 @@ function closeWindow() {
 // APPLICATION INITIALIZATION
 // ============================
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new FLLRoboticsApp();
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        window.app = new FLLRoboticsApp();
+        await window.app.init();
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        
+        // Show error message to user
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            const loadingContent = loadingScreen.querySelector('.loading-content');
+            if (loadingContent) {
+                loadingContent.innerHTML = `
+                    <div class="loading-logo">
+                        <i class="fas fa-exclamation-triangle" style="color: #ff4757;"></i>
+                    </div>
+                    <h2>Initialization Failed</h2>
+                    <p style="color: #ff4757; margin: 20px 0;">
+                        Failed to load the application: ${error.message}
+                    </p>
+                    <button onclick="location.reload()" style="
+                        background: #00a8ff; 
+                        color: white; 
+                        border: none; 
+                        padding: 10px 20px; 
+                        border-radius: 5px; 
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">
+                        Retry
+                    </button>
+                `;
+            }
+        }
+    }
 });
 
 window.addEventListener('beforeunload', (e) => {
