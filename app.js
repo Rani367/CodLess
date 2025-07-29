@@ -10,8 +10,9 @@
 const APP_CONFIG = {
     VERSION: '3.0.0',
     NAME: 'CodLess FLL Robotics Control Center',
-    BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
-    HUB_NAME_PREFIX: 'Pybricks',
+    BLUETOOTH_SERVICE_UUID: '00001623-1212-efde-1623-785feabcd123',
+    BLUETOOTH_CHARACTERISTIC_UUID: '00001624-1212-efde-1623-785feabcd123',
+    HUB_NAME_PREFIX: 'LEGO Hub',
     DEFAULT_COMMAND_TIMEOUT: 1000,
     MAX_LOG_ENTRIES: 1000,
     AUTO_SAVE_INTERVAL: 30000, // 30 seconds
@@ -376,7 +377,7 @@ class BLEController extends EventEmitter {
 
             this.server = await this.device.gatt.connect();
             this.service = await this.server.getPrimaryService(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
-            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
+            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_CHARACTERISTIC_UUID);
 
             await this.characteristic.startNotifications();
             this.characteristic.addEventListener('characteristicvaluechanged', (event) => {
@@ -408,7 +409,7 @@ class BLEController extends EventEmitter {
             
             // Handle specific Bluetooth errors with user-friendly messages
             if (error.name === 'NotFoundError') {
-                errorMessage = 'No Pybricks hub found. Make sure your hub is powered on and running the provided code.';
+                errorMessage = 'No LEGO hub found. Make sure your hub is powered on and available for connection.';
             } else if (error.name === 'NotAllowedError') {
                 errorMessage = 'Bluetooth access was denied. Please allow Bluetooth access and try again.';
             } else if (error.name === 'SecurityError') {
@@ -1385,9 +1386,9 @@ class FLLRoboticsApp extends EventEmitter {
         // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
         
-        // Pybricks integration
-        document.getElementById('copyCodeBtn')?.addEventListener('click', () => this.copyPybricksCode());
-        document.getElementById('openPybricksBtn')?.addEventListener('click', () => this.openPybricksIDE());
+        // Competition code
+        document.getElementById('downloadCompetitionCodeBtn')?.addEventListener('click', () => this.downloadCompetitionCode());
+        document.getElementById('uploadToHubBtn')?.addEventListener('click', () => this.uploadToHub());
         
         // Recording controls
         document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
@@ -1701,7 +1702,7 @@ class FLLRoboticsApp extends EventEmitter {
         const troubleshootingSteps = [
             "🔧 Troubleshooting Connection Issues:",
             "",
-            "1. Make sure your hub is powered on and running the Pybricks code",
+            "1. Make sure your hub is powered on and ready for Bluetooth connection",
             "2. Check that you're using Chrome, Edge, or another compatible browser",
             "3. Ensure you're accessing the app via HTTPS (required for Bluetooth)",
             "4. Move closer to your hub (Bluetooth range ~10 meters)",
@@ -1710,7 +1711,7 @@ class FLLRoboticsApp extends EventEmitter {
             "",
             "💡 Tips:",
             "- The hub LED should be solid blue when ready to connect",
-            "- Make sure the hub name starts with 'Pybricks'",
+            "- Make sure your LEGO hub supports Bluetooth LE",
             "- Try the simulator mode if physical connection isn't working"
         ];
 
@@ -1793,7 +1794,7 @@ class FLLRoboticsApp extends EventEmitter {
             case 'error':
             case 'disconnected':
             default:
-                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to LEGO Hub';
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator disconnected';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
@@ -1816,16 +1817,18 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     updateRunsList() {
-        const select = document.getElementById('savedRunsList');
-        if (!select) return;
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList) return;
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
         
-        select.innerHTML = '<option value="">Select a run...</option>';
+        runsList.innerHTML = '<option value="">Select a saved run...</option>';
         
-        this.savedRuns.forEach((runData, runName) => {
+        savedRuns.forEach(run => {
             const option = document.createElement('option');
-            option.value = runName;
-            option.textContent = `${runName} (${runData.commands?.length || 0} commands)`;
-            select.appendChild(option);
+            option.value = run.id;
+            option.textContent = `${run.name} (${new Date(run.createdAt).toLocaleDateString()})`;
+            runsList.appendChild(option);
         });
     }
 
@@ -1999,103 +2002,268 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
 
-    copyPybricksCode() {
-        const code = this.generatePybricksCode();
-        navigator.clipboard.writeText(code).then(() => {
-            this.toastManager.show('Pybricks code copied to clipboard!', 'success');
-        }).catch(() => {
-            this.toastManager.show('Failed to copy code to clipboard', 'error');
-        });
+    downloadCompetitionCode() {
+        const code = this.generateHubCode();
+        const blob = new Blob([code], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `competition-robot-code-${new Date().toISOString().split('T')[0]}.py`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toastManager.show('Competition code downloaded successfully!', 'success');
     }
 
-    generatePybricksCode() {
+    generateHubCode() {
         return `#!/usr/bin/env micropython
-# Generated by CodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}
+# CodLess FLL Competition Robot Code v${APP_CONFIG.VERSION}
+# Generated: ${new Date().toISOString()}
 
-from pybricks.hubs import PrimeHub
-from pybricks.pupdevices import Motor
-from pybricks.parameters import Port, Direction
-from pybricks.tools import wait
-import json
+from hub import port, motion_sensor, button, light_matrix, sound
+import motor
+import motor_pair
+import runloop
+import time
 
-hub = PrimeHub()
+# Robot Configuration
+LEFT_MOTOR = port.${this.config.leftMotorPort}
+RIGHT_MOTOR = port.${this.config.rightMotorPort}
+ARM1_MOTOR = port.${this.config.arm1MotorPort}
+ARM2_MOTOR = port.${this.config.arm2MotorPort}
 
-# Motor configuration
-left_motor = Motor(Port.${this.config.leftMotorPort})
-right_motor = Motor(Port.${this.config.rightMotorPort})
-arm1_motor = Motor(Port.${this.config.arm1MotorPort})
-arm2_motor = Motor(Port.${this.config.arm2MotorPort})
+# Initialize motor pair for driving
+motor_pair.pair(motor_pair.PAIR_1, LEFT_MOTOR, RIGHT_MOTOR)
 
-def execute_command(cmd):
-    cmd_type = cmd.get("type", "")
+async def main():
+    print("CodLess FLL Robot Ready!")
+    light_matrix.write("GO")
+    sound.beep(440, 500)
     
-    if cmd_type == "drive":
-        speed = cmd.get("speed", 0)
-        turn_rate = cmd.get("turn_rate", 0)
-        
-        left_speed = speed - turn_rate
-        right_speed = speed + turn_rate
-        
-        left_motor.run(left_speed)
-        right_motor.run(right_speed)
-        
-    elif cmd_type == "arm1":
-        speed = cmd.get("speed", 0)
-        if speed == 0:
-            arm1_motor.stop()
-        else:
-            arm1_motor.run(speed)
-            
-    elif cmd_type == "arm2":
-        speed = cmd.get("speed", 0)
-        if speed == 0:
-            arm2_motor.stop()
-        else:
-            arm2_motor.run(speed)
-    
-    elif cmd_type == "emergency_stop":
-        left_motor.stop()
-        right_motor.stop()
-        arm1_motor.stop()
-        arm2_motor.stop()
-    
-    elif cmd_type == "get_battery":
-        level = hub.battery.voltage()
-        hub.ble.send(bytes([0x02, int(level * 100 / 9000)]))
-    
-    elif cmd_type == "get_info":
-        info = {
-            "name": hub.system.name(),
-            "version": "1.0",
-            "features": ["drive", "arms", "battery"]
-        }
-        data = json.dumps(info).encode()
-        response = bytes([0x03]) + data
-        hub.ble.send(response)
-
-def main():
-    hub.ble.send("ready")
-    
+    # Main competition loop
     while True:
-        if hub.ble.received() is not None:
-            try:
-                data = hub.ble.received()
-                command = json.loads(data.decode())
-                execute_command(command)
-                hub.ble.send("ok")
-            except Exception as e:
-                hub.ble.send(f"error: {str(e)}")
+        # Check for button presses to run different missions
+        if button.pressed(button.LEFT):
+            await run_mission_1()
+        elif button.pressed(button.RIGHT):
+            await run_mission_2()
+        elif button.pressed(button.CENTER):
+            await emergency_stop()
         
-        wait(10)
+        # Wait before checking again
+        await runloop.sleep_ms(100)
 
-if __name__ == "__main__":
-    main()
+async def run_mission_1():
+    """Mission 1: Forward and back"""
+    print("Running Mission 1")
+    light_matrix.write("M1")
+    
+    # Drive forward
+    motor_pair.move(motor_pair.PAIR_1, 500, velocity=300)
+    await runloop.sleep_ms(2000)
+    
+    # Drive backward
+    motor_pair.move(motor_pair.PAIR_1, -500, velocity=300)
+    await runloop.sleep_ms(2000)
+    
+    # Stop
+    motor_pair.stop(motor_pair.PAIR_1)
+    light_matrix.write("DONE")
+
+async def run_mission_2():
+    """Mission 2: Turn and arm movement"""
+    print("Running Mission 2")
+    light_matrix.write("M2")
+    
+    # Turn left
+    motor_pair.move_tank(motor_pair.PAIR_1, 400, -300, 400)
+    await runloop.sleep_ms(1000)
+    
+    # Move arm 1
+    motor.run_for_degrees(ARM1_MOTOR, 180, 200)
+    await runloop.sleep_ms(500)
+    
+    # Move arm 2
+    motor.run_for_degrees(ARM2_MOTOR, -180, 200)
+    await runloop.sleep_ms(500)
+    
+    # Return arms to starting position
+    motor.run_for_degrees(ARM1_MOTOR, -180, 200)
+    motor.run_for_degrees(ARM2_MOTOR, 180, 200)
+    
+    light_matrix.write("DONE")
+
+async def emergency_stop():
+    """Emergency stop all motors"""
+    print("Emergency Stop!")
+    light_matrix.write("STOP")
+    sound.beep(880, 200)
+    
+    motor_pair.stop(motor_pair.PAIR_1)
+    motor.stop(ARM1_MOTOR)
+    motor.stop(ARM2_MOTOR)
+
+# Run the main program
+runloop.run(main())
 `;
     }
 
-    openPybricksIDE() {
-        window.open('https://code.pybricks.com', '_blank');
+    uploadToHub() {
+        this.toastManager.show('Upload to Hub functionality coming soon! For now, use the downloaded code with LEGO Education SPIKE App.', 'info');
     }
+
+    exportSelectedRun() {
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList || !runsList.value) {
+            this.toastManager.show('Please select a run to export', 'warning');
+            return;
+        }
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        
+        if (!selectedRun) {
+            this.toastManager.show('Selected run not found', 'error');
+            return;
+        }
+
+        const exportData = {
+            name: selectedRun.name,
+            description: selectedRun.description || '',
+            commands: selectedRun.commands,
+            duration: selectedRun.duration,
+            createdAt: selectedRun.createdAt,
+            exportedAt: new Date().toISOString(),
+            version: APP_CONFIG.VERSION
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `codless-run-${selectedRun.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toastManager.show(`Run "${selectedRun.name}" exported successfully!`, 'success');
+    }
+
+    deleteSelectedRun() {
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList || !runsList.value) {
+            this.toastManager.show('Please select a run to delete', 'warning');
+            return;
+        }
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        
+        if (!selectedRun) {
+            this.toastManager.show('Selected run not found', 'error');
+            return;
+        }
+
+        if (confirm(`Are you sure you want to delete the run "${selectedRun.name}"? This action cannot be undone.`)) {
+            const updatedRuns = savedRuns.filter(run => run.id !== runsList.value);
+            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(updatedRuns));
+            
+            // Update the UI
+            this.updateRunsList();
+            runsList.value = '';
+            
+            // Disable action buttons
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('deleteBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = true;
+            
+            this.toastManager.show(`Run "${selectedRun.name}" deleted successfully`, 'success');
+        }
+    }
+
+    importRun() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importData = JSON.parse(e.target.result);
+                    
+                    // Validate the imported data
+                    if (!importData.name || !importData.commands || !Array.isArray(importData.commands)) {
+                        throw new Error('Invalid run file format');
+                    }
+
+                    const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+                    
+                    // Create a new run with imported data
+                    const newRun = {
+                        id: 'run_' + Date.now(),
+                        name: importData.name + ' (Imported)',
+                        description: importData.description || '',
+                        commands: importData.commands,
+                        duration: importData.duration || 0,
+                        createdAt: new Date().toISOString(),
+                        importedAt: new Date().toISOString(),
+                        originalCreatedAt: importData.createdAt
+                    };
+
+                    savedRuns.push(newRun);
+                    localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+                    
+                    // Update the UI
+                    this.updateRunsList();
+                    
+                    this.toastManager.show(`Run "${newRun.name}" imported successfully!`, 'success');
+                } catch (error) {
+                    console.error('Import error:', error);
+                    this.toastManager.show('Failed to import run: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    selectRun(runId) {
+        const playBtn = document.getElementById('playBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        
+        if (runId) {
+            playBtn.disabled = false;
+            deleteBtn.disabled = false;
+            exportBtn.disabled = false;
+        } else {
+            playBtn.disabled = true;
+            deleteBtn.disabled = true;
+            exportBtn.disabled = true;
+        }
+    }
+
+    playSelectedRun() {
+        const runsList = document.getElementById('savedRunsList');
+        if (!runsList || !runsList.value) {
+            this.toastManager.show('Please select a run to play', 'warning');
+            return;
+        }
+
+        const savedRuns = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_RUNS) || '[]');
+        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        
+        if (!selectedRun) {
+            this.toastManager.show('Selected run not found', 'error');
+            return;
+        }
+
+        this.toastManager.show(`Playing run "${selectedRun.name}"...`, 'info');
+        // TODO: Implement actual playback functionality
+        this.logger.log(`Playing run: ${selectedRun.name} (${selectedRun.commands.length} commands)`, 'info');
+    }
+
+
 
     clearLog() {
         this.logger.clear();
