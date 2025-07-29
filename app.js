@@ -278,6 +278,7 @@ class RobotConfig {
         this.batteryWarning = data.batteryWarning || 20;
         this.autoSave = data.autoSave || false;
         this.debugMode = data.debugMode || false;
+        this.simulateConnected = data.simulateConnected || false;
         
         // Calibration data
         this.motorDelay = data.motorDelay || 0.0;
@@ -342,6 +343,7 @@ class BLEController extends EventEmitter {
         this.maxConnectionAttempts = 3;
         this.batteryLevel = null;
         this.hubInfo = null;
+        this.isSimulatingConnection = false;
     }
 
     async connect() {
@@ -1803,8 +1805,10 @@ class FLLRoboticsApp extends EventEmitter {
             if (this.isDeveloperMode) {
                 this.robotSimulator?.updateCommand(compensatedCommand);
                 this.logger.log(`SIM: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
-            } else if (this.bleController.connected) {
+            } else if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
                 await this.bleController.sendCommand(compensatedCommand);
+            } else if (this.bleController.isSimulatingConnection) {
+                this.logger.log(`SIMULATED: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
             }
             
             // Record if recording
@@ -1893,11 +1897,35 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     async toggleConnection() {
+        // Check if we should simulate connection instead of real connection
+        if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            // Start simulating connection
+            this.bleController.isSimulatingConnection = true;
+            this.bleController.connected = true;
+            this.updateConnectionUI('connected', 'Simulated Robot');
+            this.toastManager.show('Simulated connection established', 'success');
+            this.logger.log('Simulated connection established', 'success');
+            return;
+        } else if (this.config.simulateConnected && this.bleController.isSimulatingConnection) {
+            // Stop simulating connection
+            this.bleController.isSimulatingConnection = false;
+            this.bleController.connected = false;
+            this.updateConnectionUI('disconnected');
+            this.toastManager.show('Simulated connection terminated', 'info');
+            this.logger.log('Simulated connection terminated', 'info');
+            return;
+        }
+
+        // Normal BLE connection logic
         if (this.bleController.connected) {
             await this.bleController.disconnect();
         } else {
             await this.bleController.connect();
         }
+    }
+
+    isRobotConnected() {
+        return this.bleController.connected || this.bleController.isSimulatingConnection;
     }
 
     toggleDeveloperMode(enabled) {
@@ -2758,8 +2786,15 @@ while True:
     }
 
     async uploadToHub() {
-        if (!this.bleController.connected) {
+        if (!this.bleController.connected && !this.bleController.isSimulatingConnection) {
             this.toastManager.show('Please connect to your hub first before uploading code', 'warning');
+            return;
+        }
+
+        // If simulating connection, just show success message
+        if (this.bleController.isSimulatingConnection) {
+            this.toastManager.show('Code upload simulated successfully', 'success');
+            this.logger.log('Simulated code upload completed', 'info');
             return;
         }
 
@@ -2801,8 +2836,14 @@ while True:
     }
 
     async uploadAndRunCode(code) {
-        if (!this.bleController.device || !this.bleController.connected) {
+        if (!this.bleController.device || (!this.bleController.connected && !this.bleController.isSimulatingConnection)) {
             throw new Error('Hub not connected');
+        }
+
+        // If simulating connection, just log the action
+        if (this.bleController.isSimulatingConnection) {
+            this.logger.log('Simulated code upload and run', 'info');
+            return;
         }
 
         try {
@@ -3119,6 +3160,7 @@ while True:
         
         this.logger.log('Application shutting down', 'info');
     }
+
 }
 
 // ============================
@@ -3199,6 +3241,7 @@ function saveConfiguration() {
         config.batteryWarning = parseInt(document.getElementById('batteryWarning')?.value || 20);
         config.autoSave = document.getElementById('autoSave')?.checked || false;
         config.debugMode = document.getElementById('debugMode')?.checked || false;
+        config.simulateConnected = document.getElementById('simulateConnected')?.checked || false;
         
         // Validate configuration
         const validationErrors = config.validate();
