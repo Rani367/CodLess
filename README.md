@@ -11,7 +11,7 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 - **🚀 Direct code upload and execution** - Upload your competition code wirelessly to the hub and run it instantly
 - **Real-time robot control** with keyboard input
 - **Advanced calibration system** for precision movement
-- **Emergency stop functionality** for safety
+
 - **Comprehensive motor configuration** for drive and attachment motors
 
 ### 🎮 Simulation & Visualization
@@ -115,7 +115,7 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 
 4. **Control Your Robot**
    - Use keyboard controls (WASD for movement, QERF for arms)
-   - Hold Space bar for emergency stop
+   
    - Monitor robot status in real-time
 
 ### Recording & Playback
@@ -154,7 +154,7 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 | `S` | Move Backward | `E` | Arm 1 Down |
 | `A` | Turn Left | `R` | Arm 2 Up |
 | `D` | Turn Right | `F` | Arm 2 Down |
-| `Space` | Emergency Stop | `Esc` | Close Modals |
+| | | `Esc` | Close Modals |
 
 *Hold multiple keys for combined movements (e.g., W+D for forward-right)*
 
@@ -179,7 +179,7 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 
 ## 🛡️ Safety Features
 
-- **Emergency Stop**: Immediate halt of all robot movement
+
 - **Connection Monitoring**: Automatic detection of hub disconnection
 - **Battery Monitoring**: Low battery warnings and status display
 - **Command Validation**: Prevention of invalid or dangerous commands
@@ -281,10 +281,7 @@ JavaScript/
   speed: 150         // -1000 to 1000 (deg/s)
 }
 
-// Emergency stop
-{
-  type: "emergency_stop"
-}
+
 ```
 
 ### Event System

@@ -566,9 +566,7 @@ class BLEController extends EventEmitter {
                     case 'get_battery':
                         // Battery info is handled by the simulated battery monitoring
                         break;
-                    case 'emergency_stop':
-                        this.emit('hubMessage', { message: 'Emergency stop activated (simulated)' });
-                        break;
+
                     case 'drive_straight':
                     case 'turn':
                     case 'stop':
@@ -647,13 +645,7 @@ class BLEController extends EventEmitter {
         }
     }
 
-    emergencyStop() {
-        if (this.connected) {
-            // Clear command queue and send immediate stop
-            this.commandQueue = [];
-            this.sendCommand({ type: 'emergency_stop' }, true);
-        }
-    }
+
 }
 
 class RobotSimulator extends EventEmitter {
@@ -1185,14 +1177,7 @@ class RobotSimulator extends EventEmitter {
             this.targetArm1Speed = (command.speed || 0) * 1.5;
         } else if (cmdType === "arm2") {
             this.targetArm2Speed = (command.speed || 0) * 1.5;
-        } else if (cmdType === "emergency_stop") {
-            this.targetSpeed = 0;
-            this.targetTurn = 0;
-            this.targetArm1Speed = 0;
-            this.targetArm2Speed = 0;
-            this.velocity.x = 0;
-            this.velocity.angular = 0;
-        }
+
     }
 
     setBackgroundMap(image) {
@@ -1281,7 +1266,6 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Control state
         this.pressedKeys = new Set();
-        this.emergencyStopActive = false;
         this.lastArm1Speed = 0;
         this.lastArm2Speed = 0;
         
@@ -1712,7 +1696,7 @@ class FLLRoboticsApp extends EventEmitter {
         document.getElementById('fullscreenSimBtn')?.addEventListener('click', () => this.toggleSimulatorFullscreen());
         
         // Emergency controls
-        document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
+
         
         // Log controls
         document.getElementById('clearLogBtn')?.addEventListener('click', () => this.clearLog());
@@ -1857,7 +1841,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Prevent default for game keys when not in input fields
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                const gameKeys = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', ' '];
+                const gameKeys = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f'];
                 if (gameKeys.includes(e.key.toLowerCase())) {
                     e.preventDefault();
                 }
@@ -1869,12 +1853,6 @@ class FLLRoboticsApp extends EventEmitter {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
         const key = e.key.toLowerCase();
-        
-        // Emergency stop
-        if (key === ' ') {
-            this.emergencyStop();
-            return;
-        }
         
         if (!this.pressedKeys.has(key)) {
             this.pressedKeys.add(key);
@@ -1902,8 +1880,6 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     processMovementKeys() {
-        if (this.emergencyStopActive) return;
-        
         // Process drive commands - always send to handle both movement and stopping
         let speed = 0;
         let turn = 0;
@@ -2113,25 +2089,7 @@ class FLLRoboticsApp extends EventEmitter {
         );
     }
 
-    emergencyStop() {
-        this.emergencyStopActive = true;
-        this.pressedKeys.clear();
-        
-        // Reset arm speed tracking
-        this.lastArm1Speed = 0;
-        this.lastArm2Speed = 0;
-        
-        // Send emergency stop command
-        this.sendRobotCommand({ type: 'emergency_stop' });
-        
-        // Reset emergency stop after brief delay
-        setTimeout(() => {
-            this.emergencyStopActive = false;
-        }, 1000);
-        
-        this.logger.log('EMERGENCY STOP ACTIVATED', 'warning');
-        this.toastManager.show('Emergency Stop Activated!', 'warning');
-    }
+
 
     // ... [Additional methods for recording, playback, configuration, etc. would continue here]
 

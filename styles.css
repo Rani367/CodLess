@@ -901,20 +901,7 @@ kbd:hover {
     transform: scale(1.05);
 }
 
-/* Emergency Stop Button */
-.btn-emergency {
-    background: linear-gradient(135deg, #ff4757 0%, #dc3545 100%) !important;
-    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
 
-.btn-emergency:hover {
-    background: linear-gradient(135deg, #ff3742 0%, #c82333 100%) !important;
-    box-shadow: 0 6px 20px rgba(255, 71, 87, 0.6);
-    transform: translateY(-2px) scale(1.02);
-}
 
 /* Help Text */
 .help-text {
