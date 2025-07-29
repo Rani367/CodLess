@@ -1672,12 +1672,24 @@ class FLLRoboticsApp extends EventEmitter {
             this.updateConnectionUI('disconnected');
             this.toastManager.show('Hub disconnected', 'warning');
             this.logger.log('Hub disconnected', 'warning');
+            
+            // Stop recording if in progress when disconnected
+            if (this.isRecording) {
+                this.stopRecording();
+                this.toastManager.show('Recording stopped due to disconnection', 'warning');
+            }
         });
 
         this.bleController.on('connectionError', (data) => {
             this.updateConnectionUI('error');
             this.toastManager.show(`Connection failed: ${data.error}`, 'error');
             this.logger.log(`Connection failed: ${data.error}`, 'error');
+            
+            // Stop recording if in progress when connection fails
+            if (this.isRecording) {
+                this.stopRecording();
+                this.toastManager.show('Recording stopped due to connection error', 'warning');
+            }
             
             // Show troubleshooting help after multiple failed attempts
             if (data.attempt >= 3) {
@@ -1993,6 +2005,8 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
         this.updateDeveloperModeCheckbox();
+        // Initialize recording controls based on current connection status
+        this.enableRecordingControls(this.isRobotConnected());
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
@@ -2010,6 +2024,7 @@ class FLLRoboticsApp extends EventEmitter {
             const reason = !navigator.bluetooth ? 'Browser not supported' : 'HTTPS required';
             hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Bluetooth Unavailable - ${reason}</span>`;
             if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}`;
+            this.enableRecordingControls(false);
             return;
         }
         
@@ -2020,6 +2035,7 @@ class FLLRoboticsApp extends EventEmitter {
                 hubStatus.className = 'status-indicator connecting';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Connecting...</span>';
                 if (connectionStatus) connectionStatus.textContent = 'Connecting';
+                this.enableRecordingControls(false);
                 break;
                 
             case 'connected':
@@ -2028,6 +2044,7 @@ class FLLRoboticsApp extends EventEmitter {
                 hubStatus.className = 'status-indicator connected';
                 hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Connected${deviceName ? ` - ${deviceName}` : ''}</span>`;
                 if (connectionStatus) connectionStatus.textContent = `Connected${deviceName ? ` - ${deviceName}` : ''}`;
+                this.enableRecordingControls(true);
                 break;
                 
             case 'error':
@@ -2038,11 +2055,26 @@ class FLLRoboticsApp extends EventEmitter {
                 hubStatus.className = 'status-indicator disconnected';
                 hubStatus.innerHTML = '<div class="status-dot" aria-hidden="true"></div><span>Hub Disconnected</span>';
                 if (connectionStatus) connectionStatus.textContent = 'Disconnected';
+                this.enableRecordingControls(false);
                 break;
         }
     }
 
-
+    enableRecordingControls(enabled) {
+        const recordBtn = document.getElementById('recordBtn');
+        const runNameInput = document.getElementById('runNameInput');
+        
+        if (recordBtn) {
+            recordBtn.disabled = !enabled;
+        }
+        
+        if (runNameInput) {
+            runNameInput.disabled = !enabled;
+        }
+        
+        // Note: saveBtn is managed separately based on recording state
+        // pauseBtn is managed separately and is hidden by default
+    }
 
     updateRunsList() {
         try {
@@ -2252,8 +2284,8 @@ class FLLRoboticsApp extends EventEmitter {
         const recordBtn = document.getElementById('recordBtn');
         if (recordBtn) {
             recordBtn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i> Stop Recording';
-            recordBtn.classList.remove('btn-primary');
-            recordBtn.classList.add('btn-danger');
+            recordBtn.classList.remove('btn-danger');
+            recordBtn.classList.add('btn-primary');
         }
         
         this.toastManager.show('🔴 Recording started - all robot movements will be captured', 'info');
@@ -2270,9 +2302,9 @@ class FLLRoboticsApp extends EventEmitter {
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
         if (recordBtn) {
-            recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Start Recording';
-            recordBtn.classList.remove('btn-danger');
-            recordBtn.classList.add('btn-primary');
+            recordBtn.innerHTML = '<i class="fas fa-circle" aria-hidden="true"></i> Record Run';
+            recordBtn.classList.remove('btn-primary');
+            recordBtn.classList.add('btn-danger');
         }
         
         const duration = (Date.now() - this.recordingStartTime) / 1000;
