@@ -1422,62 +1422,112 @@ class FLLRoboticsApp extends EventEmitter {
     async loadUserData() {
         try {
             // Load configuration
-            const savedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
-            if (savedConfig) {
-                this.config = RobotConfig.fromJSON(JSON.parse(savedConfig));
+            try {
+                const savedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
+                if (savedConfig) {
+                    this.config = RobotConfig.fromJSON(JSON.parse(savedConfig));
+                }
+            } catch (configError) {
+                console.error('Error loading config:', configError);
+                localStorage.removeItem(STORAGE_KEYS.CONFIG);
             }
             
             // Load saved runs
             const savedRuns = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
             if (savedRuns) {
-                const runsData = JSON.parse(savedRuns);
-                this.savedRuns = new Map(Object.entries(runsData));
+                try {
+                    const runsData = JSON.parse(savedRuns);
+                    if (runsData && typeof runsData === 'object') {
+                        this.savedRuns = new Map(Object.entries(runsData));
+                    }
+                } catch (parseError) {
+                    console.error('Error parsing saved runs:', parseError);
+                    localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
+                    this.savedRuns = new Map();
+                }
             }
             
             // Load calibration data
-            const calibrationData = localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA);
-            if (calibrationData) {
-                const data = JSON.parse(calibrationData);
-                Object.assign(this.config, data);
-                this.isCalibrated = true;
+            try {
+                const calibrationData = localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA);
+                if (calibrationData) {
+                    const data = JSON.parse(calibrationData);
+                    Object.assign(this.config, data);
+                    this.isCalibrated = true;
+                }
+            } catch (calibrationError) {
+                console.error('Error loading calibration data:', calibrationError);
+                localStorage.removeItem(STORAGE_KEYS.CALIBRATION_DATA);
             }
             
             // Load user preferences
-            const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
-            if (preferences) {
-                const prefs = JSON.parse(preferences);
-                this.isDeveloperMode = prefs.developerMode || false;
+            try {
+                const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
+                if (preferences) {
+                    const prefs = JSON.parse(preferences);
+                    this.isDeveloperMode = prefs.developerMode || false;
+                }
+            } catch (prefsError) {
+                console.error('Error loading user preferences:', prefsError);
+                localStorage.removeItem(STORAGE_KEYS.USER_PREFERENCES);
             }
             
         } catch (error) {
             console.error('Error loading user data:', error);
+            // If there's a critical error, offer to reset all data
+            this.clearCorruptedData();
+        }
+    }
+
+    // Helper method to clear potentially corrupted localStorage data
+    clearCorruptedData() {
+        try {
+            console.warn('Clearing potentially corrupted localStorage data');
+            localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
+            localStorage.removeItem(STORAGE_KEYS.CONFIG);
+            localStorage.removeItem(STORAGE_KEYS.CALIBRATION_DATA);
+            localStorage.removeItem(STORAGE_KEYS.USER_PREFERENCES);
+            
+            // Reinitialize with defaults
+            this.savedRuns = new Map();
+            this.config = new RobotConfig();
+            this.isCalibrated = false;
+            this.isDeveloperMode = false;
+        } catch (clearError) {
+            console.error('Error clearing corrupted data:', clearError);
         }
     }
 
     // Helper function to get saved runs as array (handles both Map and array formats)
     getSavedRunsArray() {
-        const savedRunsData = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
-        let savedRuns = [];
-        
-        if (savedRunsData) {
-            try {
-                const parsedData = JSON.parse(savedRunsData);
-                // Handle both Map-like object structure and array structure
-                if (Array.isArray(parsedData)) {
-                    savedRuns = parsedData;
-                } else if (typeof parsedData === 'object' && parsedData !== null) {
-                    // Convert object entries to array format
-                    savedRuns = Object.values(parsedData);
+        try {
+            const savedRunsData = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
+            let savedRuns = [];
+            
+            if (savedRunsData) {
+                try {
+                    const parsedData = JSON.parse(savedRunsData);
+                    // Handle both Map-like object structure and array structure
+                    if (Array.isArray(parsedData)) {
+                        savedRuns = parsedData;
+                    } else if (typeof parsedData === 'object' && parsedData !== null) {
+                        // Convert object entries to array format
+                        savedRuns = Object.values(parsedData);
+                    }
+                } catch (error) {
+                    console.error('Error parsing saved runs data:', error);
+                    // Clear corrupted data and return empty array
+                    localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
+                    savedRuns = [];
                 }
-            } catch (error) {
-                console.error('Error parsing saved runs data:', error);
-                // Clear corrupted data and return empty array
-                localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
-                savedRuns = [];
             }
+            
+            // Ensure we always return an array
+            return Array.isArray(savedRuns) ? savedRuns : [];
+        } catch (error) {
+            console.error('Error in getSavedRunsArray:', error);
+            return [];
         }
-        
-        return savedRuns;
     }
 
     saveUserData() {
@@ -1975,21 +2025,31 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     updateRunsList() {
-        const runsList = document.getElementById('savedRunsList');
-        if (!runsList) return;
+        try {
+            const runsList = document.getElementById('savedRunsList');
+            if (!runsList) return;
 
-        const savedRuns = this.getSavedRunsArray();
-        
-        runsList.innerHTML = '<option value="">Select a saved run...</option>';
-        
-        // Safety check: ensure savedRuns is an array
-        if (Array.isArray(savedRuns)) {
-            savedRuns.forEach(run => {
-                const option = document.createElement('option');
-                option.value = run.id;
-                option.textContent = `${run.name} (${new Date(run.createdAt).toLocaleDateString()})`;
-                runsList.appendChild(option);
-            });
+            const savedRuns = this.getSavedRunsArray();
+            
+            runsList.innerHTML = '<option value="">Select a saved run...</option>';
+            
+            // Safety check: ensure savedRuns is an array and not null/undefined
+            if (Array.isArray(savedRuns) && savedRuns.length > 0) {
+                savedRuns.forEach(run => {
+                    // Additional safety check for run object
+                    if (run && run.id && run.name && run.createdAt) {
+                        const option = document.createElement('option');
+                        option.value = run.id;
+                        option.textContent = `${run.name} (${new Date(run.createdAt).toLocaleDateString()})`;
+                        runsList.appendChild(option);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error updating runs list:', error);
+            // Clear any corrupted data and try to reinitialize
+            localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
+            this.savedRuns = new Map();
         }
     }
 
@@ -3413,3 +3473,4 @@ document.head.appendChild(style);
 console.log(`%cCodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'color: #00a8ff; font-size: 16px; font-weight: bold;');
 console.log('🤖 Professional robotics control and simulation platform');
 console.log('📖 Documentation: https://github.com/codless-robotics/fll-control-center');
+console.log('%cIf you encounter "savedRuns.forEach is not a function" error, try: window.app?.clearCorruptedData()', 'color: #ff9800; font-size: 12px;');
