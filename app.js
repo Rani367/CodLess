@@ -1523,17 +1523,24 @@ class FLLRoboticsApp extends EventEmitter {
         }
         
         // Apply simulation state after loading config
+        console.log('Loading user data complete, applying simulation state...');
         this.applySimulationState();
     }
 
     applySimulationState() {
         // Apply simulation state based on current config
+        console.log('Applying simulation state:', {
+            simulateConnected: this.config.simulateConnected,
+            bleConnected: this.bleController.connected,
+            isSimulating: this.bleController.isSimulatingConnection
+        });
+        
         if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Start simulation
             this.bleController.isSimulatingConnection = true;
             this.bleController.connected = true;
             this.updateConnectionUI('connected', 'Simulated Robot');
-            this.toastManager.show('Simulation mode activated', 'info');
+            this.toastManager.show('🤖 Simulation mode activated! You can now record and test robot movements without a physical robot.', 'success', 8000);
             this.logger.log('Simulation mode activated', 'info');
             
             // Start simulated battery monitoring
@@ -1546,7 +1553,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.bleController.isSimulatingConnection = false;
             this.bleController.connected = false;
             this.updateConnectionUI('disconnected');
-            this.toastManager.show('Simulation mode deactivated', 'info');
+            this.toastManager.show('Simulation mode deactivated - robot controls disabled', 'info');
             this.logger.log('Simulation mode deactivated', 'info');
             
             // Stop simulated battery monitoring
@@ -1560,6 +1567,9 @@ class FLLRoboticsApp extends EventEmitter {
         } else if (!this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Real robot connected, simulation disabled - just update UI to reflect current state
             this.updateConnectionUI('connected', this.bleController.device?.name || 'Pybricks Hub');
+        } else {
+            // Log when no action is taken
+            console.log('No simulation state change needed');
         }
     }
 
@@ -2120,6 +2130,8 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
+        console.log('updateConnectionUI called with:', { status, deviceName, isSimulating: this.bleController?.isSimulatingConnection });
+        
         const connectBtn = document.getElementById('connectBtn');
         const hubStatus = document.getElementById('hubStatus');
         const connectionStatus = document.getElementById('connectionStatus');
@@ -3399,7 +3411,15 @@ function saveConfiguration() {
         config.batteryWarning = parseInt(document.getElementById('batteryWarning')?.value || 20);
         config.autoSave = document.getElementById('autoSave')?.checked || false;
         config.debugMode = document.getElementById('debugMode')?.checked || false;
-        config.simulateConnected = document.getElementById('simulateConnected')?.checked || false;
+        
+        const simulateConnectedEl = document.getElementById('simulateConnected');
+        if (simulateConnectedEl) {
+            config.simulateConnected = simulateConnectedEl.checked;
+            console.log('Simulate Connected checkbox value:', simulateConnectedEl.checked);
+        } else {
+            console.error('simulateConnected checkbox element not found');
+            config.simulateConnected = false;
+        }
         
         // Validate configuration
         const validationErrors = config.validate();
@@ -3409,9 +3429,20 @@ function saveConfiguration() {
             window.app.saveUserData();
             // Apply simulation state immediately after saving config
             window.app.applySimulationState();
+            
+            // Update the UI to reflect changes immediately
+            window.app.updateUI();
+            
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');
-            window.app.logger.log('Configuration updated', 'success');
+            window.app.logger.log(`Configuration updated - simulateConnected: ${config.simulateConnected}`, 'success');
+            
+            // Debug log to help troubleshoot
+            console.log('Configuration saved:', {
+                simulateConnected: config.simulateConnected,
+                bleConnected: window.app.bleController.connected,
+                isSimulating: window.app.bleController.isSimulatingConnection
+            });
         } else {
             window.app.toastManager.show(`Configuration errors: ${errors.join(', ')}`, 'error');
         }
