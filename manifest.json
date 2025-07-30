@@ -6,7 +6,7 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "landscape-primary",
+  "orientation": "any",
   "theme_color": "#00a8ff",
   "background_color": "#1e1e1e",
   "categories": ["robotics", "education", "utility"],

@@ -129,6 +129,9 @@
     <div class="app-container" id="appContainer" style="display: none;">
         <div class="title-bar">
             <div class="title-content">
+                <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu" aria-expanded="false">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <i class="fas fa-robot" aria-hidden="true"></i>
                 <h1>CodLess - FLL Robotics Control Center</h1>
                 <span class="version-badge">v3.0.0</span>
@@ -147,7 +150,8 @@
         </div>
 
         <div class="main-container">
-            <div class="sidebar">
+            <div class="mobile-overlay" id="mobileOverlay"></div>
+            <div class="sidebar" id="sidebar">
                 <div class="sidebar-section">
                     <div class="section-header">
                         <i class="fas fa-wifi" aria-hidden="true"></i>
