@@ -1473,8 +1473,8 @@ kbd:hover {
 }
 
 .controller-body {
-    width: 200px;
-    height: 140px;
+    width: 280px;
+    height: 180px;
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1482,271 +1482,606 @@ kbd:hover {
     transform-style: preserve-3d;
 }
 
-.controller-face {
+.controller-main-body {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+}
+
+/* Controller Front Face */
+.controller-front {
     position: absolute;
-    background: #171717;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
-}
-
-.controller-face.front,
-.controller-face.back {
-    width: 200px;
-    height: 140px;
-    border-radius: 20px;
-}
-
-.controller-face.front {
-    transform: translateZ(30px);
-    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 100%);
+    border-radius: 60px 60px 20px 20px;
     box-shadow: 
-        inset 0 2px 5px rgba(255, 255, 255, 0.1),
-        inset 0 -2px 5px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.1),
+        inset 0 -2px 8px rgba(0, 0, 0, 0.4),
         0 5px 20px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
 }
 
-.controller-face.back {
-    transform: rotateY(180deg) translateZ(30px);
-    background: #171717;
-}
-
-.controller-face.left,
-.controller-face.right {
-    width: 60px;
-    height: 140px;
-    left: 70px;
-    border-radius: 10px;
-}
-
-.controller-face.left {
-    transform: rotateY(-90deg) translateZ(100px);
-}
-
-.controller-face.right {
-    transform: rotateY(90deg) translateZ(100px);
-}
-
-.controller-face.top,
-.controller-face.bottom {
-    width: 200px;
-    height: 60px;
-    top: 40px;
-    border-radius: 10px;
-}
-
-.controller-face.top {
-    transform: rotateX(90deg) translateZ(70px);
-}
-
-.controller-face.bottom {
-    transform: rotateX(-90deg) translateZ(70px);
-}
-
-/* Xbox Controller Details */
-.left-stick,
-.right-stick {
+/* Grips */
+.grip-left,
+.grip-right {
     position: absolute;
-    width: 35px;
-    height: 35px;
+    width: 90px;
+    height: 120px;
+    bottom: -20px;
+    background: linear-gradient(145deg, #252525 0%, #151515 100%);
+    box-shadow: 
+        inset 2px 0 4px rgba(255, 255, 255, 0.05),
+        inset -2px 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.grip-left {
+    left: -20px;
+    border-radius: 50% 20% 20% 50% / 30% 20% 20% 30%;
+    transform: rotate(-15deg);
+}
+
+.grip-right {
+    right: -20px;
+    border-radius: 20% 50% 50% 20% / 20% 30% 30% 20%;
+    transform: rotate(15deg);
+}
+
+/* Center Section */
+.center-section {
+    position: absolute;
+    width: 200px;
+    height: 140px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Controller Back */
+.controller-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
+    border-radius: 60px 60px 20px 20px;
+    transform: rotateY(180deg) translateZ(40px);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Battery Compartment */
+.battery-compartment {
+    position: absolute;
+    width: 120px;
+    height: 60px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #0a0a0a;
+    border-radius: 10px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Controller Top */
+.controller-top {
+    position: absolute;
+    width: 100%;
+    height: 40px;
+    top: -20px;
+    background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
+    border-radius: 50px 50px 0 0;
+    transform: translateZ(20px);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Analog Sticks */
+.stick-housing {
+    position: absolute;
+    width: 45px;
+    height: 45px;
+    background: #0a0a0a;
+    border-radius: 50%;
+    box-shadow: 
+        inset 0 3px 8px rgba(0, 0, 0, 0.8),
+        0 1px 2px rgba(255, 255, 255, 0.05);
+}
+
+.stick-housing.left {
+    top: 30px;
+    left: 40px;
+}
+
+.stick-housing.right {
+    bottom: 50px;
+    right: 40px;
+}
+
+.stick-base {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    border-radius: 50%;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.stick-shaft {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.stick-top {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: radial-gradient(circle at 30% 30%, #3a3a3a, #1a1a1a);
     border-radius: 50%;
     box-shadow: 
-        0 2px 5px rgba(0, 0, 0, 0.5),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+        inset 0 -1px 3px rgba(0, 0, 0, 0.5),
+        0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
-.left-stick {
-    top: 45px;
-    left: 30px;
+.stick-top::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px dotted rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
 }
 
-.right-stick {
-    bottom: 25px;
-    right: 45px;
+/* D-Pad */
+.dpad-housing {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    left: 35px;
+    bottom: 35px;
+    background: #0a0a0a;
+    border-radius: 50%;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.6),
+        0 1px 2px rgba(255, 255, 255, 0.05);
 }
 
 .dpad {
     position: absolute;
     width: 40px;
     height: 40px;
-    left: 30px;
-    bottom: 30px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
-.dpad-up, .dpad-right, .dpad-down, .dpad-left {
+.dpad-vertical,
+.dpad-horizontal {
     position: absolute;
-    background: #2a2a2a;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    box-shadow: 
+        0 1px 3px rgba(0, 0, 0, 0.5),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.dpad-up, .dpad-down {
-    width: 12px;
-    height: 15px;
-    left: 14px;
+.dpad-vertical {
+    width: 14px;
+    height: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 3px;
 }
 
-.dpad-up {
-    top: 0;
-    border-radius: 3px 3px 0 0;
-}
-
-.dpad-down {
-    bottom: 0;
-    border-radius: 0 0 3px 3px;
-}
-
-.dpad-left, .dpad-right {
-    width: 15px;
-    height: 12px;
-    top: 14px;
-}
-
-.dpad-left {
-    left: 0;
-    border-radius: 3px 0 0 3px;
-}
-
-.dpad-right {
-    right: 0;
-    border-radius: 0 3px 3px 0;
+.dpad-horizontal {
+    width: 40px;
+    height: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-radius: 3px;
 }
 
 .dpad-center {
     position: absolute;
-    width: 12px;
-    height: 12px;
-    background: #2a2a2a;
-    top: 14px;
-    left: 14px;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1a1a1a;
+    border-radius: 50%;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-.buttons {
+/* ABXY Buttons */
+.buttons-housing {
     position: absolute;
-    width: 60px;
-    height: 60px;
-    right: 25px;
-    top: 35px;
+    width: 70px;
+    height: 70px;
+    right: 30px;
+    top: 25px;
 }
 
 .button-a, .button-b, .button-x, .button-y {
     position: absolute;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    font-size: 10px;
-    font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: all 0.1s ease;
     box-shadow: 
-        0 2px 4px rgba(0, 0, 0, 0.5),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+        0 3px 6px rgba(0, 0, 0, 0.6),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.4),
+        inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+.button-a span,
+.button-b span,
+.button-x span,
+.button-y span {
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    user-select: none;
 }
 
 .button-a {
     bottom: 0;
-    left: 20px;
-    background: #0d7c0d;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(145deg, #0fa00f, #0d7c0d);
 }
 
 .button-b {
     right: 0;
-    top: 20px;
-    background: #dc2626;
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(145deg, #ff2e2e, #dc2626);
 }
 
 .button-x {
     left: 0;
-    top: 20px;
-    background: #2563eb;
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(145deg, #3d7aff, #2563eb);
 }
 
 .button-y {
     top: 0;
-    left: 20px;
-    background: #f59e0b;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(145deg, #ffb21a, #f59e0b);
+}
+
+.button-a:active,
+.button-b:active,
+.button-x:active,
+.button-y:active {
+    transform: translateX(-50%) translateY(1px) scale(0.95);
+    box-shadow: 
+        0 1px 3px rgba(0, 0, 0, 0.6),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Xbox Button */
+.xbox-button-housing {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .xbox-button {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #0a0a0a;
+    border-radius: 50%;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.6),
+        0 1px 2px rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.xbox-logo {
     position: absolute;
-    width: 30px;
-    height: 30px;
+    width: 24px;
+    height: 24px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: radial-gradient(circle at 30% 30%, #4ade80, #22c55e);
     border-radius: 50%;
-    top: 55px;
-    left: 50%;
-    transform: translateX(-50%);
     box-shadow: 
-        0 2px 5px rgba(0, 0, 0, 0.5),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+        0 0 10px rgba(74, 222, 128, 0.5),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.3);
     animation: xboxButtonPulse 2s infinite;
 }
 
-@keyframes xboxButtonPulse {
-    0%, 100% { box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.3), 0 0 20px rgba(74, 222, 128, 0.5); }
-    50% { box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.3), 0 0 30px rgba(74, 222, 128, 0.8); }
+.xbox-logo::before {
+    content: 'X';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: bold;
+    color: #0a0a0a;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
+@keyframes xboxButtonPulse {
+    0%, 100% { 
+        box-shadow: 
+            0 0 10px rgba(74, 222, 128, 0.5),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+    }
+    50% { 
+        box-shadow: 
+            0 0 20px rgba(74, 222, 128, 0.8),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Menu and View Buttons */
 .menu-button,
 .view-button {
     position: absolute;
-    width: 15px;
-    height: 8px;
-    background: #2a2a2a;
-    border-radius: 2px;
+    width: 20px;
+    height: 20px;
+    background: #0a0a0a;
+    border-radius: 50%;
     top: 65px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 
+        inset 0 2px 3px rgba(0, 0, 0, 0.6),
+        0 1px 2px rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all 0.1s ease;
 }
 
 .menu-button {
-    right: 50px;
+    right: 60px;
 }
 
 .view-button {
-    left: 50px;
+    left: 60px;
 }
 
-.bumper,
+.menu-icon,
+.view-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.menu-icon::before,
+.menu-icon::after,
+.view-icon::before,
+.view-icon::after {
+    content: '';
+    position: absolute;
+    background: #3a3a3a;
+}
+
+/* Menu icon (three lines) */
+.menu-icon::before {
+    width: 10px;
+    height: 1px;
+    top: -3px;
+    left: -5px;
+}
+
+.menu-icon {
+    width: 10px;
+    height: 1px;
+    background: #3a3a3a;
+}
+
+.menu-icon::after {
+    width: 10px;
+    height: 1px;
+    bottom: -3px;
+    left: -5px;
+}
+
+/* View icon (two squares) */
+.view-icon::before {
+    width: 4px;
+    height: 4px;
+    top: -3px;
+    left: -5px;
+    border: 1px solid #3a3a3a;
+}
+
+.view-icon::after {
+    width: 4px;
+    height: 4px;
+    bottom: -3px;
+    right: -5px;
+    border: 1px solid #3a3a3a;
+}
+
+/* Bumpers and Triggers */
+.bumper {
+    position: absolute;
+    width: 80px;
+    height: 15px;
+    top: 5px;
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    border-radius: 20px;
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.5),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    font-size: 10px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.bumper.left {
+    left: 20px;
+}
+
+.bumper.right {
+    right: 20px;
+}
+
 .trigger {
     position: absolute;
-    background: #2a2a2a;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.bumper {
-    width: 50px;
-    height: 15px;
-    top: 10px;
-    left: 5px;
-    border-radius: 5px;
-}
-
-.trigger {
-    width: 30px;
+    width: 60px;
     height: 25px;
-    top: 30px;
-    left: 15px;
-    border-radius: 0 0 10px 10px;
+    bottom: -15px;
+    background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+    border-radius: 0 0 20px 20px;
+    transform: rotateX(30deg);
+    transform-origin: top;
+    box-shadow: 
+        0 3px 6px rgba(0, 0, 0, 0.6),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.trigger.left {
+    left: 30px;
+}
+
+.trigger.right {
+    right: 30px;
+}
+
+.trigger::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 3px;
+    background: #0a0a0a;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 2px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* USB Port */
+.usb-port {
+    position: absolute;
+    width: 20px;
+    height: 8px;
+    background: #0a0a0a;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 4px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 /* Shadow Effect */
 .xbox-shadow {
     position: absolute;
-    bottom: -50px;
+    bottom: -60px;
     left: 50%;
     transform: translateX(-50%);
-    width: 180px;
-    height: 40px;
-    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.4) 0%, transparent 70%);
-    filter: blur(10px);
+    width: 240px;
+    height: 60px;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, transparent 70%);
+    filter: blur(25px);
     animation: shadowPulse 8s infinite linear;
 }
 
 @keyframes shadowPulse {
-    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.4; }
-    50% { transform: translateX(-50%) scale(1.1); opacity: 0.6; }
+    0%, 100% { 
+        transform: translateX(-50%) scale(1);
+        opacity: 0.8;
+    }
+    50% { 
+        transform: translateX(-50%) scale(1.1);
+        opacity: 0.6;
+    }
+}
+
+/* Additional details for realism */
+.controller-front::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    height: 30%;
+    background: linear-gradient(180deg, 
+        rgba(255, 255, 255, 0.05) 0%,
+        transparent 100%);
+    border-radius: 50px 50px 0 0;
+    pointer-events: none;
+}
+
+/* Texture on grips */
+.grip-left::after,
+.grip-right::after {
+    content: '';
+    position: absolute;
+    width: 60%;
+    height: 80%;
+    top: 10%;
+    background-image: 
+        repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.1) 2px,
+            rgba(0, 0, 0, 0.1) 4px
+        );
+    opacity: 0.3;
+}
+
+.grip-left::after {
+    right: 10%;
+}
+
+.grip-right::after {
+    left: 10%;
+}
+
+/* Active states for buttons */
+.button-a:active { transform: translateX(-50%) translateY(2px) scale(0.9); }
+.button-b:active { transform: translateY(-50%) translateX(2px) scale(0.9); }
+.button-x:active { transform: translateY(-50%) translateX(-2px) scale(0.9); }
+.button-y:active { transform: translateX(-50%) translateY(-2px) scale(0.9); }
+
+.menu-button:active,
+.view-button:active,
+.xbox-button:active {
+    transform: scale(0.95);
+}
+
+.bumper:active {
+    transform: translateY(1px);
+}
+
+.trigger:active {
+    transform: rotateX(35deg);
 }
 
 /* Modal Text Styling */
@@ -1820,13 +2155,20 @@ kbd:hover {
     animation: successBounce 0.6s ease-out;
 }
 
-.xbox-modal-content.success .xbox-button {
+.xbox-modal-content.success .xbox-logo {
     background: radial-gradient(circle at 30% 30%, #4ade80, #22c55e);
     animation: none;
     box-shadow: 
-        0 2px 5px rgba(0, 0, 0, 0.5),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.3),
-        0 0 40px rgba(74, 222, 128, 1);
+        0 0 40px rgba(74, 222, 128, 1),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.xbox-modal-content.success .controller-front {
+    box-shadow: 
+        inset 0 2px 4px rgba(255, 255, 255, 0.1),
+        inset 0 -2px 8px rgba(0, 0, 0, 0.4),
+        0 5px 20px rgba(0, 0, 0, 0.3),
+        0 0 30px rgba(74, 222, 128, 0.3);
 }
 
 @keyframes successBounce {
