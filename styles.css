@@ -4,10 +4,7 @@
     box-sizing: border-box;
 }
 
-/* Custom viewport height for mobile browsers */
-:root {
-    --vh: 1vh;
-}
+
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -15,11 +12,6 @@ body {
     color: #ffffff;
     overflow: auto;
     user-select: none;
-    /* Enable touch interaction on mobile */
-    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-    -webkit-touch-callout: none;
-    /* Ensure smooth scrolling */
-    -webkit-overflow-scrolling: touch;
 }
 
 .app-container {
@@ -184,9 +176,6 @@ body {
     gap: 8px;
     position: relative;
     overflow: hidden;
-    /* Ensure touch events work */
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .btn::before {
@@ -441,7 +430,6 @@ body {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     image-rendering: auto;
     cursor: grab;
-    touch-action: none;
 }
 
 #robotSimulator:hover {
@@ -1139,333 +1127,12 @@ kbd:hover {
     }
 }
 
-/* Mobile Menu Toggle */
-.mobile-menu-toggle {
-    display: none;
-    width: 40px;
-    height: 40px;
-    border: none;
-    background: transparent;
-    color: #ffffff;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 0;
-    margin-right: 12px;
-    border-radius: 8px;
-    transition: background 0.2s ease;
-    -webkit-app-region: no-drag;
+
 }
 
-.mobile-menu-toggle:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
 
-.mobile-menu-toggle:active {
-    background: rgba(255, 255, 255, 0.2);
-}
 
-/* Mobile Overlay */
-.mobile-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 99;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
 
-.mobile-overlay.active {
-    opacity: 1;
-}
-
-/* Enhanced Touch Targets */
-@media (pointer: coarse) {
-    .btn {
-        min-height: 44px;
-        padding: 12px 24px;
-        font-size: 16px;
-    }
-    
-    .control-btn {
-        min-width: 60px;
-        min-height: 60px;
-        font-size: 24px;
-    }
-    
-    .checkbox-container {
-        padding: 8px 0;
-    }
-    
-    .checkbox {
-        width: 24px;
-        height: 24px;
-    }
-    
-    .slider {
-        height: 8px;
-    }
-    
-    .slider::-webkit-slider-thumb {
-        width: 28px;
-        height: 28px;
-    }
-    
-    .slider::-moz-range-thumb {
-        width: 28px;
-        height: 28px;
-    }
-    
-    /* Increase tap targets for all interactive elements */
-    button, a, input, select, textarea {
-        min-height: 44px;
-    }
-}
-
-@media (max-width: 768px) {
-    .mobile-menu-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .app-container {
-        margin: 0;
-        border-radius: 0;
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height for mobile */
-    }
-    
-    .main-container {
-        position: relative;
-        overflow-x: hidden;
-    }
-    
-    .sidebar {
-        width: 280px;
-        position: fixed;
-        top: 50px;
-        left: 0;
-        height: calc(100vh - 50px);
-        height: calc(100dvh - 50px);
-        z-index: 100;
-        transform: translateX(-100%) translateZ(0);
-        transition: transform 0.3s ease;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
-    }
-    
-    .sidebar.mobile-open {
-        transform: translateX(0);
-    }
-    
-    .mobile-overlay {
-        display: block;
-    }
-    
-    .modal-content {
-        width: 95%;
-        margin: 20px;
-    }
-    
-    .toast-container {
-        top: 10px;
-        right: 10px;
-        left: 10px;
-        max-width: none;
-    }
-    
-    .simulator-container {
-        padding: 16px;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-    
-    #robotSimulator {
-        height: min(45vh, 450px);
-        min-height: 300px;
-    }
-    
-    .simulator-info .performance-stats {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .status-bar {
-        flex-direction: column;
-        height: auto;
-        padding: 8px 20px;
-        gap: 4px;
-    }
-    
-    /* Mobile-optimized controls */
-    .controls-container {
-        padding: 16px;
-    }
-    
-    .control-group {
-        margin-bottom: 20px;
-    }
-    
-    .control-btn {
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
-    }
-    
-    /* Better mobile tables */
-    .log-table {
-        font-size: 12px;
-    }
-    
-    .log-table th,
-    .log-table td {
-        padding: 8px 4px;
-    }
-    
-    /* Mobile-friendly modals */
-    .modal-content {
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-    
-    /* Optimize title bar for mobile */
-    .title-bar {
-        padding: 0 12px;
-    }
-    
-    .title-content h1 {
-        font-size: 14px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .window-controls {
-        display: none; /* Hide window controls on mobile */
-    }
-    
-    /* Mobile-optimized direction controls */
-    .direction-controls {
-        gap: 8px;
-        margin: 16px 0;
-    }
-    
-    .direction-column {
-        gap: 8px;
-    }
-    
-    /* Better mobile input fields */
-    input[type="text"],
-    input[type="number"],
-    select,
-    textarea {
-        font-size: 16px; /* Prevents zoom on iOS */
-        padding: 12px;
-        border-radius: 8px;
-    }
-    
-    /* Mobile-friendly tabs */
-    .tab-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-    }
-    
-    .tab-container::-webkit-scrollbar {
-        display: none;
-    }
-    
-    .tab-buttons {
-        min-width: fit-content;
-        padding: 0 16px;
-    }
-    
-    .tab-button {
-        padding: 10px 16px;
-        font-size: 14px;
-        white-space: nowrap;
-    }
-    
-    /* Mobile simulator adjustments */
-    .simulator-container {
-        flex-direction: column;
-    }
-    
-    #robotSimulator {
-        width: 100%;
-        height: 40vh;
-        height: calc(var(--vh, 1vh) * 40);
-        min-height: 250px;
-        max-height: 400px;
-    }
-    
-    .simulator-controls {
-        width: 100%;
-        background: rgba(30, 30, 30, 0.95);
-        border-radius: 12px;
-        padding: 16px;
-    }
-    
-    /* Mobile log viewer */
-    .log-viewer {
-        height: 200px;
-        font-size: 12px;
-    }
-    
-    /* Improve button groups on mobile */
-    .button-group {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    
-    .button-group .btn {
-        flex: 1;
-        min-width: 120px;
-    }
-    
-    /* Mobile-friendly sliders */
-    .slider-container {
-        padding: 8px 0;
-    }
-    
-    .slider-label {
-        font-size: 14px;
-        margin-bottom: 8px;
-    }
-    
-    /* Optimize performance stats for mobile */
-    .performance-stats {
-        font-size: 12px;
-        gap: 16px;
-    }
-    
-    .stat-item {
-        min-width: auto;
-    }
-}
-
-@media (max-width: 480px) {
-    .version-badge {
-        display: none;
-    }
-    
-    .main-content {
-        padding: 12px;
-    }
-    
-    .simulator-controls {
-        flex-direction: column;
-        gap: 8px;
-        padding: 12px 16px;
-    }
-    
-    .simulator-info .performance-stats {
-        justify-content: center;
-    }
-}
 
 /* Dark mode enhancements */
 @media (prefers-color-scheme: dark) {
@@ -1666,28 +1333,8 @@ kbd:hover {
     border: 1px solid rgba(255, 107, 107, 0.2);
 }
 
-/* Responsive design for browser not supported screen */
-@media (max-width: 768px) {
-    .browser-not-supported-content {
-        padding: 30px 20px;
-        margin: 20px;
-    }
-    
-    .browser-not-supported h1 {
-        font-size: 24px;
-    }
-    
-    .browser-list {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .browser-item {
-        width: 100%;
-        max-width: 200px;
-        justify-content: center;
-    }
-}
+
+
 
 /* ============================
    XBOX CONTROLLER MODAL STYLES
@@ -2486,98 +2133,7 @@ kbd:hover {
     100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
 }
 
-/* Mobile Performance Optimizations */
-@media (max-width: 768px) {
-    /* Enable GPU acceleration for smooth animations */
-    .sidebar,
-    .mobile-overlay,
-    .modal,
-    .toast {
-        will-change: transform, opacity;
-    }
-    
-    /* Reduce animation complexity on mobile */
-    .loading-progress,
-    .pulse,
-    .spin {
-        animation-duration: 2s;
-    }
-    
-    /* Optimize scrolling performance */
-    .log-viewer,
-    .sidebar,
-    .modal-content {
-        -webkit-overflow-scrolling: touch;
-        overflow-y: auto;
-    }
-    
-    /* Disable hover effects on touch devices */
-    @media (hover: none) {
-        .btn:hover,
-        .control-btn:hover,
-        .tab-button:hover {
-            transform: none;
-            box-shadow: none;
-        }
-    }
-    
-    /* Optimize rendering for mobile */
-    .app-container {
-        contain: layout style paint;
-    }
-    
-    /* Reduce blur effects on low-end devices */
-    @media (max-width: 768px) and (max-resolution: 2dppx) {
-        .glass-effect,
-        .modal-content,
-        .toast {
-            backdrop-filter: none;
-            background: rgba(30, 30, 30, 0.98);
-        }
-    }
-}
 
-/* iOS-specific fixes */
-@supports (-webkit-touch-callout: none) {
-    /* Fix iOS rubber band scrolling */
-    body {
-        position: fixed;
-        width: 100%;
-        height: 100%;
-    }
-    
-    .app-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        overflow: hidden;
-    }
-    
-    /* Fix iOS safe area */
-    .app-container {
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
-    }
-    
-    .sidebar {
-        padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    }
-}
-
-/* Android-specific fixes */
-@media (max-width: 768px) {
-    /* Fix Android keyboard issues */
-    input:focus,
-    textarea:focus,
-    select:focus {
-        position: relative;
-        z-index: 1;
-    }
-}
 
 /* Dark mode enhancements */
 @media (prefers-color-scheme: dark) {
@@ -2590,125 +2146,7 @@ kbd:hover {
    End of File
    ======================================== */
 
-/* ========================================
-   Mobile Touch Interaction Fixes
-   ======================================== */
 
-/* Enable smooth scrolling on mobile */
-.sidebar,
-.main-content,
-.status-display,
-.modal-content,
-.tab-content {
-    -webkit-overflow-scrolling: touch;
-    overflow-scrolling: touch;
-    scroll-behavior: smooth;
-}
-
-/* Ensure natural scrolling on mobile */
-@media (max-width: 768px) {
-    html, body {
-        overflow: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        height: auto !important;
-        position: relative !important;
-    }
-    
-    .app-container {
-        min-height: 100vh;
-        height: auto;
-        margin: 0;
-        border-radius: 0;
-        overflow: visible !important;
-    }
-    
-    .main-container {
-        overflow: visible !important;
-        height: auto;
-        flex-direction: column; /* Stack sidebar and content vertically on mobile */
-    }
-    
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        overflow: visible;
-    }
-    
-    .main-content {
-        height: auto;
-        overflow: visible;
-    }
-}
-
-/* Ensure all interactive elements respond to touch */
-button,
-.btn,
-.btn-icon,
-.btn-primary,
-.btn-success,
-.btn-danger,
-.btn-warning,
-.btn-secondary,
-.tab-button,
-.mobile-menu-toggle,
-input[type="button"],
-input[type="submit"],
-select,
-a,
-[role="button"],
-[onclick] {
-    /* Enable touch events */
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    cursor: pointer;
-    /* Prevent iOS from adding delay */
-    -webkit-touch-callout: none;
-}
-
-/* Remove any pointer-events: none that might block interaction */
-@media (hover: none) and (pointer: coarse) {
-    * {
-        /* Ensure nothing is blocking touch events */
-        pointer-events: auto !important;
-    }
-    
-    /* Except for elements that should genuinely not be interactive */
-    .modal-backdrop,
-    .overlay:not(.active),
-    .disabled,
-    [disabled] {
-        pointer-events: none !important;
-    }
-}
-
-/* Additional iOS Safari fixes */
-@supports (-webkit-touch-callout: none) {
-    /* iOS specific fixes */
-    body {
-        -webkit-user-select: none;
-        -webkit-touch-callout: none;
-        -webkit-tap-highlight-color: transparent;
-    }
-    
-    /* Ensure buttons are clickable */
-    button,
-    .btn,
-    [role="button"] {
-        cursor: pointer;
-        -webkit-appearance: none;
-    }
-}
-
-/* Prevent text selection on buttons */
-button,
-.btn,
-.btn-icon {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
 
 /* ========================================
    End of File

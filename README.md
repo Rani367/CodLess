@@ -36,10 +36,10 @@ A professional, feature-rich robotics control and simulation platform for FIRST 
 
 ### 🌐 Progressive Web App (PWA)
 - **Offline functionality** with service worker caching
-- **Installable on desktop and mobile devices**
+- **Installable on desktop devices**
 - **Background sync** for data persistence
 - **Push notifications** (future feature)
-- **Responsive design** for all screen sizes
+- **Optimized desktop interface**
 
 ### 🛠️ Developer Tools
 - **Comprehensive logging system** with export capabilities
@@ -79,7 +79,7 @@ Visit the live application at: [https://codless-robotics.github.io/fll-control-c
 #### Option 3: Install as PWA
 1. Visit the application in a supported browser
 2. Click the "Install" button in the address bar
-3. The app will be installed as a desktop/mobile application
+3. The app will be installed as a desktop application
 
 ### Hub Setup
 
@@ -208,13 +208,13 @@ Each calibration measurement includes a confidence score (0-100%) indicating the
 
 *Web Bluetooth API support is required for physical robot connection*
 
-## 📱 Mobile Support
+## 💻 Desktop Requirements
 
-The application is fully responsive and supports mobile devices:
-- **Touch Controls**: Tap-based interface for mobile users
-- **Mobile Installation**: Install as a mobile app via PWA
-- **Responsive Design**: Optimized layout for all screen sizes
-- **Gesture Support**: Pinch-to-zoom in simulator view
+This application is designed exclusively for desktop computers:
+- **Web Bluetooth API**: Full support on desktop browsers
+- **Precise Controls**: Keyboard and mouse required for robot control
+- **Performance**: Optimized for desktop hardware capabilities
+
 
 ## 🔒 Privacy & Security
 
@@ -259,7 +259,7 @@ JavaScript/
 - **ES6+ JavaScript** with strict mode
 - **Comprehensive error handling** with try-catch blocks
 - **Accessibility compliance** with ARIA labels
-- **Responsive design** with mobile-first approach
+- **Desktop-optimized interface**
 - **Performance optimization** with efficient algorithms
 
 ## 📖 API Documentation

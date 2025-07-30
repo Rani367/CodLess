@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodLess - FLL Robotics Control Center</title>
     <meta name="description" content="Professional FLL Robotics Control Center - Advanced robot control, recording, and simulation platform">
     <meta name="keywords" content="FLL, robotics, LEGO, Pybricks, robot control, automation, competition">
     <meta name="author" content="CodLess Robotics">
@@ -27,7 +27,6 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="assets/icon-192x192.png">
     
-    <title>CodLess - FLL Robotics Control Center v3.0.0</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -129,9 +128,6 @@
     <div class="app-container" id="appContainer" style="display: none;">
         <div class="title-bar">
             <div class="title-content">
-                <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu" aria-expanded="false">
-                    <i class="fas fa-bars"></i>
-                </button>
                 <i class="fas fa-robot" aria-hidden="true"></i>
                 <h1>CodLess - FLL Robotics Control Center</h1>
                 <span class="version-badge">v3.0.0</span>
@@ -149,9 +145,8 @@
             </div>
         </div>
 
-        <div class="main-container">
-            <div class="mobile-overlay" id="mobileOverlay"></div>
-            <div class="sidebar" id="sidebar">
+        <div class="main-content">
+            <aside class="sidebar" id="sidebar">
                 <div class="sidebar-section">
                     <div class="section-header">
                         <i class="fas fa-wifi" aria-hidden="true"></i>
@@ -245,158 +240,157 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </aside>
 
-            <div class="main-content">
-                <div id="simulatorSection" class="content-section hidden">
-                    <div class="section-header">
-                        <i class="fas fa-eye" aria-hidden="true"></i>
-                        <h3>Robot Simulator</h3>
-                        <div class="section-actions">
-                            <button id="simulatorSettingsBtn" class="btn-icon" aria-label="Simulator settings">
-                                <i class="fas fa-cog" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="simulator-container">
-                        <canvas id="robotSimulator" aria-label="Robot movement simulator"></canvas>
-                        <div class="simulator-controls">
-                            <div class="simulator-info">
-                                <p class="info-text">Real-time visual simulation of your robot's movement and arm positions</p>
-                                <div class="performance-stats">
-                                    <span id="fpsCounter">FPS: 60</span>
-                                    <span id="latencyCounter">Latency: 0ms</span>
-                                </div>
-                            </div>
-                            <div class="button-group">
-                                <button id="uploadMapBtn" class="btn btn-primary" disabled>
-                                    <i class="fas fa-upload" aria-hidden="true"></i>
-                                    Upload Map
-                                </button>
-                                <button id="resetSimBtn" class="btn btn-success" disabled>
-                                    <i class="fas fa-refresh" aria-hidden="true"></i>
-                                    Reset Position
-                                </button>
-                                <button id="fullscreenSimBtn" class="btn btn-secondary">
-                                    <i class="fas fa-expand" aria-hidden="true"></i>
-                                    Fullscreen
-                                </button>
-                            </div>
-
-                        </div>
+            <div class="simulatorSection" id="simulatorSection" class="content-section hidden">
+                <div class="section-header">
+                    <i class="fas fa-eye" aria-hidden="true"></i>
+                    <h3>Robot Simulator</h3>
+                    <div class="section-actions">
+                        <button id="simulatorSettingsBtn" class="btn-icon" aria-label="Simulator settings">
+                            <i class="fas fa-cog" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </div>
-
-                <div class="content-section">
-                    <div class="section-header">
-                        <i class="fas fa-microphone" aria-hidden="true"></i>
-                        <h3>Recording Controls</h3>
-                        <div class="section-actions">
-                            <span id="recordingTimer" class="recording-timer hidden">00:00</span>
-                        </div>
-                    </div>
-                    <div class="recording-controls">
-                        <div class="input-group">
-                            <label for="runNameInput">Run Name:</label>
-                            <input type="text" id="runNameInput" value="Run 1" class="input-field" maxlength="50" aria-describedby="runNameHelp">
-                            <small id="runNameHelp" class="help-text">Maximum 50 characters</small>
+                <div class="simulator-container">
+                    <canvas id="robotSimulator" aria-label="Robot movement simulator"></canvas>
+                    <div class="simulator-controls">
+                        <div class="simulator-info">
+                            <p class="info-text">Real-time visual simulation of your robot's movement and arm positions</p>
+                            <div class="performance-stats">
+                                <span id="fpsCounter">FPS: 60</span>
+                                <span id="latencyCounter">Latency: 0ms</span>
+                            </div>
                         </div>
                         <div class="button-group">
-                            <button id="recordBtn" class="btn btn-danger" disabled>
-                                <i class="fas fa-circle" aria-hidden="true"></i>
-                                Record Run
+                            <button id="uploadMapBtn" class="btn btn-primary" disabled>
+                                <i class="fas fa-upload" aria-hidden="true"></i>
+                                Upload Map
                             </button>
-                            <button id="saveBtn" class="btn btn-success" disabled>
-                                <i class="fas fa-save" aria-hidden="true"></i>
-                                Save Run
+                            <button id="resetSimBtn" class="btn btn-success" disabled>
+                                <i class="fas fa-refresh" aria-hidden="true"></i>
+                                Reset Position
                             </button>
-                            <button id="pauseBtn" class="btn btn-warning hidden" disabled>
-                                <i class="fas fa-pause" aria-hidden="true"></i>
-                                Pause
+                            <button id="fullscreenSimBtn" class="btn btn-secondary">
+                                <i class="fas fa-expand" aria-hidden="true"></i>
+                                Fullscreen
                             </button>
                         </div>
+
                     </div>
                 </div>
+            </div>
 
-                <div class="content-section">
-                    <div class="section-header">
-                        <i class="fas fa-terminal" aria-hidden="true"></i>
-                        <h3>Status Display</h3>
-                        <div class="section-actions">
-                            <button id="clearLogBtn" class="btn-icon" aria-label="Clear log">
-                                <i class="fas fa-trash" aria-hidden="true"></i>
-                            </button>
-                            <button id="exportLogBtn" class="btn-icon" aria-label="Export log">
-                                <i class="fas fa-download" aria-hidden="true"></i>
-                            </button>
-                        </div>
+            <div class="content-section">
+                <div class="section-header">
+                    <i class="fas fa-microphone" aria-hidden="true"></i>
+                    <h3>Recording Controls</h3>
+                    <div class="section-actions">
+                        <span id="recordingTimer" class="recording-timer hidden">00:00</span>
                     </div>
-                    <div id="statusDisplay" class="status-display" role="log" aria-live="polite" aria-label="Application status log"></div>
                 </div>
-
-                <div class="content-section">
-                    <div class="section-header">
-                        <i class="fas fa-keyboard" aria-hidden="true"></i>
-                        <h3>Robot Controls</h3>
-                        <div class="section-actions">
-                            <button id="emergencyStopBtn" class="btn btn-danger btn-emergency">
-                                <i class="fas fa-stop" aria-hidden="true"></i>
-                                Emergency Stop
-                            </button>
-                        </div>
+                <div class="recording-controls">
+                    <div class="input-group">
+                        <label for="runNameInput">Run Name:</label>
+                        <input type="text" id="runNameInput" value="Run 1" class="input-field" maxlength="50" aria-describedby="runNameHelp">
+                        <small id="runNameHelp" class="help-text">Maximum 50 characters</small>
                     </div>
-                    <div class="controls-grid">
-                        <div class="control-group">
-                            <h4>Movement Controls</h4>
-                            <div class="control-keys">
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="W key">W</kbd>
-                                        <span>Forward</span>
-                                    </div>
+                    <div class="button-group">
+                        <button id="recordBtn" class="btn btn-danger" disabled>
+                            <i class="fas fa-circle" aria-hidden="true"></i>
+                            Record Run
+                        </button>
+                        <button id="saveBtn" class="btn btn-success" disabled>
+                            <i class="fas fa-save" aria-hidden="true"></i>
+                            Save Run
+                        </button>
+                        <button id="pauseBtn" class="btn btn-warning hidden" disabled>
+                            <i class="fas fa-pause" aria-hidden="true"></i>
+                            Pause
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-section">
+                <div class="section-header">
+                    <i class="fas fa-terminal" aria-hidden="true"></i>
+                    <h3>Status Display</h3>
+                    <div class="section-actions">
+                        <button id="clearLogBtn" class="btn-icon" aria-label="Clear log">
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                        <button id="exportLogBtn" class="btn-icon" aria-label="Export log">
+                            <i class="fas fa-download" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="statusDisplay" class="status-display" role="log" aria-live="polite" aria-label="Application status log"></div>
+            </div>
+
+            <div class="content-section">
+                <div class="section-header">
+                    <i class="fas fa-keyboard" aria-hidden="true"></i>
+                    <h3>Robot Controls</h3>
+                    <div class="section-actions">
+                        <button id="emergencyStopBtn" class="btn btn-danger btn-emergency">
+                            <i class="fas fa-stop" aria-hidden="true"></i>
+                            Emergency Stop
+                        </button>
+                    </div>
+                </div>
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <h4>Movement Controls</h4>
+                        <div class="control-keys">
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="W key">W</kbd>
+                                    <span>Forward</span>
                                 </div>
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="A key">A</kbd>
-                                        <span>Turn Left</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="S key">S</kbd>
-                                        <span>Backward</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="D key">D</kbd>
-                                        <span>Turn Right</span>
-                                    </div>
+                            </div>
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="A key">A</kbd>
+                                    <span>Turn Left</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="S key">S</kbd>
+                                    <span>Backward</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="D key">D</kbd>
+                                    <span>Turn Right</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="control-group">
-                            <h4>Arm Controls</h4>
-                            <div class="control-keys">
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="Q key">Q</kbd>
-                                        <span>Arm 1 Up</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="E key">E</kbd>
-                                        <span>Arm 1 Down</span>
-                                    </div>
+                    </div>
+                    <div class="control-group">
+                        <h4>Arm Controls</h4>
+                        <div class="control-keys">
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="Q key">Q</kbd>
+                                    <span>Arm 1 Up</span>
                                 </div>
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="R key">R</kbd>
-                                        <span>Arm 2 Up</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="F key">F</kbd>
-                                        <span>Arm 2 Down</span>
-                                    </div>
+                                <div class="key-item">
+                                    <kbd aria-label="E key">E</kbd>
+                                    <span>Arm 1 Down</span>
+                                </div>
+                            </div>
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="R key">R</kbd>
+                                    <span>Arm 2 Up</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="F key">F</kbd>
+                                    <span>Arm 2 Down</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
                                         <div class="controls-help">
                         <p class="help-text">
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
@@ -616,6 +610,25 @@
     <!-- Browser Detection Script -->
     <script>
         (function() {
+            // Detect mobile devices
+            function isMobileDevice() {
+                // Check for touch capability
+                const hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                
+                // Check user agent for mobile indicators
+                const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i;
+                const isMobileUA = mobileRegex.test(navigator.userAgent);
+                
+                // Check screen size
+                const isSmallScreen = window.innerWidth <= 768;
+                
+                // Check for mobile-specific features
+                const hasMobileFeatures = 'orientation' in window && 'ondeviceorientation' in window;
+                
+                // Return true if any strong mobile indicators are present
+                return (hasTouch && isMobileUA) || (isMobileUA && isSmallScreen) || (hasTouch && hasMobileFeatures);
+            }
+            
             // Detect Safari
             function isSafari() {
                 return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -671,8 +684,50 @@
             }
             
             // Show browser not supported message
-            function showBrowserNotSupported() {
-                document.getElementById('browserNotSupported').style.display = 'flex';
+            function showBrowserNotSupported(isMobile = false) {
+                const browserNotSupported = document.getElementById('browserNotSupported');
+                
+                if (isMobile) {
+                    // Update content for mobile devices
+                    const contentDiv = browserNotSupported.querySelector('.browser-not-supported-content');
+                    contentDiv.innerHTML = `
+                        <div class="browser-not-supported-icon">
+                            <i class="fas fa-mobile-alt"></i>
+                        </div>
+                        <h1>Device Not Supported</h1>
+                        
+                        <p><strong>Mobile devices are not supported.</strong></p>
+                        <p>This application requires a desktop or laptop computer with Web Bluetooth capabilities.</p>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0;">Why mobile is not supported:</h3>
+                            <ul style="text-align: left; max-width: 500px; margin: 0 auto;">
+                                <li>Limited Web Bluetooth implementation on mobile browsers</li>
+                                <li>Complex interface requires precise controls</li>
+                                <li>Performance requirements exceed mobile capabilities</li>
+                                <li>Desktop features are essential for robotics programming</li>
+                            </ul>
+                        </div>
+                        
+                        <p><strong>Please switch to a computer and use one of these browsers:</strong></p>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin: 10px 0;">
+                                <i class="fab fa-chrome" style="color: #4285f4;"></i> 
+                                Google Chrome 80+ (Recommended)
+                            </li>
+                            <li style="margin: 10px 0;">
+                                <i class="fab fa-edge" style="color: #0078d4;"></i> 
+                                Microsoft Edge 80+
+                            </li>
+                        </ul>
+                        
+                        <p style="margin-top: 30px; color: #718093;">
+                            For the best experience, use a desktop or laptop computer with the latest version of Chrome or Edge.
+                        </p>
+                    `;
+                }
+                
+                browserNotSupported.style.display = 'flex';
                 document.getElementById('loadingScreen').style.display = 'none';
                 document.getElementById('appContainer').style.display = 'none';
                 
@@ -686,8 +741,11 @@
             }
             
             // Main browser compatibility check
-            if (isUnsupportedBrowser() || !hasRequiredAPIs()) {
-                showBrowserNotSupported();
+            if (isMobileDevice()) {
+                showBrowserNotSupported(true);
+                return; // Stop execution
+            } else if (isUnsupportedBrowser() || !hasRequiredAPIs()) {
+                showBrowserNotSupported(false);
                 return; // Stop execution
             }
         })();
