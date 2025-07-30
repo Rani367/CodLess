@@ -279,6 +279,7 @@ class RobotConfig {
         this.autoSave = data.autoSave || false;
         this.debugMode = data.debugMode || false;
         this.simulateConnected = data.simulateConnected || false;
+        this.useXboxController = data.useXboxController || false;
         
         // Calibration data
         this.motorDelay = data.motorDelay || 0.0;
@@ -1535,6 +1536,22 @@ class FLLRoboticsApp extends EventEmitter {
             isSimulating: this.bleController.isSimulatingConnection
         });
         
+        // Update Xbox controller status display
+        const xboxStatusDiv = document.getElementById('xboxControllerStatus');
+        const xboxStatusText = document.getElementById('xboxStatus');
+        const xboxHelp = document.getElementById('xboxControllerHelp');
+        if (xboxStatusDiv && xboxStatusText) {
+            if (this.config.useXboxController) {
+                xboxStatusDiv.style.display = 'block';
+                xboxStatusText.textContent = 'Enabled';
+                xboxStatusText.style.color = '#28a745';
+                if (xboxHelp) xboxHelp.style.display = 'block';
+            } else {
+                xboxStatusDiv.style.display = 'none';
+                if (xboxHelp) xboxHelp.style.display = 'none';
+            }
+        }
+        
         if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Start simulation
             this.bleController.isSimulatingConnection = true;
@@ -2643,7 +2660,143 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!Array.isArray(savedRuns) || savedRuns.length === 0) {
             // Generate basic hub control code if no saved runs
-            return `from pybricks.hubs import PrimeHub
+            if (this.config.useXboxController) {
+                // Generate Xbox controller code
+                return `from pybricks.hubs import PrimeHub
+from pybricks.pupdevices import Motor
+from pybricks.parameters import Port, Color, Button
+from pybricks.robotics import DriveBase
+from pybricks.tools import wait
+from pybricks.iodevices import XboxController
+
+hub = PrimeHub()
+
+# Initialize Xbox controller
+print("Connecting to Xbox controller...")
+xbox = XboxController()
+print("Xbox controller connected!")
+
+# Set up hub display
+hub.display.icon([
+    [100, 100, 100, 100, 100],
+    [100, 0, 100, 0, 100], 
+    [100, 100, 100, 100, 100],
+    [100, 0, 0, 0, 100],
+    [100, 100, 100, 100, 100]
+])
+
+# Initialize motors
+left_motor_port = Port.${this.config.leftMotorPort}
+right_motor_port = Port.${this.config.rightMotorPort}
+arm1_motor_port = Port.${this.config.arm1MotorPort}
+arm2_motor_port = Port.${this.config.arm2MotorPort}
+
+# Set up drive base
+try:
+    left_motor = Motor(left_motor_port)
+    right_motor = Motor(right_motor_port)
+    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})
+    
+    drive_base.settings(
+        straight_speed=${this.config.straightSpeed},
+        straight_acceleration=${this.config.straightAcceleration},
+        turn_rate=${this.config.turnRate},
+        turn_acceleration=${this.config.turnAcceleration}
+    )
+    
+    hub.light.on(Color.GREEN)
+except:
+    hub.light.on(Color.YELLOW)
+    drive_base = None
+
+# Set up arm motors
+motors = {}
+try:
+    motors['arm1'] = Motor(arm1_motor_port)
+except:
+    pass
+
+try:
+    motors['arm2'] = Motor(arm2_motor_port)
+except:
+    pass
+
+# Show ready icon
+hub.display.icon([
+    [0, 100, 0, 100, 0],
+    [100, 100, 100, 100, 100],
+    [0, 100, 100, 100, 0],
+    [0, 0, 100, 0, 0],
+    [0, 0, 100, 0, 0]
+])
+
+# Main control loop
+while True:
+    # Get controller inputs
+    buttons = xbox.buttons.pressed()
+    left_x, left_y = xbox.joystick_left()
+    right_x, right_y = xbox.joystick_right()
+    left_trigger, right_trigger = xbox.triggers()
+    
+    # Drive control with left stick and triggers
+    if drive_base:
+        # Calculate drive speed from triggers (right forward, left backward)
+        drive_speed = (right_trigger - left_trigger) * ${this.config.straightSpeed} / 100
+        
+        # Turn rate from left stick horizontal
+        turn_rate = -left_x * ${this.config.turnRate} / 100
+        
+        # Apply drive commands
+        drive_base.drive(drive_speed, turn_rate)
+    
+    # Arm 1 control with buttons
+    if 'arm1' in motors:
+        if Button.A in buttons:  # A button for arm 1 up
+            motors['arm1'].run(200)
+        elif Button.B in buttons:  # B button for arm 1 down
+            motors['arm1'].run(-200)
+        else:
+            motors['arm1'].stop()
+    
+    # Arm 2 control with buttons
+    if 'arm2' in motors:
+        if Button.X in buttons:  # X button for arm 2 up
+            motors['arm2'].run(200)
+        elif Button.Y in buttons:  # Y button for arm 2 down
+            motors['arm2'].run(-200)
+        else:
+            motors['arm2'].stop()
+    
+    # Emergency stop with menu button
+    if Button.MENU in buttons:
+        if drive_base:
+            drive_base.stop()
+        for motor in motors.values():
+            motor.stop()
+        hub.light.on(Color.RED)
+        wait(500)
+        hub.light.on(Color.GREEN)
+    
+    # Add rumble feedback when motors experience high load
+    if drive_base:
+        try:
+            # Get motor loads
+            left_load = abs(left_motor.load())
+            right_load = abs(right_motor.load())
+            max_load = max(left_load, right_load)
+            
+            # Rumble if load is high
+            if max_load > 50:
+                rumble_power = min(100, max_load)
+                xbox.rumble(power=rumble_power, duration=100)
+        except:
+            pass
+    
+    wait(50)  # Small delay to prevent overwhelming the system
+`;
+            } else {
+                // Original code for keyboard/app control
+                return `from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor
 from pybricks.parameters import Port, Color
 from pybricks.robotics import DriveBase
@@ -2767,6 +2920,7 @@ while True:
         stdout.buffer.write(b"ERROR")
     
     wait(10)`;
+            }
         }
 
         // Generate competition code with saved runs
@@ -3485,6 +3639,7 @@ function saveConfiguration() {
         config.batteryWarning = parseInt(document.getElementById('batteryWarning')?.value || 20);
         config.autoSave = document.getElementById('autoSave')?.checked || false;
         config.debugMode = document.getElementById('debugMode')?.checked || false;
+        config.useXboxController = document.getElementById('useXboxController')?.checked || false;
         
         const simulateConnectedEl = document.getElementById('simulateConnected');
         if (simulateConnectedEl) {
@@ -3506,6 +3661,22 @@ function saveConfiguration() {
             
             // Update the UI to reflect changes immediately
             window.app.updateUI();
+            
+            // Update Xbox controller status display
+            const xboxStatusDiv = document.getElementById('xboxControllerStatus');
+            const xboxStatusText = document.getElementById('xboxStatus');
+            const xboxHelp = document.getElementById('xboxControllerHelp');
+            if (xboxStatusDiv && xboxStatusText) {
+                if (config.useXboxController) {
+                    xboxStatusDiv.style.display = 'block';
+                    xboxStatusText.textContent = 'Enabled';
+                    xboxStatusText.style.color = '#28a745';
+                    if (xboxHelp) xboxHelp.style.display = 'block';
+                } else {
+                    xboxStatusDiv.style.display = 'none';
+                    if (xboxHelp) xboxHelp.style.display = 'none';
+                }
+            }
             
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');

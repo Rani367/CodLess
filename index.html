@@ -388,6 +388,12 @@
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                             Hold multiple keys for combined movements. Press Space for emergency stop.
                         </p>
+                        <div id="xboxControllerHelp" style="display: none; margin-top: 10px;">
+                            <p class="help-text">
+                                <i class="fas fa-gamepad" aria-hidden="true"></i>
+                                <strong>Xbox Controller Mode:</strong> Left stick + triggers for driving, A/B for Arm 1, X/Y for Arm 2, Menu for emergency stop.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -405,6 +411,10 @@
             <div class="status-content">
                 <span>Battery:</span>
                 <span id="batteryStatus">Unknown</span>
+            </div>
+            <div class="status-content" id="xboxControllerStatus" style="display: none;">
+                <span>Xbox Controller:</span>
+                <span id="xboxStatus">Disabled</span>
             </div>
         </div>
     </div>
@@ -527,6 +537,11 @@
                         <div class="config-row">
                             <label for="debugMode">Debug Mode:</label>
                             <input type="checkbox" id="debugMode" class="checkbox">
+                        </div>
+                        <div class="config-row">
+                            <label for="useXboxController">Use Xbox Controller:</label>
+                            <input type="checkbox" id="useXboxController" class="checkbox" aria-describedby="xboxControllerHelp">
+                            <small id="xboxControllerHelp" class="help-text">Enable Xbox controller support for robot control (requires compatible Xbox controller)</small>
                         </div>
                     </div>
                 </div>
