@@ -4345,3 +4345,57 @@ console.log(`%cCodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'col
 console.log('🤖 Professional robotics control and simulation platform');
 console.log('📖 Documentation: https://github.com/codless-robotics/fll-control-center');
 console.log('%cIf you encounter "savedRuns.forEach is not a function" error, try: window.app?.clearCorruptedData()', 'color: #ff9800; font-size: 12px;');
+
+// ============================
+// Touch Event Support for Mobile
+// ============================
+
+// Function to add touch support to clickable elements
+function addTouchSupport() {
+    // Get all clickable elements
+    const clickableElements = document.querySelectorAll('button, .btn, .btn-icon, .tab-button, [role="button"], [onclick], a, input[type="button"], input[type="submit"]');
+    
+    clickableElements.forEach(element => {
+        // Skip if already has touch listeners
+        if (element.hasAttribute('data-touch-enabled')) return;
+        
+        // Mark as touch-enabled
+        element.setAttribute('data-touch-enabled', 'true');
+        
+        // Add touchstart listener for immediate feedback
+        element.addEventListener('touchstart', function(e) {
+            // Add visual feedback
+            this.style.opacity = '0.7';
+        }, { passive: true });
+        
+        // Add touchend listener
+        element.addEventListener('touchend', function(e) {
+            // Restore opacity
+            this.style.opacity = '';
+            
+            // Don't prevent default - let the browser handle it naturally
+            // The click event will fire automatically after touchend
+        }, { passive: true });
+        
+        // Add touchcancel listener
+        element.addEventListener('touchcancel', function(e) {
+            // Restore opacity
+            this.style.opacity = '';
+        }, { passive: true });
+    });
+}
+
+// Run on initial load
+addTouchSupport();
+
+// Re-run when DOM changes (for dynamically added elements)
+const observer = new MutationObserver(() => {
+    addTouchSupport();
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
+// Allow natural scrolling on mobile - removed restrictive touch handlers
