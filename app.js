@@ -4079,6 +4079,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     
+    // Preload the 3D model for faster loading
+    try {
+        const modelViewer = document.querySelector('#xboxController3D');
+        if (modelViewer) {
+            // Set up model viewer for optimal performance
+            modelViewer.addEventListener('load', () => {
+                console.log('3D model loaded successfully');
+            });
+            
+            modelViewer.addEventListener('error', (event) => {
+                console.error('Error loading 3D model:', event);
+            });
+            
+            // Preload the model
+            const modelUrl = modelViewer.getAttribute('src');
+            if (modelUrl) {
+                fetch(modelUrl, { priority: 'high' })
+                    .then(response => response.blob())
+                    .then(() => console.log('3D model preloaded'))
+                    .catch(err => console.error('Failed to preload 3D model:', err));
+            }
+        }
+    } catch (error) {
+        console.error('Error setting up 3D model:', error);
+    }
+    
     try {
         window.app = new FLLRoboticsApp();
         await window.app.init();
