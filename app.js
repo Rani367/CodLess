@@ -189,6 +189,158 @@ class ToastManager {
     }
 }
 
+class XboxControllerHandler {
+    constructor() {
+        this.connected = false;
+        this.gamepadIndex = null;
+        this.pollInterval = null;
+        this.lastButtonStates = {};
+        this.callbacks = {
+            onConnect: null,
+            onDisconnect: null,
+            onButtonPress: null,
+            onButtonRelease: null,
+            onAxisChange: null
+        };
+        
+        // Xbox button mapping
+        this.buttonMap = {
+            0: 'A',
+            1: 'B', 
+            2: 'X',
+            3: 'Y',
+            4: 'LB',
+            5: 'RB',
+            6: 'LT',
+            7: 'RT',
+            8: 'View',
+            9: 'Menu',
+            10: 'LeftStick',
+            11: 'RightStick',
+            12: 'DPadUp',
+            13: 'DPadDown',
+            14: 'DPadLeft',
+            15: 'DPadRight',
+            16: 'Xbox'
+        };
+        
+        // Start listening for gamepad connections
+        window.addEventListener('gamepadconnected', (e) => this.handleGamepadConnected(e));
+        window.addEventListener('gamepaddisconnected', (e) => this.handleGamepadDisconnected(e));
+    }
+    
+    handleGamepadConnected(event) {
+        const gamepad = event.gamepad;
+        
+        // Check if it's an Xbox controller
+        if (gamepad.id.toLowerCase().includes('xbox') || 
+            gamepad.id.toLowerCase().includes('xinput') ||
+            gamepad.id.toLowerCase().includes('045e')) { // Microsoft vendor ID
+            
+            this.gamepadIndex = gamepad.index;
+            this.connected = true;
+            
+            // Initialize button states
+            for (let i = 0; i < gamepad.buttons.length; i++) {
+                this.lastButtonStates[i] = false;
+            }
+            
+            // Start polling
+            this.startPolling();
+            
+            if (this.callbacks.onConnect) {
+                this.callbacks.onConnect(gamepad);
+            }
+        }
+    }
+    
+    handleGamepadDisconnected(event) {
+        if (event.gamepad.index === this.gamepadIndex) {
+            this.connected = false;
+            this.gamepadIndex = null;
+            this.stopPolling();
+            
+            if (this.callbacks.onDisconnect) {
+                this.callbacks.onDisconnect();
+            }
+        }
+    }
+    
+    startPolling() {
+        if (this.pollInterval) return;
+        
+        this.pollInterval = setInterval(() => {
+            this.pollGamepad();
+        }, 16); // ~60fps polling
+    }
+    
+    stopPolling() {
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        }
+    }
+    
+    pollGamepad() {
+        const gamepads = navigator.getGamepads();
+        const gamepad = gamepads[this.gamepadIndex];
+        
+        if (!gamepad) return;
+        
+        // Check buttons
+        for (let i = 0; i < gamepad.buttons.length; i++) {
+            const button = gamepad.buttons[i];
+            const pressed = button.pressed;
+            
+            if (pressed !== this.lastButtonStates[i]) {
+                const buttonName = this.buttonMap[i] || `Button${i}`;
+                
+                if (pressed && this.callbacks.onButtonPress) {
+                    this.callbacks.onButtonPress(buttonName, button.value);
+                } else if (!pressed && this.callbacks.onButtonRelease) {
+                    this.callbacks.onButtonRelease(buttonName);
+                }
+                
+                this.lastButtonStates[i] = pressed;
+            }
+        }
+        
+        // Report axis values
+        if (this.callbacks.onAxisChange) {
+            this.callbacks.onAxisChange({
+                leftStickX: gamepad.axes[0],
+                leftStickY: gamepad.axes[1],
+                rightStickX: gamepad.axes[2],
+                rightStickY: gamepad.axes[3],
+                leftTrigger: gamepad.buttons[6].value,
+                rightTrigger: gamepad.buttons[7].value
+            });
+        }
+    }
+    
+    isConnected() {
+        return this.connected;
+    }
+    
+    getGamepad() {
+        if (!this.connected || this.gamepadIndex === null) return null;
+        const gamepads = navigator.getGamepads();
+        return gamepads[this.gamepadIndex];
+    }
+    
+    vibrate(duration = 200, weakMagnitude = 0.5, strongMagnitude = 1.0) {
+        const gamepad = this.getGamepad();
+        if (gamepad && gamepad.vibrationActuator) {
+            gamepad.vibrationActuator.playEffect('dual-rumble', {
+                startDelay: 0,
+                duration: duration,
+                weakMagnitude: weakMagnitude,
+                strongMagnitude: strongMagnitude
+            });
+        }
+    }
+}
+
 class PerformanceMonitor {
     constructor() {
         this.metrics = {
@@ -279,7 +431,6 @@ class RobotConfig {
         this.autoSave = data.autoSave || false;
         this.debugMode = data.debugMode || false;
         this.simulateConnected = data.simulateConnected || false;
-        this.useXboxController = data.useXboxController || false;
         
         // Calibration data
         this.motorDelay = data.motorDelay || 0.0;
@@ -1268,6 +1419,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.toastManager = new ToastManager();
         this.performanceMonitor = new PerformanceMonitor();
         this.bleController = new BLEController();
+        this.xboxController = new XboxControllerHandler();
         this.robotSimulator = null;
         this.config = new RobotConfig();
         
@@ -1283,6 +1435,15 @@ class FLLRoboticsApp extends EventEmitter {
         // Control state
         this.pressedKeys = new Set();
         this.emergencyStopActive = false;
+        this.xboxAxisValues = {
+            leftStickX: 0,
+            leftStickY: 0,
+            rightStickX: 0,
+            rightStickY: 0,
+            leftTrigger: 0,
+            rightTrigger: 0
+        };
+        this.xboxButtonsPressed = new Set();
         
         // Auto-save
         this.autoSaveTimer = null;
@@ -1327,8 +1488,11 @@ class FLLRoboticsApp extends EventEmitter {
             this.setupAutoSave();
             
             console.log('Setting up keyboard controls...');
-            // Setup keyboard controls
-            this.setupKeyboardControls();
+                    // Setup keyboard controls
+        this.setupKeyboardControls();
+        
+        // Setup Xbox controller
+        this.setupXboxController();
             
             console.log('Updating UI...');
             // Initialize UI
@@ -1536,21 +1700,7 @@ class FLLRoboticsApp extends EventEmitter {
             isSimulating: this.bleController.isSimulatingConnection
         });
         
-        // Update Xbox controller status display
-        const xboxStatusDiv = document.getElementById('xboxControllerStatus');
-        const xboxStatusText = document.getElementById('xboxStatus');
-        const xboxHelp = document.getElementById('xboxControllerHelp');
-        if (xboxStatusDiv && xboxStatusText) {
-            if (this.config.useXboxController) {
-                xboxStatusDiv.style.display = 'block';
-                xboxStatusText.textContent = 'Enabled';
-                xboxStatusText.style.color = '#28a745';
-                if (xboxHelp) xboxHelp.style.display = 'block';
-            } else {
-                xboxStatusDiv.style.display = 'none';
-                if (xboxHelp) xboxHelp.style.display = 'none';
-            }
-        }
+
         
         if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Start simulation
@@ -1700,6 +1850,7 @@ class FLLRoboticsApp extends EventEmitter {
     setupEventListeners() {
         // Hub connection
         document.getElementById('connectBtn')?.addEventListener('click', () => this.toggleConnection());
+        document.getElementById('connectXboxBtn')?.addEventListener('click', () => this.connectXboxController());
         document.getElementById('developerMode')?.addEventListener('change', (e) => this.toggleDeveloperMode(e.target.checked));
         
         // Configuration
@@ -1878,6 +2029,120 @@ class FLLRoboticsApp extends EventEmitter {
                 }
             }
         });
+    }
+    
+    setupXboxController() {
+        // Set up callbacks
+        this.xboxController.callbacks.onConnect = (gamepad) => {
+            this.updateXboxControllerUI('connected', gamepad.id);
+            this.toastManager.show('Xbox Controller connected!', 'success');
+            this.logger.log(`Xbox Controller connected: ${gamepad.id}`, 'info');
+        };
+        
+        this.xboxController.callbacks.onDisconnect = () => {
+            this.updateXboxControllerUI('disconnected');
+            this.toastManager.show('Xbox Controller disconnected', 'info');
+            this.logger.log('Xbox Controller disconnected', 'info');
+        };
+        
+        this.xboxController.callbacks.onButtonPress = (button, value) => {
+            this.handleXboxButtonPress(button, value);
+        };
+        
+        this.xboxController.callbacks.onButtonRelease = (button) => {
+            this.handleXboxButtonRelease(button);
+        };
+        
+        this.xboxController.callbacks.onAxisChange = (axes) => {
+            this.xboxAxisValues = axes;
+            this.processXboxMovement();
+        };
+    }
+    
+    connectXboxController() {
+        if (this.xboxController.isConnected()) {
+            this.toastManager.show('Xbox Controller already connected', 'info');
+            return;
+        }
+        
+        this.toastManager.show('Press any button on your Xbox controller to connect...', 'info');
+        this.logger.log('Waiting for Xbox controller connection...', 'info');
+    }
+    
+    handleXboxButtonPress(button, value) {
+        this.xboxButtonsPressed.add(button);
+        
+        // Emergency stop with Menu button
+        if (button === 'Menu') {
+            this.emergencyStop();
+            return;
+        }
+        
+        // Process movement for buttons that affect it
+        if (['A', 'B', 'X', 'Y'].includes(button)) {
+            this.processXboxMovement();
+        }
+        
+        // Record button press if recording
+        if (this.isRecording) {
+            this.recordXboxEvent('buttonPress', button, value);
+        }
+    }
+    
+    handleXboxButtonRelease(button) {
+        this.xboxButtonsPressed.delete(button);
+        
+        // Process movement for buttons that affect it
+        if (['A', 'B', 'X', 'Y'].includes(button)) {
+            this.processXboxMovement();
+        }
+        
+        // Record button release if recording
+        if (this.isRecording) {
+            this.recordXboxEvent('buttonRelease', button);
+        }
+    }
+    
+    processXboxMovement() {
+        if (this.emergencyStopActive) return;
+        
+        // Calculate drive command from triggers and left stick
+        const speed = (this.xboxAxisValues.rightTrigger - this.xboxAxisValues.leftTrigger) * 200;
+        const turn = -this.xboxAxisValues.leftStickX * 100;
+        
+        this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
+        
+        // Calculate arm commands from buttons
+        let arm1Speed = 0;
+        let arm2Speed = 0;
+        
+        if (this.xboxButtonsPressed.has('A')) arm1Speed = 200;
+        if (this.xboxButtonsPressed.has('B')) arm1Speed = -200;
+        if (this.xboxButtonsPressed.has('X')) arm2Speed = 200;
+        if (this.xboxButtonsPressed.has('Y')) arm2Speed = -200;
+        
+        this.sendRobotCommand({ type: 'arm1', speed: arm1Speed });
+        this.sendRobotCommand({ type: 'arm2', speed: arm2Speed });
+    }
+    
+    updateXboxControllerUI(status, deviceName = null) {
+        const statusDiv = document.getElementById('xboxStatus');
+        const helpDiv = document.getElementById('xboxControllerHelp');
+        if (!statusDiv) return;
+        
+        const statusIndicator = statusDiv.parentElement;
+        
+        if (status === 'connected') {
+            statusIndicator.classList.remove('disconnected');
+            statusIndicator.classList.add('connected');
+            statusDiv.querySelector('span').textContent = `Xbox Controller Connected${deviceName ? ': ' + deviceName : ''}`;
+            if (helpDiv) helpDiv.style.display = 'block';
+        } else {
+            statusIndicator.classList.remove('connected');
+            statusIndicator.classList.add('disconnected');
+            statusDiv.querySelector('span').textContent = 'Xbox Controller Disconnected';
+            if (helpDiv) helpDiv.style.display = 'none';
+        }
     }
 
     handleKeyDown(e) {
@@ -2423,6 +2688,28 @@ class FLLRoboticsApp extends EventEmitter {
             eventType: 'robot'
         });
     }
+    
+    recordXboxEvent(type, button, value = null) {
+        if (!this.isRecording) return;
+        
+        const event = {
+            timestamp: Date.now() - this.recordingStartTime,
+            type,
+            button,
+            eventType: 'xbox'
+        };
+        
+        if (value !== null) {
+            event.value = value;
+        }
+        
+        // Also record axis values for movement
+        if (type === 'buttonPress' || type === 'buttonRelease') {
+            event.axes = { ...this.xboxAxisValues };
+        }
+        
+        this.recordedCommands.push(event);
+    }
 
     toggleRecording() {
         if (this.isRecording) {
@@ -2660,143 +2947,7 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!Array.isArray(savedRuns) || savedRuns.length === 0) {
             // Generate basic hub control code if no saved runs
-            if (this.config.useXboxController) {
-                // Generate Xbox controller code
-                return `from pybricks.hubs import PrimeHub
-from pybricks.pupdevices import Motor
-from pybricks.parameters import Port, Color, Button
-from pybricks.robotics import DriveBase
-from pybricks.tools import wait
-from pybricks.iodevices import XboxController
-
-hub = PrimeHub()
-
-# Initialize Xbox controller
-print("Connecting to Xbox controller...")
-xbox = XboxController()
-print("Xbox controller connected!")
-
-# Set up hub display
-hub.display.icon([
-    [100, 100, 100, 100, 100],
-    [100, 0, 100, 0, 100], 
-    [100, 100, 100, 100, 100],
-    [100, 0, 0, 0, 100],
-    [100, 100, 100, 100, 100]
-])
-
-# Initialize motors
-left_motor_port = Port.${this.config.leftMotorPort}
-right_motor_port = Port.${this.config.rightMotorPort}
-arm1_motor_port = Port.${this.config.arm1MotorPort}
-arm2_motor_port = Port.${this.config.arm2MotorPort}
-
-# Set up drive base
-try:
-    left_motor = Motor(left_motor_port)
-    right_motor = Motor(right_motor_port)
-    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})
-    
-    drive_base.settings(
-        straight_speed=${this.config.straightSpeed},
-        straight_acceleration=${this.config.straightAcceleration},
-        turn_rate=${this.config.turnRate},
-        turn_acceleration=${this.config.turnAcceleration}
-    )
-    
-    hub.light.on(Color.GREEN)
-except:
-    hub.light.on(Color.YELLOW)
-    drive_base = None
-
-# Set up arm motors
-motors = {}
-try:
-    motors['arm1'] = Motor(arm1_motor_port)
-except:
-    pass
-
-try:
-    motors['arm2'] = Motor(arm2_motor_port)
-except:
-    pass
-
-# Show ready icon
-hub.display.icon([
-    [0, 100, 0, 100, 0],
-    [100, 100, 100, 100, 100],
-    [0, 100, 100, 100, 0],
-    [0, 0, 100, 0, 0],
-    [0, 0, 100, 0, 0]
-])
-
-# Main control loop
-while True:
-    # Get controller inputs
-    buttons = xbox.buttons.pressed()
-    left_x, left_y = xbox.joystick_left()
-    right_x, right_y = xbox.joystick_right()
-    left_trigger, right_trigger = xbox.triggers()
-    
-    # Drive control with left stick and triggers
-    if drive_base:
-        # Calculate drive speed from triggers (right forward, left backward)
-        drive_speed = (right_trigger - left_trigger) * ${this.config.straightSpeed} / 100
-        
-        # Turn rate from left stick horizontal
-        turn_rate = -left_x * ${this.config.turnRate} / 100
-        
-        # Apply drive commands
-        drive_base.drive(drive_speed, turn_rate)
-    
-    # Arm 1 control with buttons
-    if 'arm1' in motors:
-        if Button.A in buttons:  # A button for arm 1 up
-            motors['arm1'].run(200)
-        elif Button.B in buttons:  # B button for arm 1 down
-            motors['arm1'].run(-200)
-        else:
-            motors['arm1'].stop()
-    
-    # Arm 2 control with buttons
-    if 'arm2' in motors:
-        if Button.X in buttons:  # X button for arm 2 up
-            motors['arm2'].run(200)
-        elif Button.Y in buttons:  # Y button for arm 2 down
-            motors['arm2'].run(-200)
-        else:
-            motors['arm2'].stop()
-    
-    # Emergency stop with menu button
-    if Button.MENU in buttons:
-        if drive_base:
-            drive_base.stop()
-        for motor in motors.values():
-            motor.stop()
-        hub.light.on(Color.RED)
-        wait(500)
-        hub.light.on(Color.GREEN)
-    
-    # Add rumble feedback when motors experience high load
-    if drive_base:
-        try:
-            # Get motor loads
-            left_load = abs(left_motor.load())
-            right_load = abs(right_motor.load())
-            max_load = max(left_load, right_load)
-            
-            # Rumble if load is high
-            if max_load > 50:
-                rumble_power = min(100, max_load)
-                xbox.rumble(power=rumble_power, duration=100)
-        except:
-            pass
-    
-    wait(50)  # Small delay to prevent overwhelming the system
-`;
-            } else {
-                // Original code for keyboard/app control
-                return `from pybricks.hubs import PrimeHub
+            return `from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor
 from pybricks.parameters import Port, Color
 from pybricks.robotics import DriveBase
@@ -2920,7 +3071,6 @@ while True:
         stdout.buffer.write(b"ERROR")
     
     wait(10)`;
-            }
         }
 
         // Generate competition code with saved runs
@@ -3458,8 +3608,72 @@ while True:
         }
 
         this.toastManager.show(`Playing run "${selectedRun.name}"...`, 'info');
-        // TODO: Implement actual playback functionality
         this.logger.log(`Playing run: ${selectedRun.name} (${selectedRun.commands.length} commands)`, 'info');
+        
+        // Execute the recorded commands
+        this.executeRecordedCommands(selectedRun.commands);
+    }
+    
+    async executeRecordedCommands(commands) {
+        if (!commands || commands.length === 0) return;
+        
+        let currentIndex = 0;
+        const startTime = Date.now();
+        
+        const executeNext = () => {
+            if (currentIndex >= commands.length) {
+                this.toastManager.show('Playback completed', 'success');
+                this.logger.log('Run playback completed', 'info');
+                return;
+            }
+            
+            const cmd = commands[currentIndex];
+            const elapsedTime = Date.now() - startTime;
+            const delay = cmd.timestamp - elapsedTime;
+            
+            if (delay > 0) {
+                setTimeout(() => {
+                    this.executeCommand(cmd);
+                    currentIndex++;
+                    executeNext();
+                }, delay);
+            } else {
+                this.executeCommand(cmd);
+                currentIndex++;
+                executeNext();
+            }
+        };
+        
+        executeNext();
+    }
+    
+    executeCommand(cmd) {
+        if (cmd.eventType === 'keyboard') {
+            // Handle keyboard events
+            if (cmd.type === 'keydown') {
+                this.pressedKeys.add(cmd.key);
+            } else if (cmd.type === 'keyup') {
+                this.pressedKeys.delete(cmd.key);
+            }
+            this.processMovementKeys();
+        } else if (cmd.eventType === 'xbox') {
+            // Handle Xbox controller events
+            if (cmd.type === 'buttonPress') {
+                this.xboxButtonsPressed.add(cmd.button);
+                if (cmd.axes) {
+                    this.xboxAxisValues = cmd.axes;
+                }
+            } else if (cmd.type === 'buttonRelease') {
+                this.xboxButtonsPressed.delete(cmd.button);
+                if (cmd.axes) {
+                    this.xboxAxisValues = cmd.axes;
+                }
+            }
+            this.processXboxMovement();
+        } else if (cmd.eventType === 'robot') {
+            // Handle direct robot commands
+            this.sendRobotCommand(cmd.command);
+        }
     }
 
 
@@ -3639,7 +3853,6 @@ function saveConfiguration() {
         config.batteryWarning = parseInt(document.getElementById('batteryWarning')?.value || 20);
         config.autoSave = document.getElementById('autoSave')?.checked || false;
         config.debugMode = document.getElementById('debugMode')?.checked || false;
-        config.useXboxController = document.getElementById('useXboxController')?.checked || false;
         
         const simulateConnectedEl = document.getElementById('simulateConnected');
         if (simulateConnectedEl) {
@@ -3662,21 +3875,7 @@ function saveConfiguration() {
             // Update the UI to reflect changes immediately
             window.app.updateUI();
             
-            // Update Xbox controller status display
-            const xboxStatusDiv = document.getElementById('xboxControllerStatus');
-            const xboxStatusText = document.getElementById('xboxStatus');
-            const xboxHelp = document.getElementById('xboxControllerHelp');
-            if (xboxStatusDiv && xboxStatusText) {
-                if (config.useXboxController) {
-                    xboxStatusDiv.style.display = 'block';
-                    xboxStatusText.textContent = 'Enabled';
-                    xboxStatusText.style.color = '#28a745';
-                    if (xboxHelp) xboxHelp.style.display = 'block';
-                } else {
-                    xboxStatusDiv.style.display = 'none';
-                    if (xboxHelp) xboxHelp.style.display = 'none';
-                }
-            }
+
             
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');
