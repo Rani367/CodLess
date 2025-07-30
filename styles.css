@@ -1473,6 +1473,18 @@ kbd:hover {
     height: 300px;
     background: transparent;
     --poster-color: transparent;
+    --progress-bar-color: #00a8ff;
+    --progress-bar-height: 3px;
+    --progress-mask: transparent;
+}
+
+/* Ensure model is centered */
+#xboxController3D::part(default-ar-button) {
+    display: none;
+}
+
+#xboxController3D::part(default-progress-bar) {
+    background-color: #00a8ff;
 }
 
 .xbox-scene {
@@ -1481,6 +1493,17 @@ kbd:hover {
     align-items: center;
     margin: 20px 0;
     min-height: 300px;
+    position: relative;
+}
+
+/* Loading state for model */
+#xboxController3D:not([loaded]) {
+    opacity: 0.7;
+}
+
+#xboxController3D[loaded] {
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
 }
 
 .xbox-modal-content.success #xboxController3D {

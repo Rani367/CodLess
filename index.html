@@ -35,6 +35,7 @@
     <!-- Preload critical resources -->
     <link rel="preload" href="app.js?v=3.0.1" as="script">
     <link rel="preload" href="styles.css" as="style">
+    <link rel="preload" href="White XBOX controller.glb" as="fetch" crossorigin>
     
     <!-- Immediate Browser Check - Must run before anything else -->
     <script>
@@ -564,8 +565,17 @@
                     src="White XBOX controller.glb" 
                     alt="Xbox Controller 3D Model"
                     auto-rotate
-                    shadow-intensity="1"
+                    rotation-per-second="90deg"
+                    camera-controls
+                    disable-zoom
+                    field-of-view="30deg"
+                    min-camera-orbit="auto auto 200%"
+                    max-camera-orbit="auto auto 200%"
+                    camera-orbit="0deg 75deg 200%"
+                    shadow-intensity="0.5"
                     exposure="1"
+                    loading="eager"
+                    reveal="auto"
                     style="width: 100%; height: 300px;">
                 </model-viewer>
             </div>
