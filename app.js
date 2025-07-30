@@ -4345,3 +4345,82 @@ console.log(`%cCodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'col
 console.log('🤖 Professional robotics control and simulation platform');
 console.log('📖 Documentation: https://github.com/codless-robotics/fll-control-center');
 console.log('%cIf you encounter "savedRuns.forEach is not a function" error, try: window.app?.clearCorruptedData()', 'color: #ff9800; font-size: 12px;');
+
+// ============================
+// Touch Event Support for Mobile
+// ============================
+
+// Function to add touch support to clickable elements
+function addTouchSupport() {
+    // Get all clickable elements
+    const clickableElements = document.querySelectorAll('button, .btn, .btn-icon, .tab-button, [role="button"], [onclick], a, input[type="button"], input[type="submit"]');
+    
+    clickableElements.forEach(element => {
+        // Skip if already has touch listeners
+        if (element.hasAttribute('data-touch-enabled')) return;
+        
+        // Mark as touch-enabled
+        element.setAttribute('data-touch-enabled', 'true');
+        
+        // Add touchstart listener for immediate feedback
+        element.addEventListener('touchstart', function(e) {
+            // Add visual feedback
+            this.style.opacity = '0.7';
+        }, { passive: true });
+        
+        // Add touchend listener
+        element.addEventListener('touchend', function(e) {
+            // Restore opacity
+            this.style.opacity = '';
+            
+            // Prevent default to avoid delay
+            e.preventDefault();
+            
+            // Trigger click event
+            const clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+            });
+            this.dispatchEvent(clickEvent);
+        }, { passive: false });
+        
+        // Add touchcancel listener
+        element.addEventListener('touchcancel', function(e) {
+            // Restore opacity
+            this.style.opacity = '';
+        }, { passive: true });
+    });
+}
+
+// Run on initial load
+addTouchSupport();
+
+// Re-run when DOM changes (for dynamically added elements)
+const observer = new MutationObserver(() => {
+    addTouchSupport();
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
+// Prevent double-tap zoom on iOS
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(e) {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+
+// Fix for iOS Safari bounce effect
+document.addEventListener('touchmove', function(e) {
+    if (e.target.closest('.sidebar, .main-content, .status-display')) {
+        // Allow scrolling in these containers
+        return;
+    }
+    e.preventDefault();
+}, { passive: false });

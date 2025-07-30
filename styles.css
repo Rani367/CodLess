@@ -15,6 +15,9 @@ body {
     color: #ffffff;
     overflow: hidden;
     user-select: none;
+    /* Enable touch interaction on mobile */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-touch-callout: none;
 }
 
 .app-container {
@@ -177,6 +180,9 @@ body {
     gap: 8px;
     position: relative;
     overflow: hidden;
+    /* Ensure touch events work */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .btn::before {
@@ -2581,227 +2587,76 @@ kbd:hover {
    ======================================== */
 
 /* ========================================
-   Virtual Touch Controls for Mobile
+   Mobile Touch Interaction Fixes
    ======================================== */
-.virtual-controls {
-    display: none;
-    position: fixed;
-    bottom: 80px;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    pointer-events: none;
-}
 
-.virtual-controls-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding: 0 20px;
-    max-width: 100%;
-    margin: 0 auto;
-    pointer-events: auto;
-}
-
-/* D-pad container */
-.dpad-container {
-    position: relative;
-}
-
-.dpad {
-    position: relative;
-    width: 180px;
-    height: 180px;
-    display: grid;
-    grid-template-columns: 60px 60px 60px;
-    grid-template-rows: 60px 60px 60px;
-    gap: 0;
-}
-
-.dpad-btn {
-    background: rgba(0, 168, 255, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    font-size: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
+/* Ensure all interactive elements respond to touch */
+button,
+.btn,
+.btn-icon,
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-secondary,
+.tab-button,
+.mobile-menu-toggle,
+input[type="button"],
+input[type="submit"],
+select,
+a,
+[role="button"],
+[onclick] {
+    /* Enable touch events */
     touch-action: manipulation;
-}
-
-.dpad-btn:active {
-    background: rgba(0, 168, 255, 1);
-    transform: scale(0.95);
-    box-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
-}
-
-.dpad-up {
-    grid-column: 2;
-    grid-row: 1;
-    border-radius: 10px 10px 0 0;
-}
-
-.dpad-left {
-    grid-column: 1;
-    grid-row: 2;
-    border-radius: 10px 0 0 10px;
-}
-
-.dpad-center {
-    grid-column: 2;
-    grid-row: 2;
-    background: rgba(255, 59, 48, 0.8);
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    margin: 5px;
-    font-size: 18px;
-}
-
-.dpad-center:active {
-    background: rgba(255, 59, 48, 1);
-    box-shadow: 0 0 20px rgba(255, 59, 48, 0.8);
-}
-
-.dpad-right {
-    grid-column: 3;
-    grid-row: 2;
-    border-radius: 0 10px 10px 0;
-}
-
-.dpad-down {
-    grid-column: 2;
-    grid-row: 3;
-    border-radius: 0 0 10px 10px;
-}
-
-/* Arm controls */
-.arm-controls-container {
-    display: flex;
-    gap: 30px;
-}
-
-.arm-control-group {
-    text-align: center;
-}
-
-.arm-control-group h4 {
-    color: var(--text-secondary);
-    font-size: 14px;
-    margin-bottom: 10px;
-    font-weight: 500;
-}
-
-.arm-btn {
-    background: rgba(52, 199, 89, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    font-size: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    margin: 0 5px;
-    transition: all 0.2s ease;
-    user-select: none;
-    -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+    cursor: pointer;
+    /* Prevent iOS from adding delay */
+    -webkit-touch-callout: none;
 }
 
-.arm-btn:active {
-    background: rgba(52, 199, 89, 1);
-    transform: scale(0.95);
-    box-shadow: 0 0 20px rgba(52, 199, 89, 0.8);
-}
-
-/* Show virtual controls only on touch devices */
+/* Remove any pointer-events: none that might block interaction */
 @media (hover: none) and (pointer: coarse) {
-    .virtual-controls {
-        display: block;
+    * {
+        /* Ensure nothing is blocking touch events */
+        pointer-events: auto !important;
     }
     
-    /* Adjust main content to make room for controls */
-    .main-content {
-        padding-bottom: 280px;
+    /* Except for elements that should genuinely not be interactive */
+    .modal-backdrop,
+    .overlay:not(.active),
+    .disabled,
+    [disabled] {
+        pointer-events: none !important;
     }
 }
 
-/* Responsive adjustments for smaller screens */
-@media (max-width: 480px) {
-    .virtual-controls-container {
-        padding: 0 10px;
+/* Additional iOS Safari fixes */
+@supports (-webkit-touch-callout: none) {
+    /* iOS specific fixes */
+    body {
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
     }
     
-    .dpad {
-        width: 150px;
-        height: 150px;
-        grid-template-columns: 50px 50px 50px;
-        grid-template-rows: 50px 50px 50px;
-    }
-    
-    .dpad-btn {
-        font-size: 20px;
-    }
-    
-    .dpad-center {
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-    }
-    
-    .arm-btn {
-        width: 50px;
-        height: 50px;
-        font-size: 18px;
-    }
-    
-    .arm-controls-container {
-        gap: 20px;
+    /* Ensure buttons are clickable */
+    button,
+    .btn,
+    [role="button"] {
+        cursor: pointer;
+        -webkit-appearance: none;
     }
 }
 
-/* Landscape orientation adjustments */
-@media (orientation: landscape) and (max-height: 600px) {
-    .virtual-controls {
-        bottom: 60px;
-    }
-    
-    .dpad {
-        width: 120px;
-        height: 120px;
-        grid-template-columns: 40px 40px 40px;
-        grid-template-rows: 40px 40px 40px;
-    }
-    
-    .dpad-btn {
-        font-size: 18px;
-    }
-    
-    .dpad-center {
-        width: 35px;
-        height: 35px;
-        font-size: 14px;
-        margin: 2.5px;
-    }
-    
-    .arm-btn {
-        width: 45px;
-        height: 45px;
-        font-size: 16px;
-    }
-    
-    .main-content {
-        padding-bottom: 200px;
-    }
+/* Prevent text selection on buttons */
+button,
+.btn,
+.btn-icon {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 /* ========================================
