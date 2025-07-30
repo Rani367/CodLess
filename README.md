@@ -2,8 +2,6 @@
 
 A professional, feature-rich robotics control and simulation platform for FIRST LEGO League (FLL) competitions. This web-based application provides advanced robot control, recording/playback functionality, real-time simulation, and comprehensive calibration tools.
 
-![CodLess Robotics Banner](assets/banner.png)
-
 ## ✨ Features
 
 ### 🤖 Robot Control
