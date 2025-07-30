@@ -2539,7 +2539,7 @@ class FLLRoboticsApp extends EventEmitter {
                 if (this.config.simulateConnected) {
                     connectBtn.innerHTML = '<i class="fas fa-robot" aria-hidden="true"></i> Start Simulation';
                 } else {
-                    connectBtn.innerHTML = '<i class="fas fa-bluetooth" aria-hidden="true"></i> Connect to Pybricks Hub';
+                    connectBtn.innerHTML = 'Connect to Pybricks Hub';
                 }
                 connectBtn.disabled = false;
                 hubStatus.className = 'status-indicator disconnected';
