@@ -4373,16 +4373,18 @@ function addTouchSupport() {
             // Restore opacity
             this.style.opacity = '';
             
-            // Prevent default to avoid delay
-            e.preventDefault();
-            
-            // Trigger click event
-            const clickEvent = new MouseEvent('click', {
-                view: window,
-                bubbles: true,
-                cancelable: true
-            });
-            this.dispatchEvent(clickEvent);
+            // Only prevent default for buttons, not for scrollable areas
+            if (this.tagName === 'BUTTON' || this.classList.contains('btn') || this.classList.contains('btn-icon')) {
+                e.preventDefault();
+                
+                // Trigger click event
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                this.dispatchEvent(clickEvent);
+            }
         }, { passive: false });
         
         // Add touchcancel listener
@@ -4416,11 +4418,17 @@ document.addEventListener('touchend', function(e) {
     lastTouchEnd = now;
 }, { passive: false });
 
-// Fix for iOS Safari bounce effect
+// Fix for iOS Safari bounce effect while allowing scrolling
 document.addEventListener('touchmove', function(e) {
-    if (e.target.closest('.sidebar, .main-content, .status-display')) {
-        // Allow scrolling in these containers
-        return;
+    // Check if the touch is on a scrollable element
+    const scrollableElements = ['.sidebar', '.main-content', '.status-display', '.modal-content', '.tab-content'];
+    const isScrollable = scrollableElements.some(selector => e.target.closest(selector));
+    
+    // Also check if it's an input or textarea (allow scrolling for text input)
+    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    
+    // Only prevent default if not in a scrollable area
+    if (!isScrollable && !isInput) {
+        e.preventDefault();
     }
-    e.preventDefault();
 }, { passive: false });

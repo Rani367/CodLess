@@ -99,6 +99,8 @@ body {
     display: flex;
     flex: 1;
     overflow: hidden;
+    /* Allow scrolling on mobile */
+    position: relative;
 }
 
 .sidebar {
@@ -2589,6 +2591,46 @@ kbd:hover {
 /* ========================================
    Mobile Touch Interaction Fixes
    ======================================== */
+
+/* Enable smooth scrolling on mobile */
+.sidebar,
+.main-content,
+.status-display,
+.modal-content,
+.tab-content {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Ensure scrollable areas are properly sized on mobile */
+@media (max-width: 768px) {
+    .app-container {
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height */
+        margin: 0;
+        border-radius: 0;
+    }
+    
+    .sidebar,
+    .main-content {
+        /* Ensure proper height calculation */
+        height: calc(100vh - 100px); /* Subtract header and status bar */
+        height: calc(100dvh - 100px);
+    }
+    
+    /* Fix main container on mobile to allow scrolling */
+    .main-container {
+        overflow: visible;
+        height: 100%;
+    }
+    
+    /* Ensure body allows scrolling on mobile */
+    body {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
 
 /* Ensure all interactive elements respond to touch */
 button,
