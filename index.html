@@ -70,6 +70,8 @@
         // Run the check immediately
         immediateBluetoothCheck();
     </script>
+    <!-- Model Viewer for 3D GLB files -->
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
 <body>
     <!-- Browser Compatibility Check -->
@@ -557,78 +559,16 @@
     <div id="xboxConnectModal" class="modal xbox-modal" role="dialog" aria-labelledby="xboxModalTitle" aria-hidden="true">
         <div class="modal-content xbox-modal-content">
             <div class="xbox-scene">
-                <div class="xbox-controller-3d">
-                    <!-- Xbox Controller Body -->
-                    <div class="controller-body">
-                        <!-- Main Body -->
-                        <div class="controller-main-body">
-                            <!-- Front Face -->
-                            <div class="controller-front">
-                                <!-- Left Grip -->
-                                <div class="grip-left"></div>
-                                <!-- Right Grip -->
-                                <div class="grip-right"></div>
-                                <!-- Center Section -->
-                                <div class="center-section">
-                                    <!-- Left Stick -->
-                                    <div class="stick-housing left">
-                                        <div class="stick-base"></div>
-                                        <div class="stick-shaft"></div>
-                                        <div class="stick-top"></div>
-                                    </div>
-                                    <!-- D-Pad -->
-                                    <div class="dpad-housing">
-                                        <div class="dpad">
-                                            <div class="dpad-vertical"></div>
-                                            <div class="dpad-horizontal"></div>
-                                            <div class="dpad-center"></div>
-                                        </div>
-                                    </div>
-                                    <!-- Right Stick -->
-                                    <div class="stick-housing right">
-                                        <div class="stick-base"></div>
-                                        <div class="stick-shaft"></div>
-                                        <div class="stick-top"></div>
-                                    </div>
-                                    <!-- ABXY Buttons -->
-                                    <div class="buttons-housing">
-                                        <div class="button-a"><span>A</span></div>
-                                        <div class="button-b"><span>B</span></div>
-                                        <div class="button-x"><span>X</span></div>
-                                        <div class="button-y"><span>Y</span></div>
-                                    </div>
-                                    <!-- Xbox Button -->
-                                    <div class="xbox-button-housing">
-                                        <div class="xbox-button">
-                                            <div class="xbox-logo"></div>
-                                        </div>
-                                    </div>
-                                    <!-- Menu and View Buttons -->
-                                    <div class="menu-button">
-                                        <div class="menu-icon"></div>
-                                    </div>
-                                    <div class="view-button">
-                                        <div class="view-icon"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Back Face -->
-                            <div class="controller-back">
-                                <div class="battery-compartment"></div>
-                                <div class="expansion-port"></div>
-                            </div>
-                            <!-- Top Section with Bumpers and Triggers -->
-                            <div class="controller-top">
-                                <div class="bumper left">LB</div>
-                                <div class="bumper right">RB</div>
-                                <div class="trigger left"></div>
-                                <div class="trigger right"></div>
-                                <div class="usb-port"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="xbox-shadow"></div>
+                <model-viewer 
+                    id="xboxController3D"
+                    src="White XBOX controller.glb" 
+                    alt="Xbox Controller 3D Model"
+                    auto-rotate
+                    camera-controls
+                    shadow-intensity="1"
+                    exposure="1"
+                    style="width: 100%; height: 300px;">
+                </model-viewer>
             </div>
             <div class="xbox-modal-text">
                 <h2 id="xboxModalTitle">Searching for Xbox Controller</h2>
