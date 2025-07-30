@@ -13,22 +13,24 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
     color: #ffffff;
-    overflow: hidden;
+    overflow: auto;
     user-select: none;
     /* Enable touch interaction on mobile */
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
     -webkit-touch-callout: none;
+    /* Ensure smooth scrolling */
+    -webkit-overflow-scrolling: touch;
 }
 
 .app-container {
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     background: linear-gradient(135deg, #2d2d2d 0%, #1e1e1e 100%);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
     border-radius: 12px;
     margin: 8px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .title-bar {
@@ -98,7 +100,7 @@ body {
 .main-container {
     display: flex;
     flex: 1;
-    overflow: hidden;
+    overflow: visible;
     /* Allow scrolling on mobile */
     position: relative;
 }
@@ -2603,32 +2605,39 @@ kbd:hover {
     scroll-behavior: smooth;
 }
 
-/* Ensure scrollable areas are properly sized on mobile */
+/* Ensure natural scrolling on mobile */
 @media (max-width: 768px) {
+    html, body {
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        height: auto !important;
+        position: relative !important;
+    }
+    
     .app-container {
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height */
+        min-height: 100vh;
+        height: auto;
         margin: 0;
         border-radius: 0;
+        overflow: visible !important;
     }
     
-    .sidebar,
-    .main-content {
-        /* Ensure proper height calculation */
-        height: calc(100vh - 100px); /* Subtract header and status bar */
-        height: calc(100dvh - 100px);
-    }
-    
-    /* Fix main container on mobile to allow scrolling */
     .main-container {
-        overflow: visible;
-        height: 100%;
+        overflow: visible !important;
+        height: auto;
+        flex-direction: column; /* Stack sidebar and content vertically on mobile */
     }
     
-    /* Ensure body allows scrolling on mobile */
-    body {
-        overflow: auto;
-        -webkit-overflow-scrolling: touch;
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        overflow: visible;
+    }
+    
+    .main-content {
+        height: auto;
+        overflow: visible;
     }
 }
 

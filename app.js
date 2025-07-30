@@ -4373,19 +4373,9 @@ function addTouchSupport() {
             // Restore opacity
             this.style.opacity = '';
             
-            // Only prevent default for buttons, not for scrollable areas
-            if (this.tagName === 'BUTTON' || this.classList.contains('btn') || this.classList.contains('btn-icon')) {
-                e.preventDefault();
-                
-                // Trigger click event
-                const clickEvent = new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                });
-                this.dispatchEvent(clickEvent);
-            }
-        }, { passive: false });
+            // Don't prevent default - let the browser handle it naturally
+            // The click event will fire automatically after touchend
+        }, { passive: true });
         
         // Add touchcancel listener
         element.addEventListener('touchcancel', function(e) {
@@ -4408,27 +4398,4 @@ observer.observe(document.body, {
     subtree: true
 });
 
-// Prevent double-tap zoom on iOS
-let lastTouchEnd = 0;
-document.addEventListener('touchend', function(e) {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) {
-        e.preventDefault();
-    }
-    lastTouchEnd = now;
-}, { passive: false });
-
-// Fix for iOS Safari bounce effect while allowing scrolling
-document.addEventListener('touchmove', function(e) {
-    // Check if the touch is on a scrollable element
-    const scrollableElements = ['.sidebar', '.main-content', '.status-display', '.modal-content', '.tab-content'];
-    const isScrollable = scrollableElements.some(selector => e.target.closest(selector));
-    
-    // Also check if it's an input or textarea (allow scrolling for text input)
-    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
-    
-    // Only prevent default if not in a scrollable area
-    if (!isScrollable && !isInput) {
-        e.preventDefault();
-    }
-}, { passive: false });
+// Allow natural scrolling on mobile - removed restrictive touch handlers
