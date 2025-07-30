@@ -1451,13 +1451,7 @@ kbd:hover {
     overflow: visible;
 }
 
-.xbox-scene {
-    width: 300px;
-    height: 300px;
-    margin: 0 auto 40px;
-    perspective: 1000px;
-    position: relative;
-}
+/* Xbox scene styling moved to line 1495 for better organization */
 
 .xbox-controller-3d {
     width: 100%;
@@ -1476,6 +1470,9 @@ kbd:hover {
     --progress-bar-color: #00a8ff;
     --progress-bar-height: 3px;
     --progress-mask: transparent;
+    /* Center the model properly */
+    display: block;
+    margin: 0 auto;
 }
 
 /* Ensure model is centered */
@@ -1491,9 +1488,12 @@ kbd:hover {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 20px 0;
+    margin: 20px auto;
     min-height: 300px;
     position: relative;
+    /* Increase width to give more space for centering */
+    width: 400px;
+    max-width: 100%;
 }
 
 /* Loading state for model */
