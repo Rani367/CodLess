@@ -4185,6 +4185,162 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// ============================
+// MOBILE ENHANCEMENTS
+// ============================
+
+// Mobile Menu Toggle
+const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+const sidebar = document.getElementById('sidebar');
+const mobileOverlay = document.getElementById('mobileOverlay');
+
+function toggleMobileMenu() {
+    const isOpen = sidebar.classList.contains('mobile-open');
+    
+    if (isOpen) {
+        closeMobileMenu();
+    } else {
+        openMobileMenu();
+    }
+}
+
+function openMobileMenu() {
+    sidebar.classList.add('mobile-open');
+    mobileOverlay.classList.add('active');
+    mobileMenuToggle.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden'; // Prevent body scroll when menu is open
+}
+
+function closeMobileMenu() {
+    sidebar.classList.remove('mobile-open');
+    mobileOverlay.classList.remove('active');
+    mobileMenuToggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = ''; // Restore body scroll
+}
+
+// Event listeners for mobile menu
+if (mobileMenuToggle) {
+    mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+}
+
+if (mobileOverlay) {
+    mobileOverlay.addEventListener('click', closeMobileMenu);
+}
+
+// Close mobile menu when clicking on any button in the sidebar
+document.querySelectorAll('.sidebar button').forEach(button => {
+    button.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+            closeMobileMenu();
+        }
+    });
+});
+
+// Handle window resize
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        if (window.innerWidth > 768) {
+            closeMobileMenu();
+        }
+    }, 250);
+});
+
+// Enhanced Touch Handling for Sliders
+document.querySelectorAll('.slider').forEach(slider => {
+    let touchStartX = 0;
+    let startValue = 0;
+    
+    slider.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        startValue = parseFloat(slider.value);
+    }, { passive: true });
+    
+    slider.addEventListener('touchmove', (e) => {
+        const touchX = e.touches[0].clientX;
+        const deltaX = touchX - touchStartX;
+        const sliderWidth = slider.offsetWidth;
+        const range = parseFloat(slider.max) - parseFloat(slider.min);
+        const deltaValue = (deltaX / sliderWidth) * range;
+        
+        slider.value = Math.max(
+            parseFloat(slider.min),
+            Math.min(parseFloat(slider.max), startValue + deltaValue)
+        );
+        
+        // Trigger input event for real-time updates
+        slider.dispatchEvent(new Event('input'));
+    }, { passive: true });
+});
+
+// Prevent double-tap zoom on buttons
+document.addEventListener('touchend', (e) => {
+    if (e.target.matches('button, .btn, .control-btn')) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+// Add swipe gesture support for tabs (if any)
+let touchStartXGlobal = 0;
+let touchStartYGlobal = 0;
+
+document.addEventListener('touchstart', (e) => {
+    touchStartXGlobal = e.touches[0].clientX;
+    touchStartYGlobal = e.touches[0].clientY;
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaX = touchEndX - touchStartXGlobal;
+    const deltaY = touchEndY - touchStartYGlobal;
+    
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+        if (deltaX > 0 && touchStartXGlobal < 50) {
+            // Swipe right from left edge - open menu
+            if (window.innerWidth <= 768 && !sidebar.classList.contains('mobile-open')) {
+                openMobileMenu();
+            }
+        } else if (deltaX < 0 && sidebar.classList.contains('mobile-open')) {
+            // Swipe left - close menu
+            closeMobileMenu();
+        }
+    }
+}, { passive: true });
+
+// Improve scroll performance on mobile
+document.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.sidebar') || e.target.closest('.modal-content')) {
+        // Allow scrolling in sidebar and modals
+        return;
+    }
+    
+    if (sidebar.classList.contains('mobile-open')) {
+        // Prevent scrolling when mobile menu is open
+        e.preventDefault();
+    }
+}, { passive: false });
+
+// Handle orientation change
+window.addEventListener('orientationchange', () => {
+    // Force re-layout after orientation change
+    setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, 100);
+});
+
+// Viewport height fix for mobile browsers
+function updateViewportHeight() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+updateViewportHeight();
+window.addEventListener('resize', updateViewportHeight);
+window.addEventListener('orientationchange', updateViewportHeight);
+
 console.log(`%cCodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'color: #00a8ff; font-size: 16px; font-weight: bold;');
 console.log('🤖 Professional robotics control and simulation platform');
 console.log('📖 Documentation: https://github.com/codless-robotics/fll-control-center');
