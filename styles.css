@@ -1430,3 +1430,407 @@ kbd:hover {
         justify-content: center;
     }
 }
+
+/* ============================
+   XBOX CONTROLLER MODAL STYLES
+   ============================ */
+
+.xbox-modal {
+    z-index: 10000;
+}
+
+.xbox-modal-content {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: visible;
+}
+
+.xbox-scene {
+    width: 300px;
+    height: 300px;
+    margin: 0 auto 40px;
+    perspective: 1000px;
+    position: relative;
+}
+
+.xbox-controller-3d {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: rotateController 8s infinite linear;
+}
+
+@keyframes rotateController {
+    0% { transform: rotateY(0deg) rotateX(-10deg); }
+    100% { transform: rotateY(360deg) rotateX(-10deg); }
+}
+
+.controller-body {
+    width: 200px;
+    height: 140px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transform-style: preserve-3d;
+}
+
+.controller-face {
+    position: absolute;
+    background: #171717;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.controller-face.front,
+.controller-face.back {
+    width: 200px;
+    height: 140px;
+    border-radius: 20px;
+}
+
+.controller-face.front {
+    transform: translateZ(30px);
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    box-shadow: 
+        inset 0 2px 5px rgba(255, 255, 255, 0.1),
+        inset 0 -2px 5px rgba(0, 0, 0, 0.5),
+        0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.controller-face.back {
+    transform: rotateY(180deg) translateZ(30px);
+    background: #171717;
+}
+
+.controller-face.left,
+.controller-face.right {
+    width: 60px;
+    height: 140px;
+    left: 70px;
+    border-radius: 10px;
+}
+
+.controller-face.left {
+    transform: rotateY(-90deg) translateZ(100px);
+}
+
+.controller-face.right {
+    transform: rotateY(90deg) translateZ(100px);
+}
+
+.controller-face.top,
+.controller-face.bottom {
+    width: 200px;
+    height: 60px;
+    top: 40px;
+    border-radius: 10px;
+}
+
+.controller-face.top {
+    transform: rotateX(90deg) translateZ(70px);
+}
+
+.controller-face.bottom {
+    transform: rotateX(-90deg) translateZ(70px);
+}
+
+/* Xbox Controller Details */
+.left-stick,
+.right-stick {
+    position: absolute;
+    width: 35px;
+    height: 35px;
+    background: radial-gradient(circle at 30% 30%, #3a3a3a, #1a1a1a);
+    border-radius: 50%;
+    box-shadow: 
+        0 2px 5px rgba(0, 0, 0, 0.5),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+}
+
+.left-stick {
+    top: 45px;
+    left: 30px;
+}
+
+.right-stick {
+    bottom: 25px;
+    right: 45px;
+}
+
+.dpad {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    left: 30px;
+    bottom: 30px;
+}
+
+.dpad-up, .dpad-right, .dpad-down, .dpad-left {
+    position: absolute;
+    background: #2a2a2a;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.dpad-up, .dpad-down {
+    width: 12px;
+    height: 15px;
+    left: 14px;
+}
+
+.dpad-up {
+    top: 0;
+    border-radius: 3px 3px 0 0;
+}
+
+.dpad-down {
+    bottom: 0;
+    border-radius: 0 0 3px 3px;
+}
+
+.dpad-left, .dpad-right {
+    width: 15px;
+    height: 12px;
+    top: 14px;
+}
+
+.dpad-left {
+    left: 0;
+    border-radius: 3px 0 0 3px;
+}
+
+.dpad-right {
+    right: 0;
+    border-radius: 0 3px 3px 0;
+}
+
+.dpad-center {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #2a2a2a;
+    top: 14px;
+    left: 14px;
+}
+
+.buttons {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    right: 25px;
+    top: 35px;
+}
+
+.button-a, .button-b, .button-x, .button-y {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.5),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+}
+
+.button-a {
+    bottom: 0;
+    left: 20px;
+    background: #0d7c0d;
+}
+
+.button-b {
+    right: 0;
+    top: 20px;
+    background: #dc2626;
+}
+
+.button-x {
+    left: 0;
+    top: 20px;
+    background: #2563eb;
+}
+
+.button-y {
+    top: 0;
+    left: 20px;
+    background: #f59e0b;
+}
+
+.xbox-button {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background: radial-gradient(circle at 30% 30%, #4ade80, #22c55e);
+    border-radius: 50%;
+    top: 55px;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 
+        0 2px 5px rgba(0, 0, 0, 0.5),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+    animation: xboxButtonPulse 2s infinite;
+}
+
+@keyframes xboxButtonPulse {
+    0%, 100% { box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.3), 0 0 20px rgba(74, 222, 128, 0.5); }
+    50% { box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.3), 0 0 30px rgba(74, 222, 128, 0.8); }
+}
+
+.menu-button,
+.view-button {
+    position: absolute;
+    width: 15px;
+    height: 8px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    top: 65px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.menu-button {
+    right: 50px;
+}
+
+.view-button {
+    left: 50px;
+}
+
+.bumper,
+.trigger {
+    position: absolute;
+    background: #2a2a2a;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bumper {
+    width: 50px;
+    height: 15px;
+    top: 10px;
+    left: 5px;
+    border-radius: 5px;
+}
+
+.trigger {
+    width: 30px;
+    height: 25px;
+    top: 30px;
+    left: 15px;
+    border-radius: 0 0 10px 10px;
+}
+
+/* Shadow Effect */
+.xbox-shadow {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 180px;
+    height: 40px;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.4) 0%, transparent 70%);
+    filter: blur(10px);
+    animation: shadowPulse 8s infinite linear;
+}
+
+@keyframes shadowPulse {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.4; }
+    50% { transform: translateX(-50%) scale(1.1); opacity: 0.6; }
+}
+
+/* Modal Text Styling */
+.xbox-modal-text {
+    text-align: center;
+    color: #fff;
+}
+
+.xbox-modal-text h2 {
+    font-size: 28px;
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.xbox-status-text {
+    color: #94a3b8;
+    font-size: 16px;
+    margin-bottom: 30px;
+}
+
+.xbox-pulse-indicator {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    margin: 30px auto;
+}
+
+.pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid #4ade80;
+    border-radius: 50%;
+    animation: pulse 3s infinite;
+    opacity: 0;
+}
+
+.pulse-ring:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.pulse-ring:nth-child(2) {
+    animation-delay: 1s;
+}
+
+.pulse-ring:nth-child(3) {
+    animation-delay: 2s;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+.xbox-cancel-btn {
+    display: block;
+    margin: 20px auto 0;
+}
+
+/* Success State */
+.xbox-modal-content.success .xbox-controller-3d {
+    animation: successBounce 0.6s ease-out;
+}
+
+.xbox-modal-content.success .xbox-button {
+    background: radial-gradient(circle at 30% 30%, #4ade80, #22c55e);
+    animation: none;
+    box-shadow: 
+        0 2px 5px rgba(0, 0, 0, 0.5),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.3),
+        0 0 40px rgba(74, 222, 128, 1);
+}
+
+@keyframes successBounce {
+    0% { transform: scale(1) rotateY(0deg) rotateX(-10deg); }
+    50% { transform: scale(1.2) rotateY(180deg) rotateX(-10deg); }
+    100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
+}

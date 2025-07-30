@@ -1889,6 +1889,13 @@ class FLLRoboticsApp extends EventEmitter {
         document.querySelector('.maximize-btn')?.addEventListener('click', () => this.toggleMaximize());
         document.querySelector('.close-btn')?.addEventListener('click', () => this.closeWindow());
         
+        // Modal click outside handlers
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'xboxConnectModal' && e.target.classList.contains('modal')) {
+                this.cancelXboxConnection();
+            }
+        });
+        
         // Logger events
         this.logger.onLog((entry) => this.displayLogEntry(entry));
     }
@@ -2034,6 +2041,23 @@ class FLLRoboticsApp extends EventEmitter {
     setupXboxController() {
         // Set up callbacks
         this.xboxController.callbacks.onConnect = (gamepad) => {
+            // Update modal to success state
+            const modal = document.getElementById('xboxConnectModal');
+            if (modal && modal.style.display === 'block') {
+                const modalContent = modal.querySelector('.xbox-modal-content');
+                const title = modal.querySelector('#xboxModalTitle');
+                const statusText = modal.querySelector('.xbox-status-text');
+                
+                modalContent.classList.add('success');
+                title.textContent = 'Controller Connected!';
+                statusText.textContent = gamepad.id;
+                
+                // Hide modal after success animation
+                setTimeout(() => {
+                    this.hideXboxConnectModal();
+                }, 1500);
+            }
+            
             this.updateXboxControllerUI('connected', gamepad.id);
             this.toastManager.show('Xbox Controller connected!', 'success');
             this.logger.log(`Xbox Controller connected: ${gamepad.id}`, 'info');
@@ -2065,8 +2089,53 @@ class FLLRoboticsApp extends EventEmitter {
             return;
         }
         
-        this.toastManager.show('Press any button on your Xbox controller to connect...', 'info');
+        // Show the modal
+        this.showXboxConnectModal();
         this.logger.log('Waiting for Xbox controller connection...', 'info');
+    }
+    
+    showXboxConnectModal() {
+        const modal = document.getElementById('xboxConnectModal');
+        if (modal) {
+            modal.style.display = 'block';
+            modal.setAttribute('aria-hidden', 'false');
+            
+            // Reset modal state
+            const modalContent = modal.querySelector('.xbox-modal-content');
+            modalContent.classList.remove('success');
+            
+            const title = modal.querySelector('#xboxModalTitle');
+            const statusText = modal.querySelector('.xbox-status-text');
+            title.textContent = 'Searching for Xbox Controller';
+            statusText.textContent = 'Press any button on your Xbox controller to connect...';
+            
+            // Set a timeout to close the modal if no controller connects
+            this.xboxConnectionTimeout = setTimeout(() => {
+                if (!this.xboxController.isConnected()) {
+                    this.hideXboxConnectModal();
+                    this.toastManager.show('No Xbox controller found. Make sure your controller is connected via Bluetooth and try again.', 'warning');
+                }
+            }, 30000); // 30 seconds timeout
+        }
+    }
+    
+    hideXboxConnectModal() {
+        const modal = document.getElementById('xboxConnectModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        
+        // Clear the timeout if it exists
+        if (this.xboxConnectionTimeout) {
+            clearTimeout(this.xboxConnectionTimeout);
+            this.xboxConnectionTimeout = null;
+        }
+    }
+    
+    cancelXboxConnection() {
+        this.hideXboxConnectModal();
+        this.toastManager.show('Xbox controller connection cancelled', 'info');
     }
     
     handleXboxButtonPress(button, value) {

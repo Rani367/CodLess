@@ -553,6 +553,61 @@
         </div>
     </div>
 
+    <!-- Xbox Controller Connection Modal -->
+    <div id="xboxConnectModal" class="modal xbox-modal" role="dialog" aria-labelledby="xboxModalTitle" aria-hidden="true">
+        <div class="modal-content xbox-modal-content">
+            <div class="xbox-scene">
+                <div class="xbox-controller-3d">
+                    <!-- Xbox Controller Body -->
+                    <div class="controller-body">
+                        <div class="controller-face front">
+                            <div class="left-stick"></div>
+                            <div class="right-stick"></div>
+                            <div class="dpad">
+                                <div class="dpad-up"></div>
+                                <div class="dpad-right"></div>
+                                <div class="dpad-down"></div>
+                                <div class="dpad-left"></div>
+                                <div class="dpad-center"></div>
+                            </div>
+                            <div class="buttons">
+                                <div class="button-a">A</div>
+                                <div class="button-b">B</div>
+                                <div class="button-x">X</div>
+                                <div class="button-y">Y</div>
+                            </div>
+                            <div class="xbox-button"></div>
+                            <div class="menu-button"></div>
+                            <div class="view-button"></div>
+                        </div>
+                        <div class="controller-face back"></div>
+                        <div class="controller-face left">
+                            <div class="bumper"></div>
+                            <div class="trigger"></div>
+                        </div>
+                        <div class="controller-face right">
+                            <div class="bumper"></div>
+                            <div class="trigger"></div>
+                        </div>
+                        <div class="controller-face top"></div>
+                        <div class="controller-face bottom"></div>
+                    </div>
+                </div>
+                <div class="xbox-shadow"></div>
+            </div>
+            <div class="xbox-modal-text">
+                <h2 id="xboxModalTitle">Searching for Xbox Controller</h2>
+                <p class="xbox-status-text">Press any button on your Xbox controller to connect...</p>
+                <div class="xbox-pulse-indicator">
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                </div>
+            </div>
+            <button class="btn btn-secondary xbox-cancel-btn" onclick="window.app?.cancelXboxConnection()">Cancel</button>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
