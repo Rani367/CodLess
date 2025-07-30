@@ -155,6 +155,10 @@
                             <i class="fas fa-bluetooth" aria-hidden="true"></i>
                             Connect to Pybricks Hub
                         </button>
+                        <button id="connectXboxBtn" class="btn btn-secondary" style="margin-top: 10px;">
+                            <i class="fas fa-gamepad" aria-hidden="true"></i>
+                            Connect Xbox Controller
+                        </button>
                         <div class="checkbox-container">
                             <input type="checkbox" id="developerMode" class="checkbox" aria-describedby="simModeDesc">
                             <label for="developerMode">Simulation Mode</label>
@@ -163,6 +167,10 @@
                         <div id="hubStatus" class="status-indicator disconnected" role="status" aria-live="polite">
                             <div class="status-dot" aria-hidden="true"></div>
                             <span>Hub Disconnected</span>
+                        </div>
+                        <div id="xboxStatus" class="status-indicator disconnected" role="status" aria-live="polite" style="margin-top: 10px;">
+                            <div class="status-dot" aria-hidden="true"></div>
+                            <span>Xbox Controller Disconnected</span>
                         </div>
                     </div>
                 </div>
@@ -383,11 +391,17 @@
                             </div>
                         </div>
                     </div>
-                    <div class="controls-help">
+                                        <div class="controls-help">
                         <p class="help-text">
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                             Hold multiple keys for combined movements. Press Space for emergency stop.
                         </p>
+                        <div id="xboxControllerHelp" style="display: none; margin-top: 10px;">
+                            <p class="help-text">
+                                <i class="fas fa-gamepad" aria-hidden="true"></i>
+                                <strong>Xbox Controller:</strong> Left stick to turn, triggers for speed. A/B for Arm 1, X/Y for Arm 2. Menu for emergency stop.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -536,6 +550,61 @@
                 <button class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Xbox Controller Connection Modal -->
+    <div id="xboxConnectModal" class="modal xbox-modal" role="dialog" aria-labelledby="xboxModalTitle" aria-hidden="true">
+        <div class="modal-content xbox-modal-content">
+            <div class="xbox-scene">
+                <div class="xbox-controller-3d">
+                    <!-- Xbox Controller Body -->
+                    <div class="controller-body">
+                        <div class="controller-face front">
+                            <div class="left-stick"></div>
+                            <div class="right-stick"></div>
+                            <div class="dpad">
+                                <div class="dpad-up"></div>
+                                <div class="dpad-right"></div>
+                                <div class="dpad-down"></div>
+                                <div class="dpad-left"></div>
+                                <div class="dpad-center"></div>
+                            </div>
+                            <div class="buttons">
+                                <div class="button-a">A</div>
+                                <div class="button-b">B</div>
+                                <div class="button-x">X</div>
+                                <div class="button-y">Y</div>
+                            </div>
+                            <div class="xbox-button"></div>
+                            <div class="menu-button"></div>
+                            <div class="view-button"></div>
+                        </div>
+                        <div class="controller-face back"></div>
+                        <div class="controller-face left">
+                            <div class="bumper"></div>
+                            <div class="trigger"></div>
+                        </div>
+                        <div class="controller-face right">
+                            <div class="bumper"></div>
+                            <div class="trigger"></div>
+                        </div>
+                        <div class="controller-face top"></div>
+                        <div class="controller-face bottom"></div>
+                    </div>
+                </div>
+                <div class="xbox-shadow"></div>
+            </div>
+            <div class="xbox-modal-text">
+                <h2 id="xboxModalTitle">Searching for Xbox Controller</h2>
+                <p class="xbox-status-text">Press any button on your Xbox controller to connect...</p>
+                <div class="xbox-pulse-indicator">
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                </div>
+            </div>
+            <button class="btn btn-secondary xbox-cancel-btn" onclick="window.app?.cancelXboxConnection()">Cancel</button>
         </div>
     </div>
 
