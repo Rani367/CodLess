@@ -2109,6 +2109,17 @@ class FLLRoboticsApp extends EventEmitter {
             title.textContent = 'Searching for Xbox Controller';
             statusText.textContent = 'Press any button on your Xbox controller to connect...';
             
+            // Reset the 3D model auto-rotation
+            const modelViewer = modal.querySelector('#xboxController3D');
+            if (modelViewer) {
+                // Remove and re-add the auto-rotate attribute to restart the animation
+                modelViewer.removeAttribute('auto-rotate');
+                // Use setTimeout to ensure the attribute removal is processed before re-adding
+                setTimeout(() => {
+                    modelViewer.setAttribute('auto-rotate', '');
+                }, 10);
+            }
+            
             // Set a timeout to close the modal if no controller connects
             this.xboxConnectionTimeout = setTimeout(() => {
                 if (!this.xboxController.isConnected()) {
