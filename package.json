@@ -1,0 +1,14 @@
+{
+  "name": "codless-robotics",
+  "version": "3.0.0",
+  "description": "Professional FLL Robotics Control Center",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.12"
+  }
+}
