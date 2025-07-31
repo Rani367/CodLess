@@ -29,6 +29,7 @@
     
     <title>CodLess - FLL Robotics Control Center v3.0.0</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="animations.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -71,8 +72,74 @@
     </script>
     <!-- Model Viewer for 3D GLB files -->
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <!-- Animation System -->
+    <script src="animations.js" defer></script>
 </head>
 <body>
+    <!-- Page Loading Animation -->
+    <style>
+        .page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+        }
+        
+        .page-loader.fade-out {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loader-content {
+            text-align: center;
+        }
+        
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #00a8ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .loader-text {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 500;
+            opacity: 0.8;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <div class="loader-text">Loading CodLess...</div>
+        </div>
+    </div>
+    <script>
+        // Remove loader when page is fully loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('pageLoader');
+                if (loader) {
+                    loader.classList.add('fade-out');
+                    setTimeout(() => loader.remove(), 500);
+                }
+            }, 500);
+        });
+    </script>
     <!-- Browser Compatibility Check -->
     <div id="browserNotSupported" class="browser-not-supported" style="display: none;">
         <div class="browser-not-supported-content">
