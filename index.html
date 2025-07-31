@@ -46,12 +46,10 @@
                 // Show the browser not supported screen immediately
                 document.addEventListener('DOMContentLoaded', function() {
                     const appContainer = document.getElementById('appContainer');
-                    const loadingScreen = document.getElementById('loadingScreen');
                     const browserNotSupported = document.getElementById('browserNotSupported');
                     
-                    // Hide app and loading screen
+                    // Hide app
                     if (appContainer) appContainer.style.display = 'none';
-                    if (loadingScreen) loadingScreen.style.display = 'none';
                     
                     // Show browser not supported screen
                     if (browserNotSupported) {
@@ -108,20 +106,6 @@
                 </ul>
                 <p class="note">Note: This application cannot function without Web Bluetooth API support.</p>
             </div>
-        </div>
-    </div>
-
-    <!-- Loading Screen -->
-    <div id="loadingScreen" class="loading-screen" style="display: none;">
-        <div class="loading-content">
-            <div class="loading-logo">
-                <i class="fas fa-robot"></i>
-            </div>
-            <h2>CodLess Robotics</h2>
-            <div class="loading-bar">
-                <div class="loading-progress"></div>
-            </div>
-            <p>Initializing Control Center...</p>
         </div>
     </div>
 
