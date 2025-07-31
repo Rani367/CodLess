@@ -1593,47 +1593,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.logger.log(`Bluetooth Support: ${navigator.bluetooth ? 'Yes' : 'No'}`, 'info');
     }
 
-    showLoadingScreen() {
-        const loadingScreen = document.getElementById('loadingScreen');
-        const appContainer = document.getElementById('appContainer');
-        
-        if (loadingScreen) loadingScreen.style.display = 'flex';
-        if (appContainer) appContainer.style.display = 'none';
-    }
-
-    async hideLoadingScreen() {
-        return new Promise(resolve => {
-            setTimeout(() => {
-                const loadingScreen = document.getElementById('loadingScreen');
-                const appContainer = document.getElementById('appContainer');
-                
-                if (loadingScreen) {
-                    loadingScreen.style.opacity = '0';
-                    setTimeout(() => {
-                        loadingScreen.style.display = 'none';
-                        if (appContainer) appContainer.style.display = 'flex';
-                        
-                        // Now that the app is visible, set up the robot simulator if it wasn't initialized
-                        if (!this.robotSimulator) {
-                            setTimeout(() => this.setupRobotSimulator(), 100);
-                        }
-                        
-                        resolve();
-                    }, 500);
-                } else {
-                    if (appContainer) appContainer.style.display = 'flex';
-                    
-                    // Now that the app is visible, set up the robot simulator if it wasn't initialized
-                    if (!this.robotSimulator) {
-                        setTimeout(() => this.setupRobotSimulator(), 100);
-                    }
-                    
-                    resolve();
-                }
-            }, 2000); // Show loading for at least 2 seconds
-        });
-    }
-
     async loadUserData() {
         try {
             // Load configuration
