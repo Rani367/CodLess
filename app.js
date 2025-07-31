@@ -1457,7 +1457,7 @@ class FLLRoboticsApp extends EventEmitter {
     async init() {
         try {
             console.log('Starting application initialization...');
-            this.showLoadingScreen();
+            // Removed showLoadingScreen() - app loads immediately
             
             console.log('Checking browser compatibility...');
             // Check browser compatibility
@@ -1498,9 +1498,11 @@ class FLLRoboticsApp extends EventEmitter {
             // Initialize UI
             this.updateUI();
             
-            console.log('Hiding loading screen...');
-            // Show application
-            await this.hideLoadingScreen();
+            // Removed hideLoadingScreen() - app is already visible
+            // Setup robot simulator now that app is visible (delayed to ensure DOM is ready)
+            if (!this.robotSimulator) {
+                setTimeout(() => this.setupRobotSimulator(), 100);
+            }
             
             console.log('Application initialized successfully!');
             this.logger.log('Application initialized successfully', 'success');
@@ -1509,32 +1511,36 @@ class FLLRoboticsApp extends EventEmitter {
         } catch (error) {
             console.error('Failed to initialize application:', error);
             
-            // Hide loading screen and show error
-            const loadingScreen = document.getElementById('loadingScreen');
-            if (loadingScreen) {
-                const loadingContent = loadingScreen.querySelector('.loading-content');
-                if (loadingContent) {
-                    loadingContent.innerHTML = `
-                        <div class="loading-logo">
-                            <i class="fas fa-exclamation-triangle" style="color: #ff4757;"></i>
+            // Show error message using toast or logger
+            this.logger?.log(`Initialization failed: ${error.message}`, 'error');
+            this.toastManager?.show(`Failed to initialize: ${error.message}`, 'error');
+            
+            // Show error in the app container
+            const appContainer = document.getElementById('appContainer');
+            if (appContainer && !this.logger) {
+                // If logger isn't available, show error directly in app container
+                appContainer.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px;">
+                        <div style="text-align: center;">
+                            <i class="fas fa-exclamation-triangle" style="color: #ff4757; font-size: 48px; margin-bottom: 20px;"></i>
+                            <h2 style="color: #ff4757; margin-bottom: 10px;">Initialization Failed</h2>
+                            <p style="color: #666; margin-bottom: 20px;">
+                                ${error.message}
+                            </p>
+                            <button onclick="location.reload()" style="
+                                background: #00a8ff; 
+                                color: white; 
+                                border: none; 
+                                padding: 10px 20px; 
+                                border-radius: 5px; 
+                                cursor: pointer;
+                                font-size: 14px;
+                            ">
+                                Retry
+                            </button>
                         </div>
-                        <h2>Initialization Failed</h2>
-                        <p style="color: #ff4757; margin: 20px 0;">
-                            ${error.message}
-                        </p>
-                        <button onclick="location.reload()" style="
-                            background: #00a8ff; 
-                            color: white; 
-                            border: none; 
-                            padding: 10px 20px; 
-                            border-radius: 5px; 
-                            cursor: pointer;
-                            font-size: 14px;
-                        ">
-                            Retry
-                        </button>
-                    `;
-                }
+                    </div>
+                `;
             }
             
             // Re-throw the error so it can be caught by the DOMContentLoaded handler
@@ -4122,32 +4128,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Failed to initialize application:', error);
         
-        // Show error message to user
-        const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen) {
-            const loadingContent = loadingScreen.querySelector('.loading-content');
-            if (loadingContent) {
-                loadingContent.innerHTML = `
-                    <div class="loading-logo">
-                        <i class="fas fa-exclamation-triangle" style="color: #ff4757;"></i>
+        // Show error message in app container
+        const appContainer = document.getElementById('appContainer');
+        if (appContainer) {
+            appContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px;">
+                    <div style="text-align: center;">
+                        <i class="fas fa-exclamation-triangle" style="color: #ff4757; font-size: 48px; margin-bottom: 20px;"></i>
+                        <h2 style="color: #ff4757; margin-bottom: 10px;">Initialization Failed</h2>
+                        <p style="color: #666; margin-bottom: 20px;">
+                            Failed to load the application: ${error.message}
+                        </p>
+                        <button onclick="location.reload()" style="
+                            background: #00a8ff; 
+                            color: white; 
+                            border: none; 
+                            padding: 10px 20px; 
+                            border-radius: 5px; 
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">
+                            Retry
+                        </button>
                     </div>
-                    <h2>Initialization Failed</h2>
-                    <p style="color: #ff4757; margin: 20px 0;">
-                        Failed to load the application: ${error.message}
-                    </p>
-                    <button onclick="location.reload()" style="
-                        background: #00a8ff; 
-                        color: white; 
-                        border: none; 
-                        padding: 10px 20px; 
-                        border-radius: 5px; 
-                        cursor: pointer;
-                        font-size: 14px;
-                    ">
-                        Retry
-                    </button>
-                `;
-            }
+                </div>
+            `;
         }
     }
 });
