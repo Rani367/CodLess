@@ -1439,7 +1439,7 @@ class RobotSimulator extends EventEmitter {
 }
 
 // ============================
-// MAIN APPLICATION CLASS
+// MAIN APPLICATION CLASSES
 // ============================
 
 class FLLRoboticsApp extends EventEmitter {
@@ -4192,6 +4192,284 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         window.app = new FLLRoboticsApp();
         await window.app.init();
+        
+        // Initialize Add to Home Screen functionality
+        initializeAddToHomeScreen();
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        
+        // Show error message in app container
+        const appContainer = document.getElementById('appContainer');
+        if (appContainer) {
+            appContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px;">
+                    <div style="text-align: center;">
+                        <i class="fas fa-exclamation-triangle" style="color: #ff4757; font-size: 48px; margin-bottom: 20px;"></i>
+                        <h2 style="color: #ff4757; margin-bottom: 10px;">Initialization Failed</h2>
+                        <p style="color: #666; margin-bottom: 20px;">
+                            Failed to load the application: ${error.message}
+                        </p>
+                        <button onclick="location.reload()" style="
+                            background: #00a8ff; 
+                            color: white; 
+                            border: none; 
+                            padding: 10px 20px; 
+                            border-radius: 5px; 
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+});
+
+window.addEventListener('beforeunload', (e) => {
+    if (window.app) {
+        window.app.cleanup();
+    }
+});
+
+// Handle page visibility changes
+document.addEventListener('visibilitychange', () => {
+    if (window.app) {
+        if (document.hidden) {
+            // Page is hidden, reduce performance
+            window.app.robotSimulator?.stop();
+        } else {
+            // Page is visible, resume
+            if (window.app.isDeveloperMode) {
+                window.app.robotSimulator?.start();
+            }
+        }
+    }
+});
+
+// Add CSS for loading animations
+const style = document.createElement('style');
+style.textContent = `
+@keyframes slideOutToast {
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+`;
+document.head.appendChild(style);
+
+console.log(`%cCodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'color: #00a8ff; font-size: 16px; font-weight: bold;');
+console.log('🤖 Professional robotics control and simulation platform');
+console.log('📖 Documentation: https://github.com/codless-robotics/fll-control-center');
+console.log('%cIf you encounter "savedRuns.forEach is not a function" error, try: window.app?.clearCorruptedData()', 'color: #ff9800; font-size: 12px;');
+
+// ============================
+// ADD TO HOME SCREEN FUNCTIONALITY
+// ============================
+
+let deferredPrompt;
+let isStandalone = false;
+
+// Check if app is running in standalone mode
+function checkStandaloneMode() {
+    // Check for various standalone indicators
+    isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                   window.navigator.standalone ||
+                   document.referrer.includes('android-app://');
+    
+    return isStandalone;
+}
+
+// Initialize Add to Home Screen functionality
+function initializeAddToHomeScreen() {
+    // Check if already in standalone mode
+    if (checkStandaloneMode()) {
+        console.log('App is running in standalone mode');
+        return;
+    }
+    
+    // Get the install button
+    const installButton = document.getElementById('installButton');
+    
+    // Check if the prompt has been shown recently (within 7 days)
+    const lastPromptTime = localStorage.getItem('a2hsLastPromptTime');
+    const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+    
+    if (lastPromptTime && Date.now() - parseInt(lastPromptTime) < sevenDaysInMs) {
+        console.log('A2HS prompt was shown recently, skipping');
+    }
+    
+    // Listen for the beforeinstallprompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        
+        // Show the install button
+        if (installButton) {
+            installButton.style.display = 'inline-flex';
+            installButton.addEventListener('click', installApp);
+        }
+        
+        // Show custom install prompt after a delay (only if not shown recently)
+        if (!lastPromptTime || Date.now() - parseInt(lastPromptTime) >= sevenDaysInMs) {
+            setTimeout(() => {
+                showInstallPrompt();
+            }, 3000); // Show after 3 seconds
+        }
+        
+        console.log('beforeinstallprompt event fired');
+    });
+    
+    // Listen for successful app installation
+    window.addEventListener('appinstalled', () => {
+        console.log('App was installed successfully');
+        hideInstallPrompt();
+        if (installButton) {
+            installButton.style.display = 'none';
+        }
+        deferredPrompt = null;
+    });
+}
+
+// Show custom install prompt
+function showInstallPrompt() {
+    // Don't show if already shown recently or in standalone mode
+    if (checkStandaloneMode() || !deferredPrompt) {
+        return;
+    }
+    
+    // Create install prompt UI
+    const promptHTML = `
+        <div id="a2hsPrompt" class="a2hs-prompt">
+            <div class="a2hs-content">
+                <div class="a2hs-icon">
+                    <img src="favicon.png" alt="CodLess Icon" width="48" height="48">
+                </div>
+                <div class="a2hs-text">
+                    <h3>Install CodLess App</h3>
+                    <p>Add to your home screen for quick access and offline use!</p>
+                </div>
+                <div class="a2hs-buttons">
+                    <button class="a2hs-install-btn" onclick="installApp()">Install</button>
+                    <button class="a2hs-cancel-btn" onclick="hideInstallPrompt()">Not Now</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add prompt to page
+    document.body.insertAdjacentHTML('beforeend', promptHTML);
+    
+    // Add animation class after a brief delay
+    setTimeout(() => {
+        const prompt = document.getElementById('a2hsPrompt');
+        if (prompt) {
+            prompt.classList.add('show');
+        }
+    }, 100);
+}
+
+// Hide install prompt
+function hideInstallPrompt() {
+    const prompt = document.getElementById('a2hsPrompt');
+    if (prompt) {
+        prompt.classList.remove('show');
+        setTimeout(() => {
+            prompt.remove();
+        }, 300);
+    }
+    
+    // Record when prompt was shown
+    localStorage.setItem('a2hsLastPromptTime', Date.now().toString());
+}
+
+// Install the app
+async function installApp() {
+    if (!deferredPrompt) {
+        console.log('No installation prompt available');
+        return;
+    }
+    
+    // Hide the prompt
+    hideInstallPrompt();
+    
+    // Show the install prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    console.log(`User response to install prompt: ${outcome}`);
+    
+    // Clear the deferred prompt
+    deferredPrompt = null;
+}
+
+// Make functions globally available
+window.installApp = installApp;
+window.hideInstallPrompt = hideInstallPrompt;
+
+// ============================
+// INITIALIZATION
+// ============================
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check if browser was blocked by immediate check
+    if (window.BROWSER_BLOCKED) {
+        console.warn('Browser blocked: Bluetooth API not supported');
+        return;
+    }
+    
+    // Secondary check for browser compatibility
+    const browserCheck = checkBrowserCompatibility();
+    
+    if (!browserCheck.isSupported) {
+        console.warn('Browser not supported:', {
+            browser: browserCheck.browserName,
+            bluetooth: browserCheck.hasBluetoothSupport,
+            secure: browserCheck.isSecureContext
+        });
+        showBrowserNotSupportedMessage();
+        return;
+    }
+    
+    // Preload the 3D model for faster loading
+    try {
+        const modelViewer = document.querySelector('#xboxController3D');
+        if (modelViewer) {
+            // Set up model viewer for optimal performance
+            modelViewer.addEventListener('load', () => {
+                console.log('3D model loaded successfully');
+            });
+            
+            modelViewer.addEventListener('error', (event) => {
+                console.error('Error loading 3D model:', event);
+            });
+            
+            // Preload the model
+            const modelUrl = modelViewer.getAttribute('src');
+            if (modelUrl) {
+                fetch(modelUrl, { priority: 'high' })
+                    .then(response => response.blob())
+                    .then(() => console.log('3D model preloaded'))
+                    .catch(err => console.error('Failed to preload 3D model:', err));
+            }
+        }
+    } catch (error) {
+        console.error('Error setting up 3D model:', error);
+    }
+    
+    try {
+        window.app = new FLLRoboticsApp();
+        await window.app.init();
+        
+        // Initialize Add to Home Screen functionality
+        initializeAddToHomeScreen();
     } catch (error) {
         console.error('Failed to initialize application:', error);
         

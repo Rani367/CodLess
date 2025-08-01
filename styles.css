@@ -2202,3 +2202,123 @@ kbd:hover {
     50% { transform: scale(1.2) rotateY(180deg) rotateX(-10deg); }
     100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
 }
+
+/* ============================
+   ADD TO HOME SCREEN PROMPT
+   ============================ */
+
+.a2hs-prompt {
+    position: fixed;
+    bottom: -150px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e1e1e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 90%;
+    width: 400px;
+}
+
+.a2hs-prompt.show {
+    bottom: 20px;
+}
+
+.a2hs-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.a2hs-icon {
+    flex-shrink: 0;
+}
+
+.a2hs-icon img {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+}
+
+.a2hs-text {
+    flex: 1;
+}
+
+.a2hs-text h3 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.a2hs-text p {
+    margin: 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+}
+
+.a2hs-buttons {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.a2hs-install-btn,
+.a2hs-cancel-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.a2hs-install-btn {
+    background: #00a8ff;
+    color: white;
+}
+
+.a2hs-install-btn:hover {
+    background: #0090e0;
+    transform: translateY(-1px);
+}
+
+.a2hs-cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.a2hs-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+    .a2hs-prompt {
+        width: calc(100% - 40px);
+        padding: 15px;
+    }
+    
+    .a2hs-content {
+        flex-wrap: wrap;
+    }
+    
+    .a2hs-buttons {
+        width: 100%;
+        margin-top: 15px;
+        margin-left: 0;
+    }
+    
+    .a2hs-install-btn,
+    .a2hs-cancel-btn {
+        flex: 1;
+    }
+}

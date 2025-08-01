@@ -26,6 +26,11 @@
     <!-- PWA Support -->
     <link rel="manifest" href="manifest.json">
     
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CodLess Robotics">
+    
     <!-- Favicon Support -->
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon.png">
@@ -202,6 +207,12 @@
                     <p class="hero-subtitle">The Future of FLL Robotics Programming</p>
                     <div class="hero-description">
                         <p>Experience intuitive robot control with cutting-edge technology</p>
+                    </div>
+                    <div class="hero-actions">
+                        <button id="installButton" class="install-button" style="display: none;">
+                            <i class="fas fa-download"></i>
+                            Install App
+                        </button>
                     </div>
                 </div>
                 <div class="floating-elements">
