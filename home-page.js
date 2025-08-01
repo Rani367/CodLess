@@ -291,10 +291,10 @@ function initHomePage() {
     // Initialize scroll animations
     initScrollAnimations();
     
-    // CTA button click handler
-    const enterButton = document.getElementById('enterApp');
-    enterButton.addEventListener('click', () => {
+    // Function to enter the app
+    const enterApp = () => {
         const homePage = document.getElementById('homePage');
+        const appContainer = document.getElementById('appContainer');
         
         // Animate out home page
         gsap.to(homePage, {
@@ -304,6 +304,7 @@ function initHomePage() {
             ease: "power2.inOut",
             onComplete: () => {
                 homePage.classList.add('hidden');
+                homePage.style.display = 'none';
                 appContainer.style.display = 'block';
                 
                 // Animate in app container
@@ -315,7 +316,15 @@ function initHomePage() {
                 });
             }
         });
-    });
+    };
+    
+    // CTA button click handler
+    const enterButton = document.getElementById('enterApp');
+    enterButton.addEventListener('click', enterApp);
+    
+    // Fixed button click handler
+    const fixedEnterButton = document.getElementById('fixedEnterApp');
+    fixedEnterButton.addEventListener('click', enterApp);
     
     // Add entrance animations
     gsap.from(".hero-title .title-word", {
