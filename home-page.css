@@ -609,7 +609,7 @@ html {
 
 /* Center Enter Button */
 .center-enter-button {
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -627,7 +627,10 @@ html {
     box-shadow: 0 15px 40px rgba(0, 242, 254, 0.5);
     text-transform: uppercase;
     animation: ctaPulse 2s ease-in-out infinite;
-    z-index: 100;
+    z-index: 1000;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
 }
 
 .center-enter-button:hover {
