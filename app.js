@@ -1434,7 +1434,6 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Control state
         this.pressedKeys = new Set();
-        this.keyPressTimestamps = new Map(); // Track when each key was pressed
         this.emergencyStopActive = false;
         this.xboxAxisValues = {
             leftStickX: 0,
@@ -1445,7 +1444,6 @@ class FLLRoboticsApp extends EventEmitter {
             rightTrigger: 0
         };
         this.xboxButtonsPressed = new Set();
-        this.xboxButtonPressTimestamps = new Map(); // Track when Xbox buttons were pressed
         
         // Auto-save
         this.autoSaveTimer = null;
@@ -2119,11 +2117,6 @@ class FLLRoboticsApp extends EventEmitter {
     handleXboxButtonPress(button, value) {
         this.xboxButtonsPressed.add(button);
         
-        // Track when the button was pressed for duration calculation
-        if (this.isRecording && !this.xboxButtonPressTimestamps.has(button)) {
-            this.xboxButtonPressTimestamps.set(button, Date.now() - this.recordingStartTime);
-        }
-        
         // Emergency stop with Menu button
         if (button === 'Menu') {
             this.emergencyStop();
@@ -2134,24 +2127,24 @@ class FLLRoboticsApp extends EventEmitter {
         if (['A', 'B', 'X', 'Y'].includes(button)) {
             this.processXboxMovement();
         }
+        
+        // Record button press if recording
+        if (this.isRecording) {
+            this.recordXboxEvent('buttonPress', button, value);
+        }
     }
     
     handleXboxButtonRelease(button) {
         this.xboxButtonsPressed.delete(button);
         
-        // Calculate duration and record command for movement buttons
-        if (this.isRecording && this.xboxButtonPressTimestamps.has(button) && ['A', 'B', 'X', 'Y'].includes(button)) {
-            const pressTime = this.xboxButtonPressTimestamps.get(button);
-            const releaseTime = Date.now() - this.recordingStartTime;
-            const duration = (releaseTime - pressTime) / 1000; // Convert to seconds
-            
-            this.recordXboxButtonWithDuration(button, pressTime, duration);
-            this.xboxButtonPressTimestamps.delete(button);
-        }
-        
         // Process movement for buttons that affect it
         if (['A', 'B', 'X', 'Y'].includes(button)) {
             this.processXboxMovement();
+        }
+        
+        // Record button release if recording
+        if (this.isRecording) {
+            this.recordXboxEvent('buttonRelease', button);
         }
     }
     
@@ -2210,13 +2203,12 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!this.pressedKeys.has(key)) {
             this.pressedKeys.add(key);
-            
-            // Track when the key was pressed for duration calculation
-            if (this.isRecording) {
-                this.keyPressTimestamps.set(key, Date.now() - this.recordingStartTime);
-            }
-            
             this.processMovementKeys();
+            
+            // Record the keydown event
+            if (this.isRecording) {
+                this.recordKeyEvent('keydown', key);
+            }
         }
     }
 
@@ -2227,91 +2219,46 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (this.pressedKeys.has(key)) {
             this.pressedKeys.delete(key);
-            
-            // Calculate duration and record command
-            if (this.isRecording && this.keyPressTimestamps.has(key)) {
-                const pressTime = this.keyPressTimestamps.get(key);
-                const releaseTime = Date.now() - this.recordingStartTime;
-                const duration = (releaseTime - pressTime) / 1000; // Convert to seconds
-                
-                this.recordKeyWithDuration(key, pressTime, duration);
-                this.keyPressTimestamps.delete(key);
-            }
-            
             this.processMovementKeys();
-        }
-    }
-
-    recordKeyWithDuration(key, timestamp, duration) {
-        if (!this.isRecording) return;
-        
-        let command = null;
-        
-        // For drive commands, we need to check what other keys were pressed
-        // to accurately record combined movements
-        if (['w', 's', 'a', 'd'].includes(key)) {
-            // Calculate the drive state at the time this key was pressed
-            let speed = 0;
-            let turn = 0;
             
-            // Check what keys were pressed during this key's duration
-            // This is a simplified approach - for perfect accuracy we'd need to track
-            // overlapping key presses more precisely
-            if (key === 'w') {
-                speed = 200;
-            } else if (key === 's') {
-                speed = -200;
-            } else if (key === 'a') {
-                turn = -100;
-            } else if (key === 'd') {
-                turn = 100;
+            // Record the keyup event
+            if (this.isRecording) {
+                this.recordKeyEvent('keyup', key);
             }
-            
-            command = { type: 'drive', speed, turn_rate: turn, duration };
-        }
-        // Arm commands
-        else if (key === 'q') {
-            command = { type: 'arm1', speed: 200, duration };
-        } else if (key === 'e') {
-            command = { type: 'arm1', speed: -200, duration };
-        } else if (key === 'r') {
-            command = { type: 'arm2', speed: 200, duration };
-        } else if (key === 'f') {
-            command = { type: 'arm2', speed: -200, duration };
-        }
-        
-        if (command) {
-            this.recordedCommands.push({
-                timestamp: timestamp,
-                command_type: command.type,
-                parameters: command
-            });
         }
     }
 
-    recordXboxButtonWithDuration(button, timestamp, duration) {
+    recordKeyEvent(type, key) {
         if (!this.isRecording) return;
         
-        let command = null;
+        this.recordedCommands.push({
+            timestamp: Date.now() - this.recordingStartTime,
+            type,
+            key,
+            eventType: 'keyboard'
+        });
+    }
+
+    recordXboxEvent(type, button, value = null) {
+        if (!this.isRecording) return;
         
-        // Arm commands for Xbox buttons
-        if (button === 'A') {
-            command = { type: 'arm1', speed: 200, duration };
-        } else if (button === 'B') {
-            command = { type: 'arm1', speed: -200, duration };
-        } else if (button === 'X') {
-            command = { type: 'arm2', speed: 200, duration };
-        } else if (button === 'Y') {
-            command = { type: 'arm2', speed: -200, duration };
+        const event = {
+            timestamp: Date.now() - this.recordingStartTime,
+            type,
+            button,
+            eventType: 'xbox'
+        };
+        
+        if (value !== null) {
+            event.value = value;
         }
         
-        if (command) {
-            this.recordedCommands.push({
-                timestamp: timestamp,
-                command_type: command.type,
-                parameters: command
-            });
+        // Also record axis values for movement
+        if (type === 'buttonPress' || type === 'buttonRelease') {
+            event.axes = { ...this.xboxAxisValues };
         }
+        
+        this.recordedCommands.push(event);
     }
 
     processMovementKeys() {
@@ -2827,8 +2774,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.isRecording = true;
         this.recordedCommands = [];
         this.recordingStartTime = Date.now();
-        this.keyPressTimestamps.clear(); // Clear any existing key press timestamps
-        this.xboxButtonPressTimestamps.clear(); // Clear any existing Xbox button press timestamps
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -2903,15 +2848,8 @@ class FLLRoboticsApp extends EventEmitter {
             id: Date.now().toString(),
             name: name,
             commands: this.recordedCommands.map(cmd => {
-                if (cmd.command_type && cmd.parameters) {
-                    // Duration-based commands
-                    return {
-                        timestamp: cmd.timestamp,
-                        command_type: cmd.command_type,
-                        parameters: cmd.parameters
-                    };
-                } else if (cmd.eventType === 'keyboard') {
-                    // Handle keyboard events (legacy support)
+                if (cmd.eventType === 'keyboard') {
+                    // Handle keyboard events
                     return {
                         command_type: cmd.type, // 'keydown' or 'keyup'
                         parameters: {
@@ -3786,28 +3724,6 @@ while True:
         } else if (cmd.eventType === 'robot') {
             // Handle direct robot commands
             this.sendRobotCommand(cmd.command);
-        } else if (cmd.command_type && cmd.parameters) {
-            // Handle duration-based commands
-            const params = cmd.parameters;
-            const duration = params.duration || 0;
-            
-            // Send the command
-            this.sendRobotCommand(params);
-            
-            // Stop the command after duration
-            if (duration > 0) {
-                setTimeout(() => {
-                    const stopCommand = { ...params };
-                    if (params.type === 'drive') {
-                        stopCommand.speed = 0;
-                        stopCommand.turn_rate = 0;
-                    } else if (params.type === 'arm1' || params.type === 'arm2') {
-                        stopCommand.speed = 0;
-                    }
-                    delete stopCommand.duration;
-                    this.sendRobotCommand(stopCommand);
-                }, duration * 1000);
-            }
         }
     }
 
