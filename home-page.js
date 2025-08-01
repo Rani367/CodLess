@@ -37,6 +37,7 @@ function init3D() {
     scene.add(pointLight);
     
     // Load Xbox Controller Model
+    /* Commented out - removing Xbox controller model
     const loader = new THREE.GLTFLoader();
     loader.load('White XBOX controller.glb', (gltf) => {
         controller = gltf.scene;
@@ -53,6 +54,7 @@ function init3D() {
         
         scene.add(controller);
     });
+    */
     
     // Create particle system
     createParticles();
@@ -169,11 +171,13 @@ function animate() {
     requestAnimationFrame(animate);
     
     // Rotate controller based on mouse position
+    /* Commented out - controller removed
     if (controller) {
         controller.rotation.x += (mouseY * 0.5 - controller.rotation.x) * 0.05;
         controller.rotation.y += (mouseX * 0.5 - controller.rotation.y) * 0.05;
         controller.rotation.z += 0.001;
     }
+    */
     
     // Animate particles
     if (particles) {
