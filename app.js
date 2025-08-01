@@ -834,12 +834,12 @@ class RobotSimulator extends EventEmitter {
         this.targetArm1Speed = 0;
         this.targetArm2Speed = 0;
         
-        // Physics parameters
+        // Physics parameters - will be updated from robot config
         this.robotMass = 2.5;
         this.robotInertia = 0.12;
         this.friction = 0.05;
-        this.maxAcceleration = 800;
-        this.maxTurnAcceleration = 600;
+        this.straightAcceleration = 250; // Default from RobotConfig
+        this.turnAcceleration = 300; // Default from RobotConfig
         
         // Simulation settings
         this.dt = 0.016; // 60 FPS
@@ -957,6 +957,14 @@ class RobotSimulator extends EventEmitter {
         }
     }
 
+    updateConfig(config) {
+        // Update acceleration settings from robot config
+        if (config) {
+            this.straightAcceleration = config.straightAcceleration || 250;
+            this.turnAcceleration = config.turnAcceleration || 300;
+        }
+    }
+
     updateCommand(command) {
         // Apply calibration factors if available
         let calibratedCommand = { ...command };
@@ -1017,15 +1025,20 @@ class RobotSimulator extends EventEmitter {
         const speedError = this.targetSpeed - this.velocity.x;
         const turnError = this.targetTurn - this.velocity.angular;
 
-        // Apply PID-like control
-        this.acceleration.x = this.clamp(speedError * 10, -this.maxAcceleration, this.maxAcceleration);
-        this.acceleration.angular = this.clamp(turnError * 15, -this.maxTurnAcceleration, this.maxTurnAcceleration);
+        // Calculate desired acceleration based on error
+        let desiredAccelX = speedError * 10;
+        let desiredAccelAngular = turnError * 10;
+        
+        // Limit acceleration to match real robot's acceleration settings
+        // The robot uses mm/s² for straight and deg/s² for turn
+        this.acceleration.x = this.clamp(desiredAccelX, -this.straightAcceleration, this.straightAcceleration);
+        this.acceleration.angular = this.clamp(desiredAccelAngular, -this.turnAcceleration, this.turnAcceleration);
 
-        // Update velocities
+        // Update velocities with acceleration
         this.velocity.x += this.acceleration.x * dt;
         this.velocity.angular += this.acceleration.angular * dt;
 
-        // Apply friction
+        // Apply friction/damping
         this.velocity.x *= (1 - this.friction * dt);
         this.velocity.angular *= (1 - this.friction * dt);
 
@@ -1246,6 +1259,24 @@ class RobotSimulator extends EventEmitter {
         this.ctx.fill();
         this.ctx.stroke();
 
+        // Draw acceleration indicator
+        if (Math.abs(this.acceleration.x) > 10 || Math.abs(this.acceleration.angular) > 10) {
+            this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([2, 2]);
+            
+            // Draw acceleration vector
+            const accelLength = Math.min(Math.abs(this.acceleration.x) * 0.05, 20);
+            if (accelLength > 0) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(-25, 0);
+                this.ctx.lineTo(-25 - accelLength * Math.sign(this.acceleration.x), 0);
+                this.ctx.stroke();
+            }
+            
+            this.ctx.setLineDash([]);
+        }
+
         this.ctx.restore();
     }
 
@@ -1303,7 +1334,7 @@ class RobotSimulator extends EventEmitter {
     drawInfo() {
         // Info panel background
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(10, 10, 220, 120);
+        this.ctx.fillRect(10, 10, 250, 140);
 
         // Info text
         this.ctx.fillStyle = '#ffffff';
@@ -1314,11 +1345,12 @@ class RobotSimulator extends EventEmitter {
         const info = [
             `Position: (${Math.round(this.robotX)}, ${Math.round(this.robotY)})`,
             `Angle: ${Math.round(this.robotAngle % 360)}°`,
-            `Speed: ${Math.round(this.velocity.x)}`,
-            `Turn Rate: ${Math.round(this.velocity.angular)}`,
+            `Speed: ${Math.round(this.velocity.x)} (target: ${Math.round(this.targetSpeed)})`,
+            `Turn Rate: ${Math.round(this.velocity.angular)} (target: ${Math.round(this.targetTurn)})`,
+            `Acceleration: ${Math.round(this.acceleration.x)} mm/s²`,
+            `Turn Accel: ${Math.round(this.acceleration.angular)} deg/s²`,
             `Arm 1: ${Math.round(this.arm1Angle)}°`,
-            `Arm 2: ${Math.round(this.arm2Angle)}°`,
-            `Trail: ${this.showTrail ? 'ON' : 'OFF'}`
+            `Arm 2: ${Math.round(this.arm2Angle)}°`
         ];
 
         info.forEach(text => {
@@ -1887,6 +1919,7 @@ class FLLRoboticsApp extends EventEmitter {
             
             this.setupHighDPICanvas(canvas);
             this.robotSimulator = new RobotSimulator(canvas);
+            this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
         }
     }
@@ -2045,6 +2078,16 @@ class FLLRoboticsApp extends EventEmitter {
         this.xboxController.callbacks.onAxisChange = (axes) => {
             this.xboxAxisValues = axes;
             this.processXboxMovement();
+            
+            // Update trigger display bars
+            const leftTriggerBar = document.getElementById('leftTriggerBar');
+            const rightTriggerBar = document.getElementById('rightTriggerBar');
+            if (leftTriggerBar) {
+                leftTriggerBar.style.width = `${axes.leftTrigger * 100}%`;
+            }
+            if (rightTriggerBar) {
+                rightTriggerBar.style.width = `${axes.rightTrigger * 100}%`;
+            }
         };
     }
     
@@ -2148,21 +2191,68 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
     
+    applySmoothCurve(value) {
+        // Apply a quadratic curve for smoother control
+        // This gives more precision at low speeds and full speed at max
+        // You can adjust the curve by changing the exponent (2.0 = quadratic, 3.0 = cubic, etc.)
+        const deadzone = 0.05; // Small deadzone to prevent drift
+        
+        if (Math.abs(value) < deadzone) return 0;
+        
+        // Apply quadratic curve
+        const sign = Math.sign(value);
+        const magnitude = Math.abs(value);
+        const curved = Math.pow(magnitude, 2.0);
+        
+        return sign * curved;
+    }
+    
     processXboxMovement() {
         if (this.emergencyStopActive) return;
         
-        // Calculate drive command from triggers and left stick
-        const speed = (this.xboxAxisValues.rightTrigger - this.xboxAxisValues.leftTrigger) * 200;
-        const turn = -this.xboxAxisValues.leftStickX * 100;
+        // Get maximum speed from config (default 500)
+        const maxSpeed = this.config.straightSpeed || 500;
+        const maxTurnRate = this.config.turnRate || 200;
+        
+        // Calculate proportional drive command from triggers
+        // Apply a smooth curve for better control feel (quadratic for more precision at low speeds)
+        const rightTriggerValue = this.applySmoothCurve(this.xboxAxisValues.rightTrigger);
+        const leftTriggerValue = this.applySmoothCurve(this.xboxAxisValues.leftTrigger);
+        
+        const forwardSpeed = rightTriggerValue * maxSpeed;
+        const reverseSpeed = leftTriggerValue * maxSpeed;
+        const speed = forwardSpeed - reverseSpeed;
+        
+        // Calculate proportional turn from left stick (already -1 to 1)
+        // Apply a small deadzone to prevent drift
+        const stickX = Math.abs(this.xboxAxisValues.leftStickX) < 0.1 ? 0 : this.xboxAxisValues.leftStickX;
+        const turn = -stickX * maxTurnRate;
         
         this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
         
-        // Calculate arm commands from buttons
+        // Update speed display
+        const speedDisplay = document.getElementById('xboxSpeedDisplay');
+        if (speedDisplay) {
+            speedDisplay.textContent = Math.round(speed);
+        }
+        
+        // Calculate arm commands
+        // Use right stick Y for arm1 (up/down on right stick)
+        // Use buttons for arm2 (or could use right stick X)
         let arm1Speed = 0;
         let arm2Speed = 0;
         
-        if (this.xboxButtonsPressed.has('A')) arm1Speed = 200;
-        if (this.xboxButtonsPressed.has('B')) arm1Speed = -200;
+        // Right stick Y-axis for smooth arm1 control
+        const stickY = Math.abs(this.xboxAxisValues.rightStickY) < 0.1 ? 0 : this.xboxAxisValues.rightStickY;
+        if (stickY !== 0) {
+            arm1Speed = -stickY * 200; // Negative because stick up is negative
+        } else if (this.xboxButtonsPressed.has('A')) {
+            arm1Speed = 200;
+        } else if (this.xboxButtonsPressed.has('B')) {
+            arm1Speed = -200;
+        }
+        
+        // Buttons for arm2 (could also use right stick X for smooth control)
         if (this.xboxButtonsPressed.has('X')) arm2Speed = 200;
         if (this.xboxButtonsPressed.has('Y')) arm2Speed = -200;
         
@@ -2187,6 +2277,14 @@ class FLLRoboticsApp extends EventEmitter {
             statusIndicator.classList.add('disconnected');
             statusDiv.querySelector('span').textContent = 'Xbox Controller Disconnected';
             if (helpDiv) helpDiv.style.display = 'none';
+            
+            // Reset trigger displays
+            const leftTriggerBar = document.getElementById('leftTriggerBar');
+            const rightTriggerBar = document.getElementById('rightTriggerBar');
+            const speedDisplay = document.getElementById('xboxSpeedDisplay');
+            if (leftTriggerBar) leftTriggerBar.style.width = '0%';
+            if (rightTriggerBar) rightTriggerBar.style.width = '0%';
+            if (speedDisplay) speedDisplay.textContent = '0';
         }
     }
 
@@ -2205,6 +2303,7 @@ class FLLRoboticsApp extends EventEmitter {
             this.pressedKeys.add(key);
             this.processMovementKeys();
             
+            // Record the keydown event
             if (this.isRecording) {
                 this.recordKeyEvent('keydown', key);
             }
@@ -2220,10 +2319,44 @@ class FLLRoboticsApp extends EventEmitter {
             this.pressedKeys.delete(key);
             this.processMovementKeys();
             
+            // Record the keyup event
             if (this.isRecording) {
                 this.recordKeyEvent('keyup', key);
             }
         }
+    }
+
+    recordKeyEvent(type, key) {
+        if (!this.isRecording) return;
+        
+        this.recordedCommands.push({
+            timestamp: Date.now() - this.recordingStartTime,
+            type,
+            key,
+            eventType: 'keyboard'
+        });
+    }
+
+    recordXboxEvent(type, button, value = null) {
+        if (!this.isRecording) return;
+        
+        const event = {
+            timestamp: Date.now() - this.recordingStartTime,
+            type,
+            button,
+            eventType: 'xbox'
+        };
+        
+        if (value !== null) {
+            event.value = value;
+        }
+        
+        // Also record axis values for movement
+        if (type === 'buttonPress' || type === 'buttonRelease') {
+            event.axes = { ...this.xboxAxisValues };
+        }
+        
+        this.recordedCommands.push(event);
     }
 
     processMovementKeys() {
@@ -2238,6 +2371,7 @@ class FLLRoboticsApp extends EventEmitter {
         if (this.pressedKeys.has('a')) turn -= 100;
         if (this.pressedKeys.has('d')) turn += 100;
         
+        // Send drive command - robot will accelerate/decelerate to target speed
         this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
         
         // Calculate arm commands
@@ -2712,16 +2846,7 @@ class FLLRoboticsApp extends EventEmitter {
         }, 1000);
     }
 
-    recordKeyEvent(type, key) {
-        if (!this.isRecording) return;
-        
-        this.recordedCommands.push({
-            timestamp: Date.now() - this.recordingStartTime,
-            type,
-            key,
-            eventType: 'keyboard'
-        });
-    }
+
 
     recordCommand(command) {
         if (!this.isRecording) return;
@@ -2734,27 +2859,7 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
     
-    recordXboxEvent(type, button, value = null) {
-        if (!this.isRecording) return;
-        
-        const event = {
-            timestamp: Date.now() - this.recordingStartTime,
-            type,
-            button,
-            eventType: 'xbox'
-        };
-        
-        if (value !== null) {
-            event.value = value;
-        }
-        
-        // Also record axis values for movement
-        if (type === 'buttonPress' || type === 'buttonRelease') {
-            event.axes = { ...this.xboxAxisValues };
-        }
-        
-        this.recordedCommands.push(event);
-    }
+
 
     toggleRecording() {
         if (this.isRecording) {
@@ -3920,7 +4025,10 @@ function saveConfiguration() {
             // Update the UI to reflect changes immediately
             window.app.updateUI();
             
-
+            // Update the robot simulator with new acceleration settings
+            if (window.app.robotSimulator) {
+                window.app.robotSimulator.updateConfig(config);
+            }
             
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');
