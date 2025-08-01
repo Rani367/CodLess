@@ -11,8 +11,7 @@ const urlsToCache = [
   '/app.js',
   '/styles.css',
   '/manifest.json',
-  '/assets/icon-192x192.png',
-  '/assets/icon-512x512.png',
+  '/favicon.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
@@ -209,20 +208,20 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: event.data ? event.data.text() : 'New notification from CodLess Robotics',
-    icon: '/assets/icon-192x192.png',
-    badge: '/assets/icon-72x72.png',
+    icon: '/favicon.png',
+    badge: '/favicon.png',
     tag: 'codless-notification',
     requireInteraction: false,
     actions: [
       {
         action: 'open',
         title: 'Open App',
-        icon: '/assets/icon-72x72.png'
+        icon: '/favicon.png'
       },
       {
         action: 'dismiss',
         title: 'Dismiss',
-        icon: '/assets/icon-72x72.png'
+        icon: '/favicon.png'
       }
     ]
   };
