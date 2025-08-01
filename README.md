@@ -6,58 +6,59 @@
 
 **Visual programming for FLL teams**
 
-CodLess is a web-based application that helps FIRST LEGO League teams control and program their robots without writing complex code. Teams can record robot movements, save them as reusable runs, and execute them during competitions.
+CodLess is a web-based tool that helps FIRST LEGO League teams program their robots without writing complex code. You can connect your LEGO hub, record movements, save them as reusable runs, and use them during competitions.
 
 ## [Live Demo](https://rani367.github.io/CodLess/)
 
+---
+
 ## Features
 
-- Connect to Pybricks-compatible LEGO hubs via Bluetooth
+- Connect to Pybricks-compatible LEGO hubs using Bluetooth
 - Record robot movements and save them as named runs
-- Upload and execute Python code directly to the hub
-- Real-time 3D visualization of robot movements
-- Calibrate motors for precise control
-- Export and import run configurations
-- Works offline after initial load
-- No installation required
+- Upload and run Python code directly on the hub
+- Real-time 2D simulation of robot movements
+- Motor calibration for accurate control
+- Export and import saved runs
+- Works offline after the first load
+- Runs in the browser, no installation needed
+
+---
 
 ## Quick Start
 
-1. Open [CodLess](https://rani367.github.io/CodLess/) in a web browser that supports Web Bluetooth (Chrome, Edge, Opera)
-2. Click "Connect Robot" to pair with your Pybricks hub
-3. Configure your motor ports in the settings
-4. Start recording movements using the control panel
-5. Save your recordings as named runs for later use
+1. Open [CodLess](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera
+2. Click **Connect Robot** to pair with your Pybricks hub
+3. Configure motor ports in the settings
+4. Record movements using the control panel
+5. Save runs with custom names for later use
+6. Replay runs or export them as Python code
+
+---
 
 ## Screenshots
 
-![Main Interface](assets/screenshots/screenshot1.png)
-*Robot control panel with recording interface*
+![Main Interface](assets/screenshots/main-interface.png)  
+*Control panel with recording options*
 
-![3D Visualization](assets/screenshots/screenshot2.png)
-*Real-time 3D robot movement visualization*
+![2D Simulation](assets/screenshots/robot-simulation.png)  
+*Real-time 2D robot simulation for testing runs*
+
+---
 
 ## Contributing
 
-We welcome contributions from the FLL community. To contribute:
+We welcome contributions from the FLL community:
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Submit a pull request
+4. Open a pull request
 
-Please ensure your code follows the existing style and includes appropriate documentation.
+Please follow the existing style and add clear documentation for new features.
+
+---
 
 ## License
 
 This project is licensed under the terms in the [LICENSE](LICENSE) file.
-
-## Where to Share
-
-<!-- Consider submitting CodLess to these awesome lists:
-1. awesome-robotics - General robotics tools and resources
-2. awesome-stem - STEM education resources and tools
-3. awesome-educational-games - Educational technology and gamification
-4. awesome-pwa - Progressive Web Apps showcase
-5. awesome-bluetooth - Bluetooth and IoT applications
--->
