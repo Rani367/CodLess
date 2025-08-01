@@ -834,12 +834,12 @@ class RobotSimulator extends EventEmitter {
         this.targetArm1Speed = 0;
         this.targetArm2Speed = 0;
         
-        // Physics parameters
+        // Physics parameters - will be updated from robot config
         this.robotMass = 2.5;
         this.robotInertia = 0.12;
         this.friction = 0.05;
-        this.maxAcceleration = 800;
-        this.maxTurnAcceleration = 600;
+        this.straightAcceleration = 250; // Default from RobotConfig
+        this.turnAcceleration = 300; // Default from RobotConfig
         
         // Simulation settings
         this.dt = 0.016; // 60 FPS
@@ -957,6 +957,14 @@ class RobotSimulator extends EventEmitter {
         }
     }
 
+    updateConfig(config) {
+        // Update acceleration settings from robot config
+        if (config) {
+            this.straightAcceleration = config.straightAcceleration || 250;
+            this.turnAcceleration = config.turnAcceleration || 300;
+        }
+    }
+
     updateCommand(command) {
         // Apply calibration factors if available
         let calibratedCommand = { ...command };
@@ -1017,15 +1025,20 @@ class RobotSimulator extends EventEmitter {
         const speedError = this.targetSpeed - this.velocity.x;
         const turnError = this.targetTurn - this.velocity.angular;
 
-        // Apply PID-like control
-        this.acceleration.x = this.clamp(speedError * 10, -this.maxAcceleration, this.maxAcceleration);
-        this.acceleration.angular = this.clamp(turnError * 15, -this.maxTurnAcceleration, this.maxTurnAcceleration);
+        // Calculate desired acceleration based on error
+        let desiredAccelX = speedError * 10;
+        let desiredAccelAngular = turnError * 10;
+        
+        // Limit acceleration to match real robot's acceleration settings
+        // The robot uses mm/s² for straight and deg/s² for turn
+        this.acceleration.x = this.clamp(desiredAccelX, -this.straightAcceleration, this.straightAcceleration);
+        this.acceleration.angular = this.clamp(desiredAccelAngular, -this.turnAcceleration, this.turnAcceleration);
 
-        // Update velocities
+        // Update velocities with acceleration
         this.velocity.x += this.acceleration.x * dt;
         this.velocity.angular += this.acceleration.angular * dt;
 
-        // Apply friction
+        // Apply friction/damping
         this.velocity.x *= (1 - this.friction * dt);
         this.velocity.angular *= (1 - this.friction * dt);
 
@@ -1246,6 +1259,24 @@ class RobotSimulator extends EventEmitter {
         this.ctx.fill();
         this.ctx.stroke();
 
+        // Draw acceleration indicator
+        if (Math.abs(this.acceleration.x) > 10 || Math.abs(this.acceleration.angular) > 10) {
+            this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([2, 2]);
+            
+            // Draw acceleration vector
+            const accelLength = Math.min(Math.abs(this.acceleration.x) * 0.05, 20);
+            if (accelLength > 0) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(-25, 0);
+                this.ctx.lineTo(-25 - accelLength * Math.sign(this.acceleration.x), 0);
+                this.ctx.stroke();
+            }
+            
+            this.ctx.setLineDash([]);
+        }
+
         this.ctx.restore();
     }
 
@@ -1303,7 +1334,7 @@ class RobotSimulator extends EventEmitter {
     drawInfo() {
         // Info panel background
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(10, 10, 220, 120);
+        this.ctx.fillRect(10, 10, 250, 140);
 
         // Info text
         this.ctx.fillStyle = '#ffffff';
@@ -1314,11 +1345,12 @@ class RobotSimulator extends EventEmitter {
         const info = [
             `Position: (${Math.round(this.robotX)}, ${Math.round(this.robotY)})`,
             `Angle: ${Math.round(this.robotAngle % 360)}°`,
-            `Speed: ${Math.round(this.velocity.x)}`,
-            `Turn Rate: ${Math.round(this.velocity.angular)}`,
+            `Speed: ${Math.round(this.velocity.x)} (target: ${Math.round(this.targetSpeed)})`,
+            `Turn Rate: ${Math.round(this.velocity.angular)} (target: ${Math.round(this.targetTurn)})`,
+            `Acceleration: ${Math.round(this.acceleration.x)} mm/s²`,
+            `Turn Accel: ${Math.round(this.acceleration.angular)} deg/s²`,
             `Arm 1: ${Math.round(this.arm1Angle)}°`,
-            `Arm 2: ${Math.round(this.arm2Angle)}°`,
-            `Trail: ${this.showTrail ? 'ON' : 'OFF'}`
+            `Arm 2: ${Math.round(this.arm2Angle)}°`
         ];
 
         info.forEach(text => {
@@ -1887,6 +1919,7 @@ class FLLRoboticsApp extends EventEmitter {
             
             this.setupHighDPICanvas(canvas);
             this.robotSimulator = new RobotSimulator(canvas);
+            this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
         }
     }
@@ -2273,6 +2306,7 @@ class FLLRoboticsApp extends EventEmitter {
         if (this.pressedKeys.has('a')) turn -= 100;
         if (this.pressedKeys.has('d')) turn += 100;
         
+        // Send drive command - robot will accelerate/decelerate to target speed
         this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
         
         // Calculate arm commands
@@ -3926,7 +3960,10 @@ function saveConfiguration() {
             // Update the UI to reflect changes immediately
             window.app.updateUI();
             
-
+            // Update the robot simulator with new acceleration settings
+            if (window.app.robotSimulator) {
+                window.app.robotSimulator.updateConfig(config);
+            }
             
             closeConfigModal();
             window.app.toastManager.show('Configuration saved successfully', 'success');
