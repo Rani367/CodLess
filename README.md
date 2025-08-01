@@ -41,7 +41,7 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 ![Main Interface](screenshots/main-interface.png)  
 *Control panel with recording options*
 
-![2D Simulation](assets/screenshots/robot-simulation.png)  
+![2D Simulation](screenshots/robot-simulator.png)  
 *Real-time 2D robot simulation for testing runs*
 
 ---
