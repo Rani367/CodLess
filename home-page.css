@@ -14,13 +14,11 @@
 .home-page {
     position: relative;
     width: 100%;
-    min-height: 100vh;
-    overflow-x: hidden;
+    height: 100vh;
+    overflow: hidden;
     background: var(--dark-gradient);
     z-index: 10000;
     transition: opacity 0.8s ease, transform 0.8s ease;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -53,7 +51,7 @@
 .hero-section {
     position: relative;
     width: 100%;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -65,6 +63,7 @@
     z-index: 10;
     text-align: center;
     padding: 2rem;
+    margin-bottom: 8rem; /* Add space for the button */
 }
 
 .hero-title {
@@ -205,13 +204,7 @@
 
 /* Scroll Indicator */
 .scroll-indicator {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    text-align: center;
-    z-index: 10;
-    animation: bounce 2s ease-in-out infinite;
+    display: none; /* Hide scroll indicator */
 }
 
 .mouse {
@@ -254,13 +247,7 @@
 
 /* Features Section */
 .features-section {
-    position: relative;
-    padding: 8rem 2rem;
-    display: flex;
-    justify-content: center;
-    gap: 3rem;
-    flex-wrap: wrap;
-    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.5) 100%);
+    display: none; /* Hide features section */
 }
 
 .feature-card {
@@ -320,12 +307,7 @@
 
 /* CTA Section */
 .cta-section {
-    position: relative;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    display: none; /* Hide CTA section */
 }
 
 .cta-content {
@@ -449,25 +431,13 @@
         font-size: clamp(3rem, 10vw, 5rem);
     }
     
-    .features-section {
-        padding: 4rem 1rem;
-        gap: 2rem;
+    .hero-content {
+        margin-bottom: 6rem;
     }
     
-    .feature-card {
-        max-width: 100%;
-    }
-    
-    .cta-button {
+    .center-enter-button {
         padding: 1.5rem 3.5rem;
         font-size: 1.2rem;
-    }
-    
-    .fixed-enter-button {
-        top: 1rem;
-        right: 1rem;
-        padding: 0.8rem 1.8rem;
-        font-size: 0.9rem;
     }
 }
 
@@ -637,35 +607,36 @@ html {
     to { transform: translateY(-2000px); }
 }
 
-/* Fixed Enter Button */
-.fixed-enter-button {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    padding: 1rem 2.5rem;
-    font-size: 1.1rem;
-    font-weight: 600;
+/* Center Enter Button */
+.center-enter-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 2rem 5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
     letter-spacing: 0.05em;
     color: #ffffff;
-    background: linear-gradient(135deg, #00f2fe 0%, #667eea 100%);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 40px;
+    background: linear-gradient(135deg, #00f2fe 0%, #667eea 50%, #764ba2 100%);
+    border: none;
+    border-radius: 60px;
     cursor: pointer;
-    z-index: 100;
+    overflow: hidden;
     transition: all 0.3s ease;
-    box-shadow: 0 8px 25px rgba(0, 242, 254, 0.4);
-    backdrop-filter: blur(10px);
+    box-shadow: 0 15px 40px rgba(0, 242, 254, 0.5);
     text-transform: uppercase;
+    animation: ctaPulse 2s ease-in-out infinite;
+    z-index: 100;
 }
 
-.fixed-enter-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(0, 242, 254, 0.6);
-    border-color: rgba(255, 255, 255, 0.4);
-    background: linear-gradient(135deg, #00f2fe 0%, #764ba2 100%);
+.center-enter-button:hover {
+    transform: translate(-50%, -50%) translateY(-5px) scale(1.1);
+    box-shadow: 0 25px 60px rgba(0, 242, 254, 0.8);
+    animation: none;
 }
 
-.fixed-enter-button::before {
+.center-enter-button::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -678,4 +649,32 @@ html {
     opacity: 0.5;
     animation: pulse 2s ease-in-out infinite;
     z-index: -1;
+}
+
+.center-enter-button .button-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.center-enter-button:hover .button-glow {
+    opacity: 1;
+}
+
+.center-enter-button .button-text {
+    position: relative;
+    z-index: 2;
+    color: #ffffff;
+    display: block;
+}
+
+/* Hide fixed enter button */
+.fixed-enter-button {
+    display: none;
 }
