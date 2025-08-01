@@ -276,8 +276,33 @@ function initScrollAnimations() {
 
 // Initialize home page
 function initHomePage() {
-    // Hide main app initially
     const appContainer = document.getElementById('appContainer');
+    const homePage = document.getElementById('homePage');
+    
+    // Check if app was launched from PWA or is in standalone mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const isFromPWA = urlParams.get('source') === 'pwa';
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                        window.navigator.standalone ||
+                        document.referrer.includes('android-app://');
+    
+    // If launched from home screen, skip the home page and go directly to app
+    if (isFromPWA || isStandalone) {
+        homePage.classList.add('hidden');
+        appContainer.style.display = 'block';
+        
+        // Optional: Add a subtle fade-in animation
+        gsap.from(appContainer, {
+            opacity: 0,
+            duration: 0.5,
+            ease: "power2.out"
+        });
+        
+        return; // Skip the rest of the home page initialization
+    }
+    
+    // Otherwise, show the home page as normal
+    // Hide main app initially
     appContainer.style.display = 'none';
     
     // Initialize 3D scene
@@ -312,6 +337,38 @@ function initHomePage() {
             }
         });
     });
+    
+    // Home button click handler (to go back to home page)
+    const homeButton = document.getElementById('homeButton');
+    if (homeButton) {
+        homeButton.addEventListener('click', () => {
+            // Animate out app container
+            gsap.to(appContainer, {
+                opacity: 0,
+                y: 50,
+                duration: 0.6,
+                ease: "power2.in",
+                onComplete: () => {
+                    appContainer.style.display = 'none';
+                    homePage.classList.remove('hidden');
+                    
+                    // Animate in home page
+                    gsap.to(homePage, {
+                        opacity: 1,
+                        y: 0,
+                        duration: 0.8,
+                        ease: "power2.out"
+                    });
+                    
+                    // Reinitialize 3D scene if needed
+                    if (!scene) {
+                        init3D();
+                        animate();
+                    }
+                }
+            });
+        });
+    }
     
     // Add entrance animations
     gsap.from(".hero-title .title-word", {
