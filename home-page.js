@@ -206,66 +206,9 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// GSAP Scroll Animations
-function initScrollAnimations() {
-    gsap.registerPlugin(ScrollTrigger);
-    
-    // Hero text animation
-    gsap.timeline({
-        scrollTrigger: {
-            trigger: ".hero-section",
-            start: "top top",
-            end: "bottom top",
-            scrub: 1
-        }
-    })
-    .to(".hero-title", { y: -100, opacity: 0.5 })
-    .to(".hero-subtitle", { y: -80, opacity: 0.3 }, "<0.1")
-    .to(".hero-description", { y: -60, opacity: 0.2 }, "<0.1");
-    
-    // Parallax effect for feature cards
-    gsap.utils.toArray(".feature-card").forEach((card) => {
-        const speed = card.dataset.speed || 0.5;
-        
-        gsap.to(card, {
-            y: -100 * speed,
-            scrollTrigger: {
-                trigger: ".features-section",
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1
-            }
-        });
-    });
-    
-    // Feature cards entrance animation
-    gsap.utils.toArray(".feature-card").forEach((card, index) => {
-        gsap.from(card, {
-            y: 100,
-            opacity: 0,
-            duration: 1,
-            delay: index * 0.2,
-            scrollTrigger: {
-                trigger: card,
-                start: "top 80%",
-                toggleActions: "play none none reverse"
-            }
-        });
-    });
-    
-    // CTA button animation
-    gsap.from(".cta-button", {
-        scale: 0,
-        opacity: 0,
-        duration: 1.5,
-        ease: "elastic.out(1, 0.5)",
-        scrollTrigger: {
-            trigger: ".cta-section",
-            start: "top 50%"
-        }
-    });
-    
-    // Gradient orbs animation
+// GSAP Animations (no scroll needed)
+function initAnimations() {
+    // Gradient orbs animation (if any orbs exist)
     gsap.utils.toArray(".gradient-orb").forEach((orb) => {
         gsap.to(orb, {
             x: "random(-100, 100)",
@@ -288,8 +231,8 @@ function initHomePage() {
     init3D();
     animate();
     
-    // Initialize scroll animations
-    initScrollAnimations();
+    // Initialize animations
+    initAnimations();
     
     // Function to enter the app
     const enterApp = () => {
@@ -320,11 +263,21 @@ function initHomePage() {
     
     // CTA button click handler
     const enterButton = document.getElementById('enterApp');
-    enterButton.addEventListener('click', enterApp);
+    if (enterButton) {
+        enterButton.addEventListener('click', enterApp);
+    }
     
     // Fixed button click handler
     const fixedEnterButton = document.getElementById('fixedEnterApp');
-    fixedEnterButton.addEventListener('click', enterApp);
+    if (fixedEnterButton) {
+        fixedEnterButton.addEventListener('click', enterApp);
+    }
+    
+    // Center button click handler
+    const centerEnterButton = document.getElementById('centerEnterApp');
+    if (centerEnterButton) {
+        centerEnterButton.addEventListener('click', enterApp);
+    }
     
     // Add entrance animations
     gsap.from(".hero-title .title-word", {
@@ -351,12 +304,12 @@ function initHomePage() {
         ease: "power3.out"
     });
     
-    gsap.from(".scroll-indicator", {
-        y: -30,
+    gsap.from(".center-enter-button", {
+        scale: 0,
         opacity: 0,
-        duration: 1,
-        delay: 1.2,
-        ease: "power3.out"
+        duration: 1.5,
+        delay: 1,
+        ease: "elastic.out(1, 0.5)"
     });
 }
 
