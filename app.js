@@ -2078,6 +2078,16 @@ class FLLRoboticsApp extends EventEmitter {
         this.xboxController.callbacks.onAxisChange = (axes) => {
             this.xboxAxisValues = axes;
             this.processXboxMovement();
+            
+            // Update trigger display bars
+            const leftTriggerBar = document.getElementById('leftTriggerBar');
+            const rightTriggerBar = document.getElementById('rightTriggerBar');
+            if (leftTriggerBar) {
+                leftTriggerBar.style.width = `${axes.leftTrigger * 100}%`;
+            }
+            if (rightTriggerBar) {
+                rightTriggerBar.style.width = `${axes.rightTrigger * 100}%`;
+            }
         };
     }
     
@@ -2181,21 +2191,68 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
     
+    applySmoothCurve(value) {
+        // Apply a quadratic curve for smoother control
+        // This gives more precision at low speeds and full speed at max
+        // You can adjust the curve by changing the exponent (2.0 = quadratic, 3.0 = cubic, etc.)
+        const deadzone = 0.05; // Small deadzone to prevent drift
+        
+        if (Math.abs(value) < deadzone) return 0;
+        
+        // Apply quadratic curve
+        const sign = Math.sign(value);
+        const magnitude = Math.abs(value);
+        const curved = Math.pow(magnitude, 2.0);
+        
+        return sign * curved;
+    }
+    
     processXboxMovement() {
         if (this.emergencyStopActive) return;
         
-        // Calculate drive command from triggers and left stick
-        const speed = (this.xboxAxisValues.rightTrigger - this.xboxAxisValues.leftTrigger) * 200;
-        const turn = -this.xboxAxisValues.leftStickX * 100;
+        // Get maximum speed from config (default 500)
+        const maxSpeed = this.config.straightSpeed || 500;
+        const maxTurnRate = this.config.turnRate || 200;
+        
+        // Calculate proportional drive command from triggers
+        // Apply a smooth curve for better control feel (quadratic for more precision at low speeds)
+        const rightTriggerValue = this.applySmoothCurve(this.xboxAxisValues.rightTrigger);
+        const leftTriggerValue = this.applySmoothCurve(this.xboxAxisValues.leftTrigger);
+        
+        const forwardSpeed = rightTriggerValue * maxSpeed;
+        const reverseSpeed = leftTriggerValue * maxSpeed;
+        const speed = forwardSpeed - reverseSpeed;
+        
+        // Calculate proportional turn from left stick (already -1 to 1)
+        // Apply a small deadzone to prevent drift
+        const stickX = Math.abs(this.xboxAxisValues.leftStickX) < 0.1 ? 0 : this.xboxAxisValues.leftStickX;
+        const turn = -stickX * maxTurnRate;
         
         this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
         
-        // Calculate arm commands from buttons
+        // Update speed display
+        const speedDisplay = document.getElementById('xboxSpeedDisplay');
+        if (speedDisplay) {
+            speedDisplay.textContent = Math.round(speed);
+        }
+        
+        // Calculate arm commands
+        // Use right stick Y for arm1 (up/down on right stick)
+        // Use buttons for arm2 (or could use right stick X)
         let arm1Speed = 0;
         let arm2Speed = 0;
         
-        if (this.xboxButtonsPressed.has('A')) arm1Speed = 200;
-        if (this.xboxButtonsPressed.has('B')) arm1Speed = -200;
+        // Right stick Y-axis for smooth arm1 control
+        const stickY = Math.abs(this.xboxAxisValues.rightStickY) < 0.1 ? 0 : this.xboxAxisValues.rightStickY;
+        if (stickY !== 0) {
+            arm1Speed = -stickY * 200; // Negative because stick up is negative
+        } else if (this.xboxButtonsPressed.has('A')) {
+            arm1Speed = 200;
+        } else if (this.xboxButtonsPressed.has('B')) {
+            arm1Speed = -200;
+        }
+        
+        // Buttons for arm2 (could also use right stick X for smooth control)
         if (this.xboxButtonsPressed.has('X')) arm2Speed = 200;
         if (this.xboxButtonsPressed.has('Y')) arm2Speed = -200;
         
@@ -2220,6 +2277,14 @@ class FLLRoboticsApp extends EventEmitter {
             statusIndicator.classList.add('disconnected');
             statusDiv.querySelector('span').textContent = 'Xbox Controller Disconnected';
             if (helpDiv) helpDiv.style.display = 'none';
+            
+            // Reset trigger displays
+            const leftTriggerBar = document.getElementById('leftTriggerBar');
+            const rightTriggerBar = document.getElementById('rightTriggerBar');
+            const speedDisplay = document.getElementById('xboxSpeedDisplay');
+            if (leftTriggerBar) leftTriggerBar.style.width = '0%';
+            if (rightTriggerBar) rightTriggerBar.style.width = '0%';
+            if (speedDisplay) speedDisplay.textContent = '0';
         }
     }
 

@@ -452,8 +452,27 @@
                         <div id="xboxControllerHelp" style="display: none; margin-top: 10px;">
                             <p class="help-text">
                                 <i class="fas fa-gamepad" aria-hidden="true"></i>
-                                <strong>Xbox Controller:</strong> Left stick to turn, triggers for speed. A/B for Arm 1, X/Y for Arm 2. Menu for emergency stop.
+                                <strong>Xbox Controller:</strong> Right trigger = forward (proportional), Left trigger = reverse (proportional), Left stick = turn. Right stick or A/B for Arm 1, X/Y for Arm 2. Menu for emergency stop.
                             </p>
+                            <div id="xboxTriggerDisplay" style="margin-top: 10px;">
+                                <div style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 11px; color: #aaa;">L Trigger (Reverse)</div>
+                                        <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                                            <div id="leftTriggerBar" style="background: #ff5252; height: 100%; width: 0%; transition: width 0.1s;"></div>
+                                        </div>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 11px; color: #aaa;">R Trigger (Forward)</div>
+                                        <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                                            <div id="rightTriggerBar" style="background: #4caf50; height: 100%; width: 0%; transition: width 0.1s;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 5px; font-size: 12px; color: #00bcd4;">
+                                    Speed: <span id="xboxSpeedDisplay">0</span> mm/s
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
