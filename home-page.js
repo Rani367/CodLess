@@ -7,22 +7,33 @@ let windowHalfY = window.innerHeight / 2;
 
 // Initialize 3D Scene
 function init3D() {
-    const container = document.getElementById('canvas-container');
-    
-    // Scene setup
-    scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0f0c29, 1, 1000);
-    
-    // Camera setup
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.z = 50;
-    
-    // Renderer setup
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000, 0);
-    container.appendChild(renderer.domElement);
+    try {
+        const container = document.getElementById('canvas-container');
+        if (!container) {
+            console.error('Canvas container not found');
+            return;
+        }
+        
+        // Check if THREE is loaded
+        if (typeof THREE === 'undefined') {
+            console.error('Three.js library not loaded');
+            return;
+        }
+        
+        // Scene setup
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x0f0c29, 1, 1000);
+        
+        // Camera setup
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+        camera.position.z = 50;
+        
+        // Renderer setup
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        container.appendChild(renderer.domElement);
     
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040, 2);
@@ -98,6 +109,9 @@ function createParticles() {
     
     particles = new THREE.Points(geometry, material);
     scene.add(particles);
+    } catch (error) {
+        console.error('Error initializing 3D scene:', error);
+    }
 }
 
 // Create floating geometric shapes
@@ -170,6 +184,11 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
     
+    // Check if renderer exists before rendering
+    if (!renderer || !scene || !camera) {
+        return;
+    }
+    
     // Rotate controller based on mouse position
     /* Commented out - controller removed
     if (controller) {
@@ -238,8 +257,14 @@ function initHomePage() {
     
     // Function to enter the app
     const enterApp = () => {
+        console.log('Entering app...');
         const homePage = document.getElementById('homePage');
         const appContainer = document.getElementById('appContainer');
+        
+        if (!homePage || !appContainer) {
+            console.error('Required elements not found:', { homePage, appContainer });
+            return;
+        }
         
         // Animate out home page
         gsap.to(homePage, {
@@ -259,6 +284,9 @@ function initHomePage() {
                     duration: 0.6,
                     ease: "power2.out"
                 });
+                
+                // Trigger resize event to help with any layout issues
+                window.dispatchEvent(new Event('resize'));
             }
         });
     };
@@ -275,51 +303,59 @@ function initHomePage() {
         modernCodLessButton.addEventListener('click', enterApp);
     }
     
-
-    
-    // Add entrance animations
-    gsap.from(".hero-title .title-word", {
-        y: 100,
-        opacity: 0,
-        duration: 1,
-        stagger: 0.2,
-        ease: "power3.out"
-    });
-    
-    gsap.from(".hero-subtitle", {
-        y: 50,
-        opacity: 0,
-        duration: 1,
-        delay: 0.5,
-        ease: "power3.out"
-    });
-    
-    gsap.from(".hero-description", {
-        y: 30,
-        opacity: 0,
-        duration: 1,
-        delay: 0.8,
-        ease: "power3.out"
-    });
-    
-    gsap.from(".modern-codless-button", {
-        scale: 0.8,
-        opacity: 0,
-        duration: 1.2,
-        delay: 1.2,
-        ease: "back.out(1.7)",
-        clearProps: "all"
-    });
-    
-    // Add a subtle floating animation to the button
-    gsap.to(".modern-codless-button", {
-        y: -5,
-        duration: 2,
-        repeat: -1,
-        yoyo: true,
-        ease: "power1.inOut",
-        delay: 2.5
-    });
+    // Add entrance animations (check if GSAP is loaded)
+    if (typeof gsap !== 'undefined') {
+        // Wait a bit to ensure all elements are rendered
+        setTimeout(() => {
+            gsap.from(".hero-title .title-word", {
+                y: 100,
+                opacity: 0,
+                duration: 1,
+                stagger: 0.2,
+                ease: "power3.out"
+            });
+            
+            gsap.from(".hero-subtitle", {
+                y: 50,
+                opacity: 0,
+                duration: 1,
+                delay: 0.5,
+                ease: "power3.out"
+            });
+            
+            gsap.from(".hero-description", {
+                y: 30,
+                opacity: 0,
+                duration: 1,
+                delay: 0.8,
+                ease: "power3.out"
+            });
+            
+            const modernCodLessBtn = document.querySelector(".modern-codless-button");
+            if (modernCodLessBtn) {
+                gsap.from(modernCodLessBtn, {
+                    scale: 0.8,
+                    opacity: 0,
+                    duration: 1.2,
+                    delay: 1.2,
+                    ease: "back.out(1.7)",
+                    clearProps: "all"
+                });
+                
+                // Add a subtle floating animation to the button
+                gsap.to(modernCodLessBtn, {
+                    y: -5,
+                    duration: 2,
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "power1.inOut",
+                    delay: 2
+                });
+            }
+        }, 100);
+    } else {
+        console.error('GSAP library not loaded');
+    }
 }
 
 // Wait for DOM to load
