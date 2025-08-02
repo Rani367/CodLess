@@ -223,6 +223,8 @@ function initAnimations() {
 
 // Initialize home page
 function initHomePage() {
+    console.log('Initializing home page...');
+    
     // Hide main app initially
     const appContainer = document.getElementById('appContainer');
     appContainer.style.display = 'none';
@@ -276,6 +278,11 @@ function initHomePage() {
     // Center button click handler
     const centerEnterButton = document.getElementById('centerEnterApp');
     if (centerEnterButton) {
+        // Ensure button is visible
+        centerEnterButton.style.opacity = '1';
+        centerEnterButton.style.visibility = 'visible';
+        centerEnterButton.style.display = 'block';
+        
         centerEnterButton.addEventListener('click', enterApp);
     }
     
@@ -305,12 +312,33 @@ function initHomePage() {
     });
     
     gsap.from(".center-enter-button", {
-        scale: 0,
+        scale: 0.8,
         opacity: 0,
         duration: 1.5,
         delay: 1,
-        ease: "elastic.out(1, 0.5)"
+        ease: "elastic.out(1, 0.5)",
+        clearProps: "all",
+        onComplete: function() {
+            console.log('Button animation complete');
+            const btn = document.querySelector('.center-enter-button');
+            if (btn) {
+                btn.style.opacity = '1';
+                btn.style.transform = 'translate(-50%, -50%)';
+            }
+        }
     });
+    
+    // Ensure button is visible after animations
+    setTimeout(() => {
+        const btn = document.querySelector('.center-enter-button');
+        if (btn) {
+            btn.style.opacity = '1';
+            btn.style.visibility = 'visible';
+            btn.style.display = 'block';
+            btn.style.transform = 'translate(-50%, -50%)';
+            console.log('Button visibility ensured');
+        }
+    }, 3000); // Wait 3 seconds for all animations to complete
 }
 
 // Wait for DOM to load
