@@ -263,28 +263,19 @@ function initHomePage() {
         });
     };
     
-    // CTA button click handler
+    // Enter button handler
     const enterButton = document.getElementById('enterApp');
     if (enterButton) {
         enterButton.addEventListener('click', enterApp);
     }
     
-    // Fixed button click handler
-    const fixedEnterButton = document.getElementById('fixedEnterApp');
-    if (fixedEnterButton) {
-        fixedEnterButton.addEventListener('click', enterApp);
+    // Modern CodLess button click handler
+    const modernCodLessButton = document.getElementById('modernCodLessBtn');
+    if (modernCodLessButton) {
+        modernCodLessButton.addEventListener('click', enterApp);
     }
     
-    // Center button click handler
-    const centerEnterButton = document.getElementById('centerEnterApp');
-    if (centerEnterButton) {
-        // Ensure button is visible
-        centerEnterButton.style.opacity = '1';
-        centerEnterButton.style.visibility = 'visible';
-        centerEnterButton.style.display = 'block';
-        
-        centerEnterButton.addEventListener('click', enterApp);
-    }
+
     
     // Add entrance animations
     gsap.from(".hero-title .title-word", {
@@ -311,34 +302,24 @@ function initHomePage() {
         ease: "power3.out"
     });
     
-    gsap.from(".center-enter-button", {
+    gsap.from(".modern-codless-button", {
         scale: 0.8,
         opacity: 0,
-        duration: 1.5,
-        delay: 1,
-        ease: "elastic.out(1, 0.5)",
-        clearProps: "all",
-        onComplete: function() {
-            console.log('Button animation complete');
-            const btn = document.querySelector('.center-enter-button');
-            if (btn) {
-                btn.style.opacity = '1';
-                btn.style.transform = 'translate(-50%, -50%)';
-            }
-        }
+        duration: 1.2,
+        delay: 1.2,
+        ease: "back.out(1.7)",
+        clearProps: "all"
     });
     
-    // Ensure button is visible after animations
-    setTimeout(() => {
-        const btn = document.querySelector('.center-enter-button');
-        if (btn) {
-            btn.style.opacity = '1';
-            btn.style.visibility = 'visible';
-            btn.style.display = 'block';
-            btn.style.transform = 'translate(-50%, -50%)';
-            console.log('Button visibility ensured');
-        }
-    }, 3000); // Wait 3 seconds for all animations to complete
+    // Add a subtle floating animation to the button
+    gsap.to(".modern-codless-button", {
+        y: -5,
+        duration: 2,
+        repeat: -1,
+        yoyo: true,
+        ease: "power1.inOut",
+        delay: 2.5
+    });
 }
 
 // Wait for DOM to load

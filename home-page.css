@@ -435,10 +435,7 @@
         margin-bottom: 6rem;
     }
     
-    .center-enter-button {
-        padding: 1.5rem 3.5rem;
-        font-size: 1.2rem;
-    }
+
 }
 
 /* Additional Visual Enhancements */
@@ -607,77 +604,157 @@ html {
     to { transform: translateY(-2000px); }
 }
 
-/* Center Enter Button */
-.center-enter-button {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 2rem 5rem;
-    font-size: 1.5rem;
+
+
+/* Modern CodLess Button */
+.modern-codless-button {
+    position: relative;
+    margin-top: 2.5rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-block;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-codless-button .button-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 2.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     color: #ffffff;
-    background: linear-gradient(135deg, #00f2fe 0%, #667eea 50%, #764ba2 100%);
-    border: none;
-    border-radius: 60px;
-    cursor: pointer;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    box-shadow: 0 15px 40px rgba(0, 242, 254, 0.5);
-    text-transform: uppercase;
-    animation: ctaPulse 2s ease-in-out infinite;
-    z-index: 1000;
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: block !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    border-radius: 100px;
+    box-shadow: 
+        0 4px 15px rgba(102, 126, 234, 0.4),
+        0 8px 30px rgba(118, 75, 162, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
 }
 
-.center-enter-button:hover {
-    transform: translate(-50%, -50%) translateY(-5px) scale(1.1);
-    box-shadow: 0 25px 60px rgba(0, 242, 254, 0.8);
-    animation: none;
+.modern-codless-button .button-text {
+    font-size: 1.25rem;
+    text-transform: none;
 }
 
-.center-enter-button::before {
-    content: '';
+.modern-codless-button .button-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-codless-button .button-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Button backdrop for depth */
+.modern-codless-button .button-backdrop {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 100%;
-    height: 100%;
-    transform: translate(-50%, -50%);
-    background: inherit;
-    border-radius: inherit;
-    opacity: 0.5;
-    animation: pulse 2s ease-in-out infinite;
-    z-index: -1;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    border-radius: 100px;
+    transform: translateY(4px);
+    filter: blur(10px);
+    opacity: 0.4;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
 }
 
-.center-enter-button .button-glow {
+/* Animated glow effect */
+.modern-codless-button .button-glow {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 100%;
-    height: 100%;
-    transform: translate(-50%, -50%);
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(102, 126, 234, 0.4) 0%, transparent 70%);
     opacity: 0;
     transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 0;
 }
 
-.center-enter-button:hover .button-glow {
+/* Hover effects */
+.modern-codless-button:hover {
+    transform: translateY(-2px);
+}
+
+.modern-codless-button:hover .button-content {
+    background: linear-gradient(135deg, #7c8ff0 0%, #8759a8 50%, #f1a0fc 100%);
+    box-shadow: 
+        0 6px 20px rgba(102, 126, 234, 0.5),
+        0 12px 40px rgba(118, 75, 162, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.modern-codless-button:hover .button-backdrop {
+    transform: translateY(6px);
+    filter: blur(15px);
+    opacity: 0.6;
+}
+
+.modern-codless-button:hover .button-icon {
+    transform: translateX(4px);
+}
+
+.modern-codless-button:hover .button-glow {
     opacity: 1;
+    animation: glowPulse 2s ease-in-out infinite;
 }
 
-.center-enter-button .button-text {
-    position: relative;
-    z-index: 2;
-    color: #ffffff;
-    display: block;
+/* Active state */
+.modern-codless-button:active {
+    transform: translateY(0);
 }
 
-/* Hide fixed enter button */
-.fixed-enter-button {
-    display: none;
+.modern-codless-button:active .button-content {
+    box-shadow: 
+        0 2px 10px rgba(102, 126, 234, 0.4),
+        0 4px 20px rgba(118, 75, 162, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.modern-codless-button:active .button-backdrop {
+    transform: translateY(2px);
+}
+
+/* Glow pulse animation */
+@keyframes glowPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.3;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .modern-codless-button .button-content {
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+    }
+    
+    .modern-codless-button .button-text {
+        font-size: 1.1rem;
+    }
+    
+    .modern-codless-button .button-icon svg {
+        width: 20px;
+        height: 20px;
+    }
 }
