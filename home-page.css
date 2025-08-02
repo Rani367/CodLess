@@ -425,6 +425,29 @@
     display: block;
 }
 
+/* Browser Warning */
+.browser-warning {
+    margin-top: 20px;
+    padding: 15px 25px;
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.browser-warning p {
+    color: #ff9800;
+    font-size: 14px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.browser-warning i {
+    font-size: 18px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .hero-title {

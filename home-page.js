@@ -248,6 +248,14 @@ function initHomePage() {
     const appContainer = document.getElementById('appContainer');
     appContainer.style.display = 'none';
     
+    // Check browser compatibility and show warning if needed
+    if (!navigator.bluetooth) {
+        const warning = document.getElementById('browserWarning');
+        if (warning) {
+            warning.style.display = 'block';
+        }
+    }
+    
     // Initialize 3D scene
     init3D();
     animate();
@@ -256,8 +264,90 @@ function initHomePage() {
     initAnimations();
     
     // Function to enter the app
-    const enterApp = () => {
+    const enterApp = async () => {
         console.log('Entering app...');
+        
+        // Check if browser is supported
+        const browserNotSupported = document.getElementById('browserNotSupported');
+        if (browserNotSupported && browserNotSupported.style.display === 'flex') {
+            console.error('Browser not supported');
+            // Show browser not supported message
+            const homePage = document.getElementById('homePage');
+            if (homePage) {
+                homePage.style.display = 'none';
+            }
+            return;
+        }
+        
+        // Wait a bit for app to initialize if it hasn't yet
+        if (!window.app && !window.APP_CONFIG) {
+            console.log('Waiting for app to initialize...');
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Check if app.js is loaded by checking for a global object or function
+        if (!window.app && !window.APP_CONFIG) {
+            console.error('App not loaded properly. This browser may not support required features.');
+            
+            // Show error in app container
+            const homePage = document.getElementById('homePage');
+            const appContainer = document.getElementById('appContainer');
+            
+            if (homePage && appContainer) {
+                // Hide home page
+                homePage.style.display = 'none';
+                
+                // Show app container with error message
+                appContainer.style.display = 'block';
+                appContainer.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px; background: #1e1e1e;">
+                        <div style="text-align: center; max-width: 600px;">
+                            <i class="fas fa-exclamation-triangle" style="color: #ff9800; font-size: 64px; margin-bottom: 30px;"></i>
+                            <h2 style="color: #ff9800; margin-bottom: 20px; font-size: 28px;">Browser Not Supported</h2>
+                            <p style="color: #ccc; margin-bottom: 30px; font-size: 18px; line-height: 1.6;">
+                                CodLess requires Web Bluetooth API which is not supported in your current browser.
+                            </p>
+                            <div style="background: rgba(255, 152, 0, 0.1); border: 1px solid rgba(255, 152, 0, 0.3); border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                                <h3 style="color: #ff9800; margin-bottom: 15px;">Supported Browsers:</h3>
+                                <ul style="list-style: none; padding: 0; margin: 0; color: #ccc; font-size: 16px;">
+                                    <li style="margin-bottom: 10px;"><i class="fab fa-chrome" style="margin-right: 10px;"></i>Chrome (version 80+)</li>
+                                    <li style="margin-bottom: 10px;"><i class="fab fa-edge" style="margin-right: 10px;"></i>Microsoft Edge (version 80+)</li>
+                                    <li><i class="fab fa-opera" style="margin-right: 10px;"></i>Opera</li>
+                                </ul>
+                            </div>
+                            <div style="color: #999; font-size: 14px; margin-bottom: 30px;">
+                                <p><strong>Note:</strong> Safari and Firefox do not support Web Bluetooth API at this time.</p>
+                            </div>
+                            <button onclick="window.location.href='https://www.google.com/chrome/'" style="
+                                background: #00a8ff; 
+                                color: white; 
+                                border: none; 
+                                padding: 12px 30px; 
+                                border-radius: 5px; 
+                                cursor: pointer;
+                                font-size: 16px;
+                                margin-right: 10px;
+                            ">
+                                Download Chrome
+                            </button>
+                            <button onclick="location.reload()" style="
+                                background: transparent; 
+                                color: #00a8ff; 
+                                border: 1px solid #00a8ff; 
+                                padding: 12px 30px; 
+                                border-radius: 5px; 
+                                cursor: pointer;
+                                font-size: 16px;
+                            ">
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            return;
+        }
+        
         const homePage = document.getElementById('homePage');
         const appContainer = document.getElementById('appContainer');
         
