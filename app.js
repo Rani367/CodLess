@@ -1439,7 +1439,7 @@ class RobotSimulator extends EventEmitter {
 }
 
 // ============================
-// MAIN APPLICATION CLASS
+// MAIN APPLICATION CLASSES
 // ============================
 
 class FLLRoboticsApp extends EventEmitter {
@@ -1944,6 +1944,17 @@ class FLLRoboticsApp extends EventEmitter {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.textRenderingOptimization = 'optimizeQuality';
+    }
+
+    onSimulatorUpdate(data) {
+        // Handle position updates from the robot simulator
+        // This can be used for logging, recording, or updating UI elements
+        if (this.logger) {
+            this.logger.log(`Robot position: x=${data.x.toFixed(2)}, y=${data.y.toFixed(2)}, angle=${data.angle.toFixed(2)}°`, 'info');
+        }
+        
+        // Emit the position update for other components that might be listening
+        this.emit('robotPositionUpdate', data);
     }
 
     setupBLEEvents() {
