@@ -78,6 +78,9 @@ function init3D() {
     
     // Window resize event
     window.addEventListener('resize', onWindowResize);
+    } catch (error) {
+        console.error('Error initializing 3D scene:', error);
+    }
 }
 
 // Create floating particles
@@ -109,9 +112,6 @@ function createParticles() {
     
     particles = new THREE.Points(geometry, material);
     scene.add(particles);
-    } catch (error) {
-        console.error('Error initializing 3D scene:', error);
-    }
 }
 
 // Create floating geometric shapes
