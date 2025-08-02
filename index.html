@@ -191,11 +191,6 @@
 
     <!-- Home Page -->
     <div id="homePage" class="home-page">
-        <!-- Fixed Enter Button -->
-        <button id="fixedEnterApp" class="fixed-enter-button">
-            Enter Codless
-        </button>
-        
         <!-- Hero Section with 3D Background -->
         <section class="hero-section">
             <div id="canvas-container" class="canvas-container"></div>
@@ -208,6 +203,19 @@
                     <div class="hero-description">
                         <p>Experience intuitive robot control with cutting-edge technology</p>
                     </div>
+                    <!-- Modern CodLess Button -->
+                    <button id="modernCodLessBtn" class="modern-codless-button">
+                        <span class="button-content">
+                            <span class="button-text">CodLess</span>
+                            <span class="button-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                        </span>
+                        <div class="button-backdrop"></div>
+                        <div class="button-glow"></div>
+                    </button>
                 </div>
                 <div class="floating-elements">
                     <div class="floating-cube"></div>
@@ -223,12 +231,6 @@
             </div>
         </section>
     </div>
-
-    <!-- Center Enter Button (outside homePage to prevent hiding) -->
-    <button id="centerEnterApp" class="center-enter-button">
-        <span class="button-text">ENTER CODLESS</span>
-        <div class="button-glow"></div>
-    </button>
 
     <!-- Main Application -->
     <div class="app-container" id="appContainer">
