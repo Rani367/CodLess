@@ -39,6 +39,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Instant Authentication - ZERO SETUP REQUIRED! -->
+    
     <!-- Preload critical resources -->
     <link rel="preload" href="app.js?v=3.0.1" as="script">
     <link rel="preload" href="styles.css" as="style">
@@ -189,6 +191,9 @@
                 <i class="fas fa-robot" aria-hidden="true"></i>
                 <h1>CodLess - FLL Robotics Control Center</h1>
                 <span class="version-badge">v3.0.0</span>
+            </div>
+            <div class="user-controls" id="userControls" style="margin-right: 1rem;">
+                <!-- User button will be inserted here by auth-ui.js -->
             </div>
             <div class="window-controls">
                 <button class="window-btn minimize-btn" onclick="minimizeWindow()" aria-label="Minimize window">
@@ -765,6 +770,11 @@
         })();
     </script>
 
+    <!-- Authentication System -->
+    <script src="instant-auth.js"></script>
+    <script src="auth-ui.js"></script>
+    <script src="auth-adapter.js"></script>
+    <script src="animations.js"></script>
     <script src="app.js?v=3.0.1"></script>
 </body>
 </html>
