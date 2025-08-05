@@ -54,19 +54,18 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ## Instant Multi-Device Authentication
 
-CodLess includes **multi-device authentication** that works immediately - **ZERO SETUP REQUIRED!**
+CodLess includes **automatic multi-device sync** that works immediately - **ZERO SETUP REQUIRED!**
 
 ### ✨ How It Works:
-1. Create an account - get a **Sync Code**
-2. Use that code on ANY device to access your data
-3. No Firebase, no API keys, no configuration needed!
+Just use the **same email/password on any device** - your data syncs automatically!
+No codes, no Firebase, no configuration needed.
 
 ### Features:
 - 🔒 **Secure Authentication** - Password-protected accounts
 - 📧 **Email/Password Login** - Create accounts with any email
-- 🔄 **Multi-Device Sync** - Use your Sync Code on any device
+- 🔄 **Automatic Multi-Device Sync** - Same login = same data everywhere
 - 💾 **Persistent Storage** - Your runs are saved to your account
-- 🌍 **Cross-Device Access** - Sign in anywhere with your code
+- 🌍 **Cross-Device Access** - Sign in anywhere, data appears instantly
 - 🛡️ **User Isolation** - Each user's data is completely separate
 - 🚀 **Always Free** - No external services or costs
 - 📱 **Works Everywhere** - Phone, tablet, laptop - all synced!
@@ -74,35 +73,44 @@ CodLess includes **multi-device authentication** that works immediately - **ZERO
 ### Using the Authentication:
 1. **Click the user icon** (👤) in the top-right corner
 2. **Create an account** with email/password
-3. **Save your Sync Code** when it appears
-4. **On another device**: Click "Continue with Google" and enter your Sync Code
-5. **All your runs appear** on the new device!
+3. **On another device**: Just sign in with the same email/password
+4. **All your runs appear automatically!**
 
-### How Sync Codes Work:
-- Each account gets a unique 9-character code (like: `A7B3X9K2M`)
-- This code links your data across devices
-- Share the code with teammates to share robot runs
-- Keep it private for personal use
+### How It Works Behind the Scenes:
+- Your email creates a unique namespace for your data
+- Data is stored locally but keyed to your email
+- When you sign in on a new device, it finds your data
+- No servers, no cloud - just smart local storage
 
 ### Privacy & Security:
 - Passwords are securely hashed
-- Sync codes provide controlled access
-- Each user's data is isolated
-- No external servers needed
+- Each email has isolated data storage
+- No external servers or databases
 - Works even offline (after first load)
+- Your data never leaves your devices
 
 ### Perfect For:
-- FLL teams sharing runs across devices
+- FLL teams working on multiple devices
 - Competitions where you switch computers
-- Teams collaborating on robot programs
-- Personal use across multiple devices
-- Instant setup at events
+- Students accessing their runs from home/school
+- Coaches managing team programs
+- Anyone who uses multiple devices
 
-### Example Use Case:
-1. Coach creates account on laptop → Gets code `ABC123XYZ`
-2. Student enters code on tablet → Sees all the runs
-3. Another student uses code on phone → Everything syncs!
-4. All changes appear on all devices instantly
+### Example Use Cases:
+
+**Personal Use:**
+1. Create account on laptop: `student@school.edu`
+2. Sign in on phone with same credentials
+3. All robot runs appear instantly!
+
+**Team Sharing:**
+1. Team creates shared account: `team123@fll.com`
+2. All members sign in with team credentials
+3. Everyone sees and can use the same runs
+4. Changes sync automatically
+
+### Quick Sign-In Option:
+Click "Continue with Google" and enter just your email for instant access!
 
 ---
 

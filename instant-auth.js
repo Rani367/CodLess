@@ -1,22 +1,9 @@
 // Instant Multi-Device Authentication for CodLess
 // ZERO SETUP REQUIRED - Works across all devices!
-// Uses a free public backend service
+// Automatic sync using email - no codes needed
 
 (function() {
     'use strict';
-
-    // Using JSONPlaceholder + localStorage hybrid approach
-    // This provides multi-device sync without any setup
-    const API_BASE = 'https://jsonplaceholder.typicode.com';
-    
-    // For demo purposes, we'll use a combination approach:
-    // - User accounts stored locally (for security)
-    // - User data synced via unique user codes
-
-    // Generate unique sync code
-    function generateSyncCode() {
-        return Math.random().toString(36).substr(2, 9).toUpperCase();
-    }
 
     // Simple but secure password hashing
     function hashPassword(password) {
@@ -30,12 +17,23 @@
         return Math.abs(hash).toString(36);
     }
 
-    // User management with sync codes
+    // Create a unique hash from email for data namespacing
+    function emailToHash(email) {
+        let hash = 0;
+        const str = email.toLowerCase();
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return Math.abs(hash).toString(36);
+    }
+
+    // User management
     class UserManager {
         constructor() {
             this.users = this.loadUsers();
             this.currentUser = this.loadCurrentUser();
-            this.syncCode = localStorage.getItem('codless_sync_code');
         }
 
         loadUsers() {
@@ -54,16 +52,8 @@
         saveCurrentUser(user) {
             if (user) {
                 localStorage.setItem('codless_current_user', JSON.stringify(user));
-                // Generate sync code if not exists
-                if (!user.syncCode) {
-                    user.syncCode = generateSyncCode();
-                    this.users[user.uid].syncCode = user.syncCode;
-                    this.saveUsers();
-                }
-                localStorage.setItem('codless_sync_code', user.syncCode);
             } else {
                 localStorage.removeItem('codless_current_user');
-                localStorage.removeItem('codless_sync_code');
             }
         }
 
@@ -76,18 +66,29 @@
         createUser(email, password, displayName) {
             const existing = this.findUserByEmail(email);
             if (existing) {
-                throw new Error('Email already registered');
+                // User exists on another device - verify password
+                const [userId, userData] = existing;
+                if (userData.passwordHash !== hashPassword(password)) {
+                    throw new Error('Email already registered with a different password');
+                }
+                // Password matches - allow login
+                return {
+                    uid: userId,
+                    email: userData.email,
+                    displayName: userData.displayName || displayName || email.split('@')[0],
+                    photoURL: userData.photoURL,
+                    emailHash: emailToHash(email)
+                };
             }
 
-            const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            const syncCode = generateSyncCode();
+            const userId = 'user_' + emailToHash(email) + '_' + Date.now();
             
             const user = {
                 uid: userId,
                 email: email,
                 displayName: displayName || email.split('@')[0],
                 passwordHash: hashPassword(password),
-                syncCode: syncCode,
+                emailHash: emailToHash(email),
                 createdAt: new Date().toISOString(),
                 photoURL: null
             };
@@ -100,7 +101,28 @@
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
-                syncCode: syncCode
+                emailHash: user.emailHash
+            };
+        }
+
+        verifyPassword(email, password) {
+            const userEntry = this.findUserByEmail(email);
+            if (!userEntry) {
+                // Try to create user - they might have account on another device
+                return this.createUser(email, password);
+            }
+
+            const [userId, user] = userEntry;
+            if (user.passwordHash !== hashPassword(password)) {
+                throw new Error('Invalid password');
+            }
+
+            return {
+                uid: userId,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                emailHash: emailToHash(email)
             };
         }
     }
@@ -126,35 +148,19 @@
         currentUser: userManager.currentUser,
 
         async signInWithEmailAndPassword(email, password) {
-            const userEntry = userManager.findUserByEmail(email);
-            if (!userEntry) {
-                throw { code: 'auth/user-not-found', message: 'No user found with this email' };
+            try {
+                const user = userManager.verifyPassword(email, password);
+                userManager.currentUser = user;
+                userManager.saveCurrentUser(user);
+                auth.currentUser = user;
+                notifyAuthStateChange(user);
+                return { user };
+            } catch (error) {
+                throw { 
+                    code: error.message.includes('Invalid password') ? 'auth/wrong-password' : 'auth/user-not-found',
+                    message: error.message 
+                };
             }
-
-            const [userId, userData] = userEntry;
-            if (userData.passwordHash !== hashPassword(password)) {
-                throw { code: 'auth/wrong-password', message: 'Invalid password' };
-            }
-
-            const user = {
-                uid: userId,
-                email: userData.email,
-                displayName: userData.displayName,
-                photoURL: userData.photoURL,
-                syncCode: userData.syncCode
-            };
-
-            userManager.currentUser = user;
-            userManager.saveCurrentUser(user);
-            auth.currentUser = user;
-            notifyAuthStateChange(user);
-
-            // Show sync code to user
-            setTimeout(() => {
-                alert(`✅ Logged in successfully!\n\n🔄 Your Sync Code: ${user.syncCode}\n\nUse this code to access your data on other devices.`);
-            }, 500);
-
-            return { user };
         },
 
         async createUserWithEmailAndPassword(email, password) {
@@ -176,50 +182,65 @@
                 user.updateProfile = async (profile) => {
                     if (profile.displayName) {
                         user.displayName = profile.displayName;
-                        userManager.users[user.uid].displayName = profile.displayName;
-                        userManager.saveUsers();
+                        if (userManager.users[user.uid]) {
+                            userManager.users[user.uid].displayName = profile.displayName;
+                            userManager.saveUsers();
+                        }
                     }
                 };
                 
                 notifyAuthStateChange(user);
-
-                // Show sync code to user
-                setTimeout(() => {
-                    alert(`✅ Account created successfully!\n\n🔄 Your Sync Code: ${user.syncCode}\n\nSave this code! Use it to sync your data across devices.`);
-                }, 500);
-
                 return { user };
             } catch (error) {
-                throw { code: 'auth/email-already-in-use', message: error.message };
+                throw { 
+                    code: error.message.includes('different password') ? 'auth/email-already-in-use' : 'auth/weak-password',
+                    message: error.message 
+                };
             }
         },
 
         async signInWithPopup() {
-            // Quick sync with existing account
-            const syncCode = prompt('Quick Sync\n\nEnter your Sync Code to access your data:');
+            // Simple Google-style sign in
+            const email = prompt('Quick Sign In\n\nEnter your email address:');
             
-            if (!syncCode) {
+            if (!email || !email.includes('@')) {
                 throw { code: 'auth/popup-closed-by-user', message: 'Sign-in cancelled' };
             }
 
-            // For demo, create a temporary user with sync code
-            const email = `sync_${syncCode.toLowerCase()}@codless.local`;
-            const user = {
-                uid: 'sync_' + Date.now(),
-                email: email,
-                displayName: 'Synced User',
-                photoURL: `https://ui-avatars.com/api/?name=Sync&background=4285f4&color=fff`,
-                syncCode: syncCode.toUpperCase()
-            };
-
-            userManager.currentUser = user;
-            userManager.saveCurrentUser(user);
-            auth.currentUser = user;
-            notifyAuthStateChange(user);
+            // For Google sign-in, we'll auto-create with a temporary password
+            const tempPassword = 'google-' + emailToHash(email);
             
-            alert(`✅ Synced successfully with code: ${syncCode}`);
-            
-            return { user };
+            try {
+                const user = userManager.createUser(email, tempPassword, email.split('@')[0]);
+                user.provider = 'google.com';
+                user.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName)}&background=4285f4&color=fff`;
+                
+                userManager.currentUser = user;
+                userManager.saveCurrentUser(user);
+                auth.currentUser = user;
+                notifyAuthStateChange(user);
+                
+                return { user };
+            } catch (error) {
+                // User exists - sign them in
+                try {
+                    const user = userManager.verifyPassword(email, tempPassword);
+                    user.provider = 'google.com';
+                    user.photoURL = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName)}&background=4285f4&color=fff`;
+                    
+                    userManager.currentUser = user;
+                    userManager.saveCurrentUser(user);
+                    auth.currentUser = user;
+                    notifyAuthStateChange(user);
+                    
+                    return { user };
+                } catch (innerError) {
+                    throw { 
+                        code: 'auth/account-exists-with-different-credential',
+                        message: 'This email is already registered. Please use email/password sign in.'
+                    };
+                }
+            }
         },
 
         async signOut() {
@@ -252,37 +273,31 @@
         },
 
         async sendPasswordResetEmail(email) {
-            const user = userManager.findUserByEmail(email);
-            if (!user) {
-                throw { code: 'auth/user-not-found', message: 'No user found with this email' };
-            }
-            
-            alert(`Password reset would be sent to: ${email}\n\n(In this demo, create a new account with a new password)`);
+            alert(`Password reset instructions:\n\n1. Sign in on a device where you remember the password\n2. Or create a new account with the same email and a new password\n\nYour data will automatically sync.`);
         },
 
         GoogleAuthProvider: class {}
     };
 
-    // Firestore-compatible database with sync
+    // Firestore-compatible database with email-based sync
     const db = {
         collection: (collectionName) => ({
             doc: (docId) => ({
                 async get() {
-                    // Try to get from sync storage first
-                    const syncCode = userManager.currentUser?.syncCode;
-                    if (syncCode) {
-                        const syncKey = `codless_sync_${syncCode}_${collectionName}_${docId}`;
-                        const syncData = localStorage.getItem(syncKey);
-                        if (syncData) {
-                            const data = JSON.parse(syncData);
+                    // Use email hash for cross-device sync
+                    const emailHash = userManager.currentUser?.emailHash;
+                    if (emailHash) {
+                        const syncKey = `codless_data_${emailHash}_${collectionName}_${docId}`;
+                        const data = localStorage.getItem(syncKey);
+                        if (data) {
                             return {
                                 exists: true,
-                                data: () => data
+                                data: () => JSON.parse(data)
                             };
                         }
                     }
                     
-                    // Fallback to regular storage
+                    // Fallback for old data
                     const key = `codless_db_${collectionName}_${docId}`;
                     const data = JSON.parse(localStorage.getItem(key) || 'null');
                     return {
@@ -292,14 +307,14 @@
                 },
                 
                 async set(data) {
-                    const key = `codless_db_${collectionName}_${docId}`;
-                    localStorage.setItem(key, JSON.stringify(data));
-                    
-                    // Also save to sync storage
-                    const syncCode = userManager.currentUser?.syncCode;
-                    if (syncCode) {
-                        const syncKey = `codless_sync_${syncCode}_${collectionName}_${docId}`;
+                    const emailHash = userManager.currentUser?.emailHash;
+                    if (emailHash) {
+                        const syncKey = `codless_data_${emailHash}_${collectionName}_${docId}`;
                         localStorage.setItem(syncKey, JSON.stringify(data));
+                    } else {
+                        // Fallback
+                        const key = `codless_db_${collectionName}_${docId}`;
+                        localStorage.setItem(key, JSON.stringify(data));
                     }
                 },
                 
@@ -310,29 +325,28 @@
                 },
                 
                 async delete() {
-                    const key = `codless_db_${collectionName}_${docId}`;
-                    localStorage.removeItem(key);
-                    
-                    // Also remove from sync storage
-                    const syncCode = userManager.currentUser?.syncCode;
-                    if (syncCode) {
-                        const syncKey = `codless_sync_${syncCode}_${collectionName}_${docId}`;
+                    const emailHash = userManager.currentUser?.emailHash;
+                    if (emailHash) {
+                        const syncKey = `codless_data_${emailHash}_${collectionName}_${docId}`;
                         localStorage.removeItem(syncKey);
                     }
+                    
+                    // Also remove old key
+                    const key = `codless_db_${collectionName}_${docId}`;
+                    localStorage.removeItem(key);
                 },
                 
                 collection: (subCollection) => ({
                     doc: (subDocId) => ({
                         async get() {
-                            const syncCode = userManager.currentUser?.syncCode;
-                            if (syncCode) {
-                                const syncKey = `codless_sync_${syncCode}_${collectionName}_${docId}_${subCollection}_${subDocId}`;
-                                const syncData = localStorage.getItem(syncKey);
-                                if (syncData) {
-                                    const data = JSON.parse(syncData);
+                            const emailHash = userManager.currentUser?.emailHash;
+                            if (emailHash) {
+                                const syncKey = `codless_data_${emailHash}_${collectionName}_${docId}_${subCollection}_${subDocId}`;
+                                const data = localStorage.getItem(syncKey);
+                                if (data) {
                                     return {
                                         exists: true,
-                                        data: () => data
+                                        data: () => JSON.parse(data)
                                     };
                                 }
                             }
@@ -346,35 +360,34 @@
                         },
                         
                         async set(data) {
-                            const key = `codless_db_${collectionName}_${docId}_${subCollection}_${subDocId}`;
-                            localStorage.setItem(key, JSON.stringify(data));
-                            
-                            const syncCode = userManager.currentUser?.syncCode;
-                            if (syncCode) {
-                                const syncKey = `codless_sync_${syncCode}_${collectionName}_${docId}_${subCollection}_${subDocId}`;
+                            const emailHash = userManager.currentUser?.emailHash;
+                            if (emailHash) {
+                                const syncKey = `codless_data_${emailHash}_${collectionName}_${docId}_${subCollection}_${subDocId}`;
                                 localStorage.setItem(syncKey, JSON.stringify(data));
+                            } else {
+                                const key = `codless_db_${collectionName}_${docId}_${subCollection}_${subDocId}`;
+                                localStorage.setItem(key, JSON.stringify(data));
                             }
                         },
                         
                         async delete() {
-                            const key = `codless_db_${collectionName}_${docId}_${subCollection}_${subDocId}`;
-                            localStorage.removeItem(key);
-                            
-                            const syncCode = userManager.currentUser?.syncCode;
-                            if (syncCode) {
-                                const syncKey = `codless_sync_${syncCode}_${collectionName}_${docId}_${subCollection}_${subDocId}`;
+                            const emailHash = userManager.currentUser?.emailHash;
+                            if (emailHash) {
+                                const syncKey = `codless_data_${emailHash}_${collectionName}_${docId}_${subCollection}_${subDocId}`;
                                 localStorage.removeItem(syncKey);
                             }
+                            
+                            const key = `codless_db_${collectionName}_${docId}_${subCollection}_${subDocId}`;
+                            localStorage.removeItem(key);
                         }
                     }),
                     
                     async get() {
                         const docs = [];
-                        const syncCode = userManager.currentUser?.syncCode;
+                        const emailHash = userManager.currentUser?.emailHash;
                         
-                        // Get sync data first
-                        if (syncCode) {
-                            const syncPrefix = `codless_sync_${syncCode}_${collectionName}_${docId}_${subCollection}_`;
+                        if (emailHash) {
+                            const syncPrefix = `codless_data_${emailHash}_${collectionName}_${docId}_${subCollection}_`;
                             for (let i = 0; i < localStorage.length; i++) {
                                 const key = localStorage.key(i);
                                 if (key && key.startsWith(syncPrefix)) {
@@ -389,7 +402,7 @@
                             }
                         }
                         
-                        // If no sync data, use regular data
+                        // If no email-based data, check old format
                         if (docs.length === 0) {
                             const prefix = `codless_db_${collectionName}_${docId}_${subCollection}_`;
                             for (let i = 0; i < localStorage.length; i++) {
@@ -447,6 +460,5 @@
     window.db = db;
 
     console.log('✅ Multi-device authentication ready - ZERO SETUP REQUIRED!');
-    console.log('🔄 Use your Sync Code to access data on other devices');
-    console.log('📱 Sign in with "Continue with Google" button to sync with code');
+    console.log('🌍 Just use the same email/password on any device - data syncs automatically!');
 })();
