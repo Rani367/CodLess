@@ -459,6 +459,12 @@
     window.auth = auth;
     window.db = db;
 
+    // Create the CodLessAuth object that other modules expect
+    window.CodLessAuth = {
+        authManager: authManager,
+        dataManager: dataManager
+    };
+
     console.log('✅ Multi-device authentication ready - ZERO SETUP REQUIRED!');
     console.log('🌍 Just use the same email/password on any device - data syncs automatically!');
 })();
