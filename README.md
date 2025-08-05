@@ -52,26 +52,38 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ---
 
-## Authentication System
+## Secure Authentication System
 
-CodLess includes a **ready-to-use authentication system** with no setup required! 
+CodLess includes a **secure, ready-to-use authentication system** with no setup required! 
 
 ### Features:
-- ✅ **Instant Setup** - Works immediately, no configuration needed
-- 📧 **Email/Password Login** - Create an account with your email
-- 🔐 **Google Sign-in** - One-click login with Google account  
-- ☁️ **Cloud Storage** - Your runs are saved to the cloud automatically
-- 🔄 **Multi-device Sync** - Access your runs from any device
+- 🔒 **Secure Authentication** - Powered by Firebase with industry-standard security
+- 📧 **Email/Password Login** - Create a secure account with your email
+- 🔐 **Google Sign-in** - One-click login with Google OAuth 2.0
+- ☁️ **Private Cloud Storage** - Your runs are securely stored and only accessible by you
+- 🔄 **Multi-device Sync** - Access your runs from any device with automatic sync
+- 🛡️ **Data Protection** - Each user can only access and modify their own data
 - 🚀 **Free to Use** - Using Firebase's generous free tier
+
+### Security Features:
+- **User Isolation**: Each user's data is completely isolated from other users
+- **Secure Sessions**: Automatic session management with secure tokens
+- **Password Protection**: Passwords are securely hashed and never stored in plain text
+- **OAuth 2.0**: Google sign-in uses industry-standard OAuth authentication
+- **Firestore Rules**: Server-side security rules ensure data access control
 
 ### How to Use:
 1. Click the user icon in the top-right corner
-2. Sign up with email or Google
-3. Your runs will automatically sync to the cloud
+2. Sign up with email/password or Google account
+3. Your runs will automatically sync to the secure cloud
 4. Sign in on any device to access your saved runs
+5. Only you can view, edit, or delete your runs
 
-### Note for High-Traffic Deployments:
-The default configuration uses a shared Firebase project. For production deployments with many users, you may want to create your own Firebase project following the [Firebase Setup Guide](FIREBASE_SETUP.md).
+### Privacy & Security:
+- Your robot runs and settings are private to your account
+- No other user can access or modify your data
+- All data transmission is encrypted using HTTPS
+- Firebase handles all security best practices automatically
 
 ---
 
