@@ -3,9 +3,16 @@
 
 class AuthUI {
     constructor() {
+        console.log('🔍 Auth UI: Constructor called');
+        console.log('🔍 Auth UI: window.CodLessAuth:', window.CodLessAuth);
+        
         this.authManager = window.CodLessAuth?.authManager;
         this.dataManager = window.CodLessAuth?.dataManager;
         this.currentModal = null;
+        
+        console.log('🔍 Auth UI: authManager assigned:', this.authManager);
+        console.log('🔍 Auth UI: dataManager assigned:', this.dataManager);
+        
         this.initializeStyles();
     }
 
@@ -549,7 +556,11 @@ class AuthUI {
     }
 
     createUserButton() {
+        console.log('🔍 Auth UI: createUserButton called');
+        console.log('🔍 Auth UI: authManager:', this.authManager);
+        
         const user = this.authManager.getCurrentUser();
+        console.log('🔍 Auth UI: Current user:', user);
         
         const button = document.createElement('div');
         button.className = 'user-avatar';
@@ -575,6 +586,7 @@ class AuthUI {
             }
         });
 
+        console.log('🔍 Auth UI: Created button element:', button);
         return button;
     }
 
@@ -645,25 +657,87 @@ class AuthUI {
 
 // Initialize AuthUI when the auth manager is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🔍 Auth UI: DOMContentLoaded fired');
+    
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds max wait
+    
     // Wait for Firebase to be initialized
     const checkAuth = setInterval(() => {
-        if (window.CodLessAuth) {
+        attempts++;
+        console.log('🔍 Auth UI: Checking for CodLessAuth...', window.CodLessAuth);
+        
+        if (window.CodLessAuth || attempts >= maxAttempts) {
             clearInterval(checkAuth);
+            
+            if (window.CodLessAuth) {
+                console.log('✅ Auth UI: CodLessAuth found, initializing AuthUI');
+            } else {
+                console.warn('⚠️ Auth UI: CodLessAuth not found after timeout, creating fallback');
+                // Create a fallback auth system if the main one didn't load
+                window.CodLessAuth = {
+                    authManager: {
+                        getCurrentUser: () => null,
+                        onAuthStateChange: (callback) => {},
+                        signIn: async () => { throw new Error('Auth system not loaded'); },
+                        signUp: async () => { throw new Error('Auth system not loaded'); },
+                        signOut: async () => {}
+                    },
+                    dataManager: {}
+                };
+            }
+            
             window.authUI = new AuthUI();
             
             // Add user button to the UI
             const userControls = document.getElementById('userControls');
+            console.log('🔍 Auth UI: userControls element:', userControls);
+            
             if (userControls) {
                 const userButton = window.authUI.createUserButton();
+                console.log('🔍 Auth UI: Created user button:', userButton);
                 userControls.appendChild(userButton);
                 
                 // Update button when auth state changes
-                window.CodLessAuth.authManager.onAuthStateChange(() => {
-                    const newButton = window.authUI.createUserButton();
-                    userControls.innerHTML = '';
-                    userControls.appendChild(newButton);
-                });
+                if (window.CodLessAuth.authManager.onAuthStateChange) {
+                    window.CodLessAuth.authManager.onAuthStateChange(() => {
+                        console.log('🔍 Auth UI: Auth state changed, updating button');
+                        const newButton = window.authUI.createUserButton();
+                        userControls.innerHTML = '';
+                        userControls.appendChild(newButton);
+                    });
+                }
+            } else {
+                console.error('❌ Auth UI: userControls element not found!');
             }
         }
     }, 100);
+});
+
+// Also try to initialize on window load as a fallback
+window.addEventListener('load', () => {
+    console.log('🔍 Auth UI: Window load event fired');
+    
+    // Check if auth UI was already initialized
+    if (!window.authUI) {
+        console.log('⚠️ Auth UI: Not initialized yet on window load, forcing initialization');
+        
+        // Force create the auth UI
+        const userControls = document.getElementById('userControls');
+        if (userControls && !userControls.querySelector('#userButton')) {
+            // Create a minimal auth UI
+            const button = document.createElement('div');
+            button.className = 'user-avatar';
+            button.id = 'userButton';
+            button.innerHTML = '<i class="fas fa-user"></i>';
+            button.style.cursor = 'pointer';
+            
+            button.addEventListener('click', () => {
+                alert('Authentication system is still loading. Please refresh the page if this persists.');
+            });
+            
+            userControls.appendChild(button);
+            console.log('✅ Auth UI: Fallback button created');
+        }
+    }
 });

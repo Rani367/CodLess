@@ -774,7 +774,36 @@
     <script src="instant-auth.js"></script>
     <script src="auth-ui.js"></script>
     <script src="auth-adapter.js"></script>
-    <script src="animations.js"></script>
     <script src="app.js?v=3.0.1"></script>
+    
+    <!-- Ensure Auth UI Initialization -->
+    <script>
+        // Final check to ensure auth UI is visible
+        setTimeout(() => {
+            const userControls = document.getElementById('userControls');
+            if (userControls && !userControls.querySelector('#userButton')) {
+                console.warn('Auth UI not initialized after page load, forcing creation');
+                
+                // Create a basic user button
+                const button = document.createElement('div');
+                button.className = 'user-avatar';
+                button.id = 'userButton';
+                button.innerHTML = '<i class="fas fa-user"></i>';
+                button.title = 'Click to sign in';
+                
+                button.addEventListener('click', () => {
+                    if (window.authUI) {
+                        window.authUI.showLoginModal();
+                    } else {
+                        console.error('Auth system not available');
+                        alert('Authentication system is loading. Please try again in a moment.');
+                    }
+                });
+                
+                userControls.appendChild(button);
+                console.log('Fallback auth button created');
+            }
+        }, 2000); // Wait 2 seconds after page load
+    </script>
 </body>
 </html>

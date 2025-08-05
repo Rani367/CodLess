@@ -37,10 +37,13 @@ body {
 
 .user-controls {
     -webkit-app-region: no-drag;
-    display: flex;
+    display: flex !important;
     align-items: center;
     margin-left: auto;
     margin-right: 1rem;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1000;
 }
 
 .user-avatar {
@@ -49,7 +52,7 @@ body {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.1);
     border: 2px solid rgba(255, 255, 255, 0.2);
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     cursor: pointer;
@@ -58,6 +61,8 @@ body {
     font-weight: 600;
     font-size: 16px;
     overflow: hidden;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .user-avatar:hover {

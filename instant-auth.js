@@ -4,6 +4,7 @@
 
 (function() {
     'use strict';
+    console.log('🔍 Instant Auth: Starting initialization...');
 
     // Simple but secure password hashing
     function hashPassword(password) {
@@ -467,4 +468,5 @@
 
     console.log('✅ Multi-device authentication ready - ZERO SETUP REQUIRED!');
     console.log('🌍 Just use the same email/password on any device - data syncs automatically!');
+    console.log('🔍 Instant Auth: CodLessAuth object created:', window.CodLessAuth);
 })();
