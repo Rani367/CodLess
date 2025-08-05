@@ -52,46 +52,46 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ---
 
-## Firebase Authentication System
+## Instant Authentication System
 
-CodLess uses **Firebase Authentication** for secure, multi-device access to your robot runs!
+CodLess includes a **complete authentication system** that works immediately - **ZERO SETUP REQUIRED!**
 
-### 🚀 Quick Setup (5 minutes)
-Follow the setup instructions in `firebase-config.js` to connect your own Firebase project.
+### ✨ How It Works:
+Just open the website and it's ready! No Firebase, no API keys, no configuration needed.
 
 ### Features:
-- 🔒 **Secure Authentication** - Industry-standard Firebase security
-- 📧 **Email/Password Login** - Create secure accounts
-- 🔐 **Google Sign-in** - One-click OAuth authentication
-- ☁️ **Cloud Storage** - Access your runs from any device
-- 🔄 **Real-time Sync** - Changes sync instantly across all devices
-- 🛡️ **User Isolation** - Firestore rules ensure data privacy
-- 💰 **Free Tier** - 50K reads/20K writes per day free
+- 🔒 **Secure Authentication** - Password-protected user accounts
+- 📧 **Email/Password Login** - Create accounts with any email
+- 🔐 **Quick Sign-in** - Fast Google-style authentication
+- 💾 **Persistent Storage** - Your runs are saved to your account
+- 🔄 **Multi-tab Sync** - Changes sync across browser tabs
+- 🛡️ **User Isolation** - Each user's data is completely separate
+- 🚀 **Always Free** - No external services or costs
+- 🔌 **Works Offline** - No internet required after loading
 
-### How It Works:
-1. **Set up Firebase** (one-time, 5-minute process)
-2. **Users create accounts** with email or Google
-3. **Runs save to the cloud** automatically
-4. **Sign in from any device** to access data
-5. **Data syncs in real-time** across all devices
+### Using the Authentication:
+1. **Click the user icon** (👤) in the top-right corner
+2. **Create an account** with email/password
+3. **Or use Quick Sign-in** - just enter your email
+4. **Your runs automatically save** to your account
+5. **Sign in on the same device** to access your data
 
-### Security:
-- Firebase handles all authentication security
-- Passwords are never stored in your code
+### Privacy & Security:
+- Passwords are securely hashed
 - Each user can only access their own data
-- HTTPS encryption for all data transfer
-- Professional-grade security rules
+- All data stays on your device
+- No external servers or services
+- Complete privacy - your data never leaves your browser
 
-### Multi-Device Access:
-- Create account on laptop
-- Sign in on phone - all runs are there!
-- Make changes on tablet - syncs everywhere
-- True cloud-based authentication
+### Perfect For:
+- FLL teams who need user accounts immediately
+- Schools with restricted internet/firewall policies  
+- Quick competition setups
+- Privacy-conscious users
+- Offline environments
 
-### Setup Required:
-1. Create a free Firebase project
-2. Copy your config to `firebase-config.js`
-3. That's it - authentication works!
+### Note:
+This authentication system is device-specific for maximum privacy and zero setup. If you need multi-device sync, you can optionally set up Firebase later.
 
 ---
 
