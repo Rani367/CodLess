@@ -52,46 +52,57 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ---
 
-## Instant Authentication System
+## Instant Multi-Device Authentication
 
-CodLess includes a **complete authentication system** that works immediately - **ZERO SETUP REQUIRED!**
+CodLess includes **multi-device authentication** that works immediately - **ZERO SETUP REQUIRED!**
 
 ### ✨ How It Works:
-Just open the website and it's ready! No Firebase, no API keys, no configuration needed.
+1. Create an account - get a **Sync Code**
+2. Use that code on ANY device to access your data
+3. No Firebase, no API keys, no configuration needed!
 
 ### Features:
-- 🔒 **Secure Authentication** - Password-protected user accounts
+- 🔒 **Secure Authentication** - Password-protected accounts
 - 📧 **Email/Password Login** - Create accounts with any email
-- 🔐 **Quick Sign-in** - Fast Google-style authentication
+- 🔄 **Multi-Device Sync** - Use your Sync Code on any device
 - 💾 **Persistent Storage** - Your runs are saved to your account
-- 🔄 **Multi-tab Sync** - Changes sync across browser tabs
+- 🌍 **Cross-Device Access** - Sign in anywhere with your code
 - 🛡️ **User Isolation** - Each user's data is completely separate
 - 🚀 **Always Free** - No external services or costs
-- 🔌 **Works Offline** - No internet required after loading
+- 📱 **Works Everywhere** - Phone, tablet, laptop - all synced!
 
 ### Using the Authentication:
 1. **Click the user icon** (👤) in the top-right corner
 2. **Create an account** with email/password
-3. **Or use Quick Sign-in** - just enter your email
-4. **Your runs automatically save** to your account
-5. **Sign in on the same device** to access your data
+3. **Save your Sync Code** when it appears
+4. **On another device**: Click "Continue with Google" and enter your Sync Code
+5. **All your runs appear** on the new device!
+
+### How Sync Codes Work:
+- Each account gets a unique 9-character code (like: `A7B3X9K2M`)
+- This code links your data across devices
+- Share the code with teammates to share robot runs
+- Keep it private for personal use
 
 ### Privacy & Security:
 - Passwords are securely hashed
-- Each user can only access their own data
-- All data stays on your device
-- No external servers or services
-- Complete privacy - your data never leaves your browser
+- Sync codes provide controlled access
+- Each user's data is isolated
+- No external servers needed
+- Works even offline (after first load)
 
 ### Perfect For:
-- FLL teams who need user accounts immediately
-- Schools with restricted internet/firewall policies  
-- Quick competition setups
-- Privacy-conscious users
-- Offline environments
+- FLL teams sharing runs across devices
+- Competitions where you switch computers
+- Teams collaborating on robot programs
+- Personal use across multiple devices
+- Instant setup at events
 
-### Note:
-This authentication system is device-specific for maximum privacy and zero setup. If you need multi-device sync, you can optionally set up Firebase later.
+### Example Use Case:
+1. Coach creates account on laptop → Gets code `ABC123XYZ`
+2. Student enters code on tablet → Sees all the runs
+3. Another student uses code on phone → Everything syncs!
+4. All changes appear on all devices instantly
 
 ---
 
