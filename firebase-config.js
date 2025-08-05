@@ -1,23 +1,13 @@
 // Firebase Configuration for CodLess
-// This file handles Firebase initialization and authentication setup
+// This file now uses the local authentication system
+// No external Firebase setup required!
 
-// Firebase configuration for CodLess
-// Using Firebase's demo project for immediate functionality
-const firebaseConfig = {
-    apiKey: "AIzaSyAzjC1Zr6o-6X5I5jnYwpUlvKeQgfMpJTg",
-    authDomain: "fir-demo-project.firebaseapp.com",
-    projectId: "fir-demo-project",
-    storageBucket: "fir-demo-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abc123def456"
-};
+// The local-auth-system.js file provides all Firebase functionality locally
+// Including auth, firestore, and all Firebase methods
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-
-// Initialize Firebase services
-const auth = firebase.auth();
-const db = firebase.firestore();
+// Initialize services (using local implementations)
+const auth = window.auth;
+const db = window.db;
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 // Enable offline persistence for Firestore
