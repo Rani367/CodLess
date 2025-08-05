@@ -2681,13 +2681,14 @@ class FLLRoboticsApp extends EventEmitter {
             const runsList = document.getElementById('savedRunsList');
             if (!runsList) return;
 
-            const savedRuns = this.getSavedRunsArray();
-            
             runsList.innerHTML = '<option value="">Select a saved run...</option>';
             
-            // Safety check: ensure savedRuns is an array and not null/undefined
-            if (Array.isArray(savedRuns) && savedRuns.length > 0) {
-                savedRuns.forEach(run => {
+            // Convert Map to array and sort by creation date
+            const savedRunsArray = Array.from(this.savedRuns.values())
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            if (savedRunsArray.length > 0) {
+                savedRunsArray.forEach(run => {
                     // Additional safety check for run object
                     if (run && run.id && run.name && run.createdAt) {
                         const option = document.createElement('option');
@@ -2699,10 +2700,13 @@ class FLLRoboticsApp extends EventEmitter {
             }
         } catch (error) {
             console.error('Error updating runs list:', error);
-            // Clear any corrupted data and try to reinitialize
-            localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS);
-            this.savedRuns = new Map();
+            this.toastManager.show('Error updating runs list', 'error');
         }
+    }
+    
+    // Add alias for compatibility
+    updateSavedRunsList() {
+        this.updateRunsList();
     }
 
     updateSimulatorVisibility() {
@@ -2912,7 +2916,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.logger.log(`Recording stopped: ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`);
     }
 
-    saveCurrentRun() {
+    async saveCurrentRun() {
         if (!this.recordedCommands || this.recordedCommands.length === 0) {
             this.toastManager.show('No recorded commands to save', 'warning');
             return;
@@ -2983,12 +2987,19 @@ class FLLRoboticsApp extends EventEmitter {
                 this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
         };
 
-        // Save to localStorage
+        // Save using auth adapter (handles both cloud and local storage)
         try {
-            savedRuns.push(run);
-            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+            this.savedRuns.set(run.id, run);
+            
+            if (window.authAdapter) {
+                await window.authAdapter.saveRun(run);
+            } else {
+                // Fallback to direct localStorage if auth adapter not available
+                savedRuns.push(run);
+                localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
+            }
         } catch (error) {
-            console.error('Error saving to localStorage:', error);
+            console.error('Error saving run:', error);
             this.toastManager.show('Failed to save run - storage error', 'error');
             return;
         }
@@ -3635,15 +3646,14 @@ while True:
         this.toastManager.show(`Run "${selectedRun.name}" exported successfully!`, 'success');
     }
 
-    deleteSelectedRun() {
+    async deleteSelectedRun() {
         const runsList = document.getElementById('savedRunsList');
         if (!runsList || !runsList.value) {
             this.toastManager.show('Please select a run to delete', 'warning');
             return;
         }
 
-        const savedRuns = this.getSavedRunsArray();
-        const selectedRun = savedRuns.find(run => run.id === runsList.value);
+        const selectedRun = this.savedRuns.get(runsList.value);
         
         if (!selectedRun) {
             this.toastManager.show('Selected run not found', 'error');
@@ -3651,8 +3661,18 @@ while True:
         }
 
         if (confirm(`Are you sure you want to delete the run "${selectedRun.name}"? This action cannot be undone.`)) {
-            const updatedRuns = savedRuns.filter(run => run.id !== runsList.value);
-            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(updatedRuns));
+            // Delete from memory
+            this.savedRuns.delete(runsList.value);
+            
+            // Delete using auth adapter (handles both cloud and local storage)
+            if (window.authAdapter) {
+                await window.authAdapter.deleteRun(runsList.value);
+            } else {
+                // Fallback to direct localStorage if auth adapter not available
+                const savedRuns = this.getSavedRunsArray();
+                const updatedRuns = savedRuns.filter(run => run.id !== runsList.value);
+                localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(updatedRuns));
+            }
             
             // Update the UI
             this.updateRunsList();
