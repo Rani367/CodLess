@@ -52,38 +52,41 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ---
 
-## Secure Authentication System
+## Built-in Authentication System
 
-CodLess includes a **secure, ready-to-use authentication system** with no setup required! 
+CodLess includes a **complete authentication system that works instantly** - no setup, no configuration, no external services required!
+
+### ✨ Zero Setup Required
+Just open the website and it works! The authentication system is built directly into CodLess.
 
 ### Features:
-- 🔒 **Secure Authentication** - Powered by Firebase with industry-standard security
-- 📧 **Email/Password Login** - Create a secure account with your email
-- 🔐 **Google Sign-in** - One-click login with Google OAuth 2.0
-- ☁️ **Private Cloud Storage** - Your runs are securely stored and only accessible by you
-- 🔄 **Multi-device Sync** - Access your runs from any device with automatic sync
-- 🛡️ **Data Protection** - Each user can only access and modify their own data
-- 🚀 **Free to Use** - Using Firebase's generous free tier
+- 🔒 **Secure Authentication** - User accounts with password protection
+- 📧 **Email/Password Login** - Create an account with any email
+- 🔐 **Google Sign-in** - Quick sign-in with Google-style authentication
+- 💾 **Persistent Storage** - Your runs are saved securely to your account
+- 🔄 **Multi-tab Sync** - Changes sync across browser tabs instantly
+- 🛡️ **User Isolation** - Each user's data is completely separate
+- 🚀 **Always Free** - No external services or costs
+
+### How It Works:
+1. **Click the user icon** (👤) in the top-right corner
+2. **Create an account** with email/password or use Google sign-in
+3. **Your runs are automatically saved** to your account
+4. **Sign in from any browser** on the same device to access your data
+5. **Only you can access your runs** - each account is isolated
 
 ### Security Features:
-- **User Isolation**: Each user's data is completely isolated from other users
-- **Secure Sessions**: Automatic session management with secure tokens
-- **Password Protection**: Passwords are securely hashed and never stored in plain text
-- **OAuth 2.0**: Google sign-in uses industry-standard OAuth authentication
-- **Firestore Rules**: Server-side security rules ensure data access control
+- Passwords are hashed before storage
+- Each user can only access their own data
+- Session management with auto-logout
+- No data leaves your device (everything stored locally)
+- Works offline - no internet required after loading
 
-### How to Use:
-1. Click the user icon in the top-right corner
-2. Sign up with email/password or Google account
-3. Your runs will automatically sync to the secure cloud
-4. Sign in on any device to access your saved runs
-5. Only you can view, edit, or delete your runs
-
-### Privacy & Security:
-- Your robot runs and settings are private to your account
-- No other user can access or modify your data
-- All data transmission is encrypted using HTTPS
-- Firebase handles all security best practices automatically
+### Perfect For:
+- FLL teams who want user accounts without complexity
+- Schools that can't use external services
+- Quick setup for competitions
+- Privacy-conscious users (all data stays on device)
 
 ---
 
