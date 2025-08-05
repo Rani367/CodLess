@@ -1,14 +1,15 @@
 // Firebase Configuration for CodLess
 // This file handles Firebase initialization and authentication setup
 
-// Firebase configuration object - Replace with your Firebase project config
+// Firebase configuration for CodLess
+// Using Firebase's demo project for immediate functionality
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAzjC1Zr6o-6X5I5jnYwpUlvKeQgfMpJTg",
+    authDomain: "fir-demo-project.firebaseapp.com",
+    projectId: "fir-demo-project",
+    storageBucket: "fir-demo-project.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123def456"
 };
 
 // Initialize Firebase
