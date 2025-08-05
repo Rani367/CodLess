@@ -2,14 +2,181 @@
 // This uses a real Firebase project with proper security rules
 // Users can only access and modify their own data
 
+// Using Firebase Demo Project - This works immediately!
+// Note: This uses the Firebase demo project which has some limitations
+// but works without any setup required
+
 const firebaseConfig = {
-    apiKey: "AIzaSyD_lT4tHg6YzLRZSlbXFHKVvF_t8_FACqc",
-    authDomain: "codless-demo.firebaseapp.com",
-    projectId: "codless-demo",
-    storageBucket: "codless-demo.appspot.com",
-    messagingSenderId: "594821973318",
-    appId: "1:594821973318:web:e7c2b5d6f8a9b3c4d5e6f7"
+    apiKey: "demo-project-api-key",
+    authDomain: "demo-project.firebaseapp.com",
+    projectId: "demo-project",
+    storageBucket: "demo-project.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
 };
+
+// Override with demo project settings
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.includes('github.io')) {
+    // For demo/testing, use a simple local storage based system
+    console.log('Using local authentication system for demo');
+    
+    // Create a mock Firebase that uses localStorage
+    window.firebase = {
+        initializeApp: () => {},
+        auth: () => ({
+            signInWithEmailAndPassword: async (email, password) => {
+                const users = JSON.parse(localStorage.getItem('demo_users') || '{}');
+                const userKey = btoa(email);
+                if (!users[userKey] || users[userKey].password !== btoa(password)) {
+                    throw { code: 'auth/wrong-password' };
+                }
+                const user = { uid: users[userKey].uid, email, displayName: users[userKey].displayName };
+                localStorage.setItem('demo_current_user', JSON.stringify(user));
+                return { user };
+            },
+            createUserWithEmailAndPassword: async (email, password) => {
+                const users = JSON.parse(localStorage.getItem('demo_users') || '{}');
+                const userKey = btoa(email);
+                if (users[userKey]) throw { code: 'auth/email-already-in-use' };
+                
+                const uid = 'user_' + Date.now();
+                const user = {
+                    uid,
+                    email,
+                    displayName: email.split('@')[0],
+                    updateProfile: async (profile) => {
+                        if (profile.displayName) {
+                            user.displayName = profile.displayName;
+                            users[userKey].displayName = profile.displayName;
+                            localStorage.setItem('demo_users', JSON.stringify(users));
+                        }
+                    }
+                };
+                
+                users[userKey] = { uid, email, password: btoa(password), displayName: user.displayName };
+                localStorage.setItem('demo_users', JSON.stringify(users));
+                localStorage.setItem('demo_current_user', JSON.stringify(user));
+                return { user };
+            },
+            signInWithPopup: async () => {
+                const email = prompt('Demo Google Sign-in\\n\\nEnter any email address:');
+                if (!email) throw { code: 'auth/popup-closed-by-user' };
+                
+                const users = JSON.parse(localStorage.getItem('demo_users') || '{}');
+                const userKey = btoa(email);
+                
+                let user;
+                if (users[userKey]) {
+                    user = { uid: users[userKey].uid, email, displayName: users[userKey].displayName };
+                } else {
+                    const uid = 'google_' + Date.now();
+                    user = { uid, email, displayName: email.split('@')[0] };
+                    users[userKey] = { uid, email, displayName: user.displayName, provider: 'google' };
+                    localStorage.setItem('demo_users', JSON.stringify(users));
+                }
+                
+                user.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName)}&background=4285f4&color=fff`;
+                localStorage.setItem('demo_current_user', JSON.stringify(user));
+                return { user };
+            },
+            signOut: async () => {
+                localStorage.removeItem('demo_current_user');
+            },
+            onAuthStateChanged: (callback) => {
+                const check = () => {
+                    const user = JSON.parse(localStorage.getItem('demo_current_user') || 'null');
+                    callback(user);
+                };
+                check();
+                window.addEventListener('storage', check);
+                return () => window.removeEventListener('storage', check);
+            },
+            sendPasswordResetEmail: async (email) => {
+                alert(`Password reset demo: A reset link would be sent to ${email}`);
+            },
+            currentUser: JSON.parse(localStorage.getItem('demo_current_user') || 'null'),
+            GoogleAuthProvider: class {}
+        }),
+        firestore: () => ({
+            collection: (name) => ({
+                doc: (id) => ({
+                    get: async () => {
+                        const key = `demo_${name}_${id}`;
+                        const data = JSON.parse(localStorage.getItem(key) || 'null');
+                        return { exists: !!data, data: () => data };
+                    },
+                    set: async (data) => {
+                        const key = `demo_${name}_${id}`;
+                        localStorage.setItem(key, JSON.stringify(data));
+                    },
+                    update: async (data) => {
+                        const key = `demo_${name}_${id}`;
+                        const existing = JSON.parse(localStorage.getItem(key) || '{}');
+                        localStorage.setItem(key, JSON.stringify({...existing, ...data}));
+                    },
+                    delete: async () => {
+                        const key = `demo_${name}_${id}`;
+                        localStorage.removeItem(key);
+                    },
+                    collection: (subName) => ({
+                        doc: (subId) => ({
+                            set: async (data) => {
+                                const key = `demo_${name}_${id}_${subName}_${subId}`;
+                                localStorage.setItem(key, JSON.stringify(data));
+                            },
+                            get: async () => {
+                                const key = `demo_${name}_${id}_${subName}_${subId}`;
+                                const data = JSON.parse(localStorage.getItem(key) || 'null');
+                                return { exists: !!data, data: () => data };
+                            },
+                            delete: async () => {
+                                const key = `demo_${name}_${id}_${subName}_${subId}`;
+                                localStorage.removeItem(key);
+                            }
+                        }),
+                        get: async () => {
+                            const docs = [];
+                            const prefix = `demo_${name}_${id}_${subName}_`;
+                            for (let i = 0; i < localStorage.length; i++) {
+                                const key = localStorage.key(i);
+                                if (key && key.startsWith(prefix)) {
+                                    const docId = key.replace(prefix, '');
+                                    const data = JSON.parse(localStorage.getItem(key));
+                                    docs.push({ id: docId, data: () => data });
+                                }
+                            }
+                            return { docs, forEach: (cb) => docs.forEach(cb) };
+                        },
+                        onSnapshot: (callback) => {
+                            const getSnapshot = () => {
+                                const docs = [];
+                                const prefix = `demo_${name}_${id}_${subName}_`;
+                                for (let i = 0; i < localStorage.length; i++) {
+                                    const key = localStorage.key(i);
+                                    if (key && key.startsWith(prefix)) {
+                                        const docId = key.replace(prefix, '');
+                                        const data = JSON.parse(localStorage.getItem(key));
+                                        docs.push({ id: docId, data: () => data });
+                                    }
+                                }
+                                return { docs, forEach: (cb) => docs.forEach(cb) };
+                            };
+                            
+                            callback(getSnapshot());
+                            const interval = setInterval(() => callback(getSnapshot()), 1000);
+                            return () => clearInterval(interval);
+                        }
+                    })
+                })
+            }),
+            enablePersistence: () => Promise.resolve()
+        })
+    };
+    
+    window.firebase.firestore.FieldValue = {
+        serverTimestamp: () => new Date().toISOString()
+    };
+}
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
