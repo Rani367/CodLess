@@ -1,0 +1,272 @@
+/* Autonomous Navigation UI Styles */
+
+/* Mode Selector */
+.mode-selector-section {
+    margin-bottom: 20px;
+}
+
+.mode-selector {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.mode-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px 10px;
+    background: #2c3e50;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    color: #ecf0f1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.mode-btn:hover {
+    background: #34495e;
+    transform: translateY(-2px);
+}
+
+.mode-btn.active {
+    background: #3498db;
+    border-color: #2980b9;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.mode-btn i {
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.mode-btn span {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.mode-btn small {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+/* Autonomous Panel */
+#autonomousPanel {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.autonomous-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.autonomous-mode-selector h4 {
+    color: #ecf0f1;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.autonomous-subpanel {
+    background: #2c3e50;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #34495e;
+}
+
+.autonomous-subpanel h4 {
+    color: #3498db;
+    margin-bottom: 15px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Input Row */
+.input-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.input-row .input-group {
+    flex: 1;
+}
+
+.input-row .input-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #bdc3c7;
+    font-size: 12px;
+}
+
+.input-row .input-field {
+    width: 100%;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #ecf0f1;
+    font-size: 14px;
+}
+
+.input-row .input-field:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* Button Groups */
+.button-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.button-group-vertical .btn {
+    justify-content: flex-start;
+    text-align: left;
+}
+
+/* Autonomous Status */
+.autonomous-status {
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    margin-top: 20px;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #333;
+}
+
+.status-row:last-child {
+    border-bottom: none;
+}
+
+.status-row span:first-child {
+    color: #7f8c8d;
+    font-size: 13px;
+}
+
+.status-row span:last-child {
+    color: #ecf0f1;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+#currentPosition {
+    font-family: 'Courier New', monospace;
+}
+
+#localizationConfidence {
+    color: #2ecc71;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .mode-selector {
+        flex-direction: column;
+    }
+    
+    .mode-btn {
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 12px 15px;
+    }
+    
+    .mode-btn i {
+        margin-right: 10px;
+        margin-bottom: 0;
+    }
+    
+    .input-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+    .autonomous-subpanel {
+        background: #1e1e1e;
+        border-color: #444;
+    }
+    
+    .input-row .input-field {
+        background: #0a0a0a;
+        border-color: #444;
+    }
+}
+
+/* Animation for mode switching */
+.autonomous-subpanel {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Special button styles */
+.btn-emergency {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+    }
+}
+
+/* Loading states */
+.autonomous-loading {
+    position: relative;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.autonomous-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30px;
+    height: 30px;
+    margin: -15px 0 0 -15px;
+    border: 3px solid #3498db;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

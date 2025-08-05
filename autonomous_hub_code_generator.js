@@ -153,32 +153,33 @@ def main():
     ])
     
     print("Robot ready!")
-    print("Modes: LEFT=Teleop, CENTER=Replay, RIGHT=Autonomous")
+    print("Control mode from CodLess app")
+    
+    # Start in teleop mode
+    current_mode = MODE_TELEOP
+    hub.light.on(Color.CYAN)
     
     while True:
-        # Check for mode changes
-        pressed = hub.buttons.pressed()
-        
-        if Button.LEFT in pressed:
-            current_mode = MODE_TELEOP
+        # Run current mode
+        if current_mode == MODE_TELEOP:
             hub.light.on(Color.CYAN)
-            print("Teleop mode")
+            print("Teleop mode active")
             teleop_mode(keyboard)
-        elif Button.CENTER in pressed:
-            current_mode = MODE_REPLAY
+        elif current_mode == MODE_REPLAY:
             hub.light.on(Color.MAGENTA)
-            print("Replay mode")
-            replay_mode()
-        ${includeAutonomous ? `elif Button.RIGHT in pressed:
-            current_mode = MODE_AUTONOMOUS
+            print("Replay mode active")
+            replay_mode(keyboard)
+        ${includeAutonomous ? `elif current_mode == MODE_AUTONOMOUS:
             hub.light.on(Color.ORANGE)
-            print("Autonomous mode")
-            autonomous_mode()` : ''}
+            print("Autonomous mode active")
+            autonomous_mode(keyboard)` : ''}
         
         wait(50)
 
 def teleop_mode(keyboard):
     """Teleoperation mode - control via Bluetooth commands."""
+    global current_mode
+    
     while current_mode == MODE_TELEOP:
         stdout.buffer.write(b"rdy")
         
@@ -195,7 +196,19 @@ def teleop_mode(keyboard):
                 
                 cmd_type = command.get('type', '')
                 
-                if cmd_type == 'drive' and drive_base:
+                if cmd_type == 'mode':
+                    # Handle mode change from app
+                    new_mode = command.get('mode', '')
+                    if new_mode == 'teleop':
+                        current_mode = MODE_TELEOP
+                    elif new_mode == 'replay':
+                        current_mode = MODE_REPLAY
+                    elif new_mode == 'autonomous':
+                        current_mode = MODE_AUTONOMOUS
+                    stdout.buffer.write(b"MODE_CHANGED")
+                    return  # Exit to main loop for mode switch
+                    
+                elif cmd_type == 'drive' and drive_base:
                     speed = command.get('speed', 0)
                     turn_rate = command.get('turn_rate', 0)
                     drive_base.drive(speed, turn_rate)
@@ -224,40 +237,63 @@ def teleop_mode(keyboard):
         
         wait(10)
 
-def replay_mode():
-    """Replay saved runs."""
-    runs = {
-        ${savedRuns.map((run, i) => `${i + 1}: run_${i + 1},  # ${run.name}`).join(',\n        ')}
-    }
-    
-    if not runs:
-        print("No saved runs")
-        hub.light.on(Color.RED)
-        wait(1000)
-        return
-    
-    selected_run = 1
-    hub.display.number(selected_run)
+def replay_mode(keyboard):
+    """Replay saved runs - controlled from app."""
+    global current_mode
     
     while current_mode == MODE_REPLAY:
-        pressed = hub.buttons.pressed()
+        stdout.buffer.write(b"rdy")
         
-        if Button.LEFT in pressed:
-            selected_run = max(1, selected_run - 1)
-            hub.display.number(selected_run)
-            wait(300)
-        elif Button.RIGHT in pressed:
-            selected_run = min(len(runs), selected_run + 1)
-            hub.display.number(selected_run)
-            wait(300)
-        elif Button.CENTER in pressed:
-            hub.light.on(Color.BLUE)
-            runs[selected_run]()
-            hub.light.on(Color.GREEN)
-            wait(1000)
-            hub.light.on(Color.MAGENTA)
+        while not keyboard.poll(10):
+            wait(1)
         
-        wait(50)
+        try:
+            data = stdin.buffer.read()
+            if data:
+                command_str = data.decode('utf-8')
+                command = ujson.loads(command_str)
+                
+                cmd_type = command.get('type', '')
+                
+                if cmd_type == 'mode':
+                    # Handle mode change from app
+                    new_mode = command.get('mode', '')
+                    if new_mode == 'teleop':
+                        current_mode = MODE_TELEOP
+                    elif new_mode == 'replay':
+                        current_mode = MODE_REPLAY
+                    elif new_mode == 'autonomous':
+                        current_mode = MODE_AUTONOMOUS
+                    stdout.buffer.write(b"MODE_CHANGED")
+                    return
+                    
+                elif cmd_type == 'replay':
+                    # Run specific saved run
+                    run_id = command.get('run_id', 1)
+                    runs = {
+                        ${savedRuns.map((run, i) => `${i + 1}: run_${i + 1},  # ${run.name}`).join(',\n                        ')}
+                    }
+                    if run_id in runs:
+                        hub.light.on(Color.BLUE)
+                        runs[run_id]()
+                        hub.light.on(Color.GREEN)
+                        stdout.buffer.write(b"REPLAY_COMPLETE")
+                    else:
+                        stdout.buffer.write(b"RUN_NOT_FOUND")
+                    
+                elif cmd_type == 'stop':
+                    if drive_base:
+                        drive_base.stop()
+                    for motor in motors.values():
+                        motor.stop()
+                    stdout.buffer.write(b"STOP_OK")
+                else:
+                    stdout.buffer.write(b"UNKNOWN_CMD")
+                    
+        except Exception as e:
+            stdout.buffer.write(b"ERROR")
+        
+        wait(10)
 
 # Start main program
 main()`;
@@ -359,50 +395,157 @@ def run_${index + 1}():
 
     generateAutonomousRunFunctions() {
         return `
-def autonomous_mode():
-    """Autonomous navigation mode."""
+def autonomous_mode(keyboard):
+    """Autonomous navigation mode - controlled from app."""
+    global current_mode
+    
     if not autonomous:
         print("Autonomous navigation not available")
         hub.light.on(Color.RED)
         wait(1000)
         return
     
-    # Autonomous menu
-    AUTO_WAYPOINT = 1
-    AUTO_PATH_PLAN = 2
-    AUTO_REPLAY = 3
-    AUTO_DEMO = 4
-    
-    selected = AUTO_WAYPOINT
-    hub.display.number(selected)
+    # Send initial position
+    x, y, heading = autonomous.get_best_pose()
+    status_msg = ujson.dumps({
+        'type': 'status',
+        'position': {'x': x, 'y': y, 'heading': heading},
+        'confidence': autonomous.localization.get_confidence()
+    })
+    stdout.buffer.write(status_msg.encode())
     
     while current_mode == MODE_AUTONOMOUS:
-        pressed = hub.buttons.pressed()
+        stdout.buffer.write(b"rdy")
         
-        if Button.LEFT in pressed:
-            selected = max(1, selected - 1)
-            hub.display.number(selected)
-            wait(300)
-        elif Button.RIGHT in pressed:
-            selected = min(4, selected + 1)
-            hub.display.number(selected)
-            wait(300)
-        elif Button.CENTER in pressed:
-            hub.light.on(Color.BLUE)
+        while not keyboard.poll(10):
+            # Update navigation periodically
+            autonomous.update_navigation()
             
-            if selected == AUTO_WAYPOINT:
-                autonomous_waypoint_demo()
-            elif selected == AUTO_PATH_PLAN:
-                autonomous_path_planning_demo()
-            elif selected == AUTO_REPLAY:
-                autonomous_replay_demo()
-            elif selected == AUTO_DEMO:
-                autonomous_full_demo()
+            # Send status updates every 500ms
+            if autonomous.update_timer.time() > 500:
+                x, y, heading = autonomous.get_best_pose()
+                status_msg = ujson.dumps({
+                    'type': 'status',
+                    'position': {'x': x, 'y': y, 'heading': heading},
+                    'confidence': autonomous.localization.get_confidence()
+                })
+                stdout.buffer.write(status_msg.encode())
+                autonomous.update_timer.reset()
             
-            hub.light.on(Color.ORANGE)
-            wait(1000)
+            wait(1)
         
-        wait(50)
+        try:
+            data = stdin.buffer.read()
+            if data:
+                command_str = data.decode('utf-8')
+                command = ujson.loads(command_str)
+                
+                cmd_type = command.get('type', '')
+                
+                if cmd_type == 'mode':
+                    # Handle mode change from app
+                    new_mode = command.get('mode', '')
+                    if new_mode == 'teleop':
+                        current_mode = MODE_TELEOP
+                    elif new_mode == 'replay':
+                        current_mode = MODE_REPLAY
+                    elif new_mode == 'autonomous':
+                        current_mode = MODE_AUTONOMOUS
+                    stdout.buffer.write(b"MODE_CHANGED")
+                    return
+                    
+                elif cmd_type == 'autonomous':
+                    action = command.get('action', '')
+                    
+                    if action == 'navigate':
+                        x = command.get('x', 0)
+                        y = command.get('y', 0)
+                        heading = command.get('heading', None)
+                        use_path_planning = command.get('usePathPlanning', True)
+                        
+                        success = autonomous.navigate_to(x, y, heading, use_path_planning)
+                        if success:
+                            stdout.buffer.write(b"NAV_SUCCESS")
+                        else:
+                            stdout.buffer.write(b"NAV_FAILED")
+                    
+                    elif action == 'followPath':
+                        commands = command.get('commands', [])
+                        use_waypoints = command.get('useWaypoints', True)
+                        
+                        success = autonomous.follow_recorded_path(commands, use_waypoints)
+                        if success:
+                            stdout.buffer.write(b"PATH_SUCCESS")
+                        else:
+                            stdout.buffer.write(b"PATH_FAILED")
+                    
+                    elif action == 'demo':
+                        demo_type = command.get('demoType', '')
+                        
+                        if demo_type == 'square':
+                            autonomous_waypoint_demo()
+                        elif demo_type == 'figure8':
+                            # Implement figure 8 demo
+                            commands = [
+                                {'type': 'drive', 'speed': 200, 'turn_rate': 0, 'duration': 2.0},
+                                {'type': 'drive', 'speed': 100, 'turn_rate': 45, 'duration': 3.0},
+                                {'type': 'drive', 'speed': 200, 'turn_rate': 0, 'duration': 2.0},
+                                {'type': 'drive', 'speed': 100, 'turn_rate': -45, 'duration': 6.0},
+                                {'type': 'drive', 'speed': 200, 'turn_rate': 0, 'duration': 2.0},
+                                {'type': 'drive', 'speed': 100, 'turn_rate': 45, 'duration': 3.0},
+                            ]
+                            autonomous.follow_recorded_path(commands, True)
+                        elif demo_type == 'obstacle':
+                            autonomous_path_planning_demo()
+                        elif demo_type == 'mission':
+                            autonomous_full_demo()
+                        
+                        stdout.buffer.write(b"DEMO_COMPLETE")
+                    
+                    elif action == 'calibrate':
+                        expected_color = command.get('expectedColor', 'BLACK')
+                        color_map = {'BLACK': Color.BLACK, 'WHITE': Color.WHITE, 'RED': Color.RED}
+                        color = color_map.get(expected_color, Color.BLACK)
+                        
+                        success = autonomous.calibrate_on_line(color)
+                        if success:
+                            stdout.buffer.write(b"CALIBRATE_SUCCESS")
+                        else:
+                            stdout.buffer.write(b"CALIBRATE_FAILED")
+                    
+                    elif action == 'resetPosition':
+                        x = command.get('x', 0)
+                        y = command.get('y', 0)
+                        heading = command.get('heading', 0)
+                        
+                        autonomous.initialize_position(x, y, heading)
+                        stdout.buffer.write(b"POSITION_RESET")
+                    
+                    elif action == 'addObstacle':
+                        x = command.get('x', 0)
+                        y = command.get('y', 0)
+                        width = command.get('width', 100)
+                        height = command.get('height', 100)
+                        
+                        autonomous.add_obstacle(x, y, width, height)
+                        stdout.buffer.write(b"OBSTACLE_ADDED")
+                    
+                    elif action == 'clearObstacles':
+                        autonomous.clear_obstacles()
+                        stdout.buffer.write(b"OBSTACLES_CLEARED")
+                    
+                elif cmd_type == 'stop':
+                    autonomous.drive_base.stop()
+                    autonomous.is_running = False
+                    stdout.buffer.write(b"STOP_OK")
+                else:
+                    stdout.buffer.write(b"UNKNOWN_CMD")
+                    
+        except Exception as e:
+            stdout.buffer.write(b"ERROR")
+            print(f"Error: {e}")
+        
+        wait(10)
 
 def autonomous_waypoint_demo():
     """Demo waypoint navigation."""
