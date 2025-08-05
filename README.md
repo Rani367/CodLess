@@ -52,20 +52,26 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ---
 
-## Setting Up Authentication (Optional)
+## Authentication System
 
-CodLess works perfectly without authentication - all features are available locally. However, if you want to enable cloud storage and sync across devices:
+CodLess includes a **ready-to-use authentication system** with no setup required! 
 
-1. Follow the [Firebase Setup Guide](FIREBASE_SETUP.md) to configure your own Firebase project
-2. Update `firebase-config.js` with your Firebase credentials
-3. Deploy the app to your preferred hosting service
+### Features:
+- ✅ **Instant Setup** - Works immediately, no configuration needed
+- 📧 **Email/Password Login** - Create an account with your email
+- 🔐 **Google Sign-in** - One-click login with Google account  
+- ☁️ **Cloud Storage** - Your runs are saved to the cloud automatically
+- 🔄 **Multi-device Sync** - Access your runs from any device
+- 🚀 **Free to Use** - Using Firebase's generous free tier
 
-The authentication system provides:
-- Secure login with email/password or Google account
-- Cloud storage for all your saved runs
-- Automatic sync across devices
-- Team collaboration features
-- Complete data privacy and security
+### How to Use:
+1. Click the user icon in the top-right corner
+2. Sign up with email or Google
+3. Your runs will automatically sync to the cloud
+4. Sign in on any device to access your saved runs
+
+### Note for High-Traffic Deployments:
+The default configuration uses a shared Firebase project. For production deployments with many users, you may want to create your own Firebase project following the [Firebase Setup Guide](FIREBASE_SETUP.md).
 
 ---
 
