@@ -1,11 +1,6 @@
-// CodLess FLL Robotics Control Center - Professional JavaScript Application
-// Version 3.0.0 - Stable release with enhanced browser compatibility and bug fixes
-
 'use strict';
 
-// ============================
-// GLOBAL CONSTANTS & CONFIG
-// ============================
+
 
 const APP_CONFIG = {
     VERSION: '3.0.0',
@@ -25,9 +20,7 @@ const STORAGE_KEYS = {
     CALIBRATION_DATA: 'fllRoboticsCalibration_v3'
 };
 
-// ============================
-// UTILITY CLASSES
-// ============================
+// Utilities
 
 class EventEmitter {
     constructor() {
@@ -403,9 +396,7 @@ class PerformanceMonitor {
     }
 }
 
-// ============================
-// CORE APPLICATION CLASSES
-// ============================
+// Core application classes
 
 class RobotConfig {
     constructor(data = {}) {
@@ -1438,9 +1429,7 @@ class RobotSimulator extends EventEmitter {
     }
 }
 
-// ============================
-// MAIN APPLICATION CLASS
-// ============================
+// Main application class
 
 class FLLRoboticsApp extends EventEmitter {
     constructor() {
@@ -3925,9 +3914,7 @@ while True:
 
 }
 
-// ============================
-// GLOBAL FUNCTIONS
-// ============================
+// Global functions
 
 function showTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -4071,9 +4058,7 @@ function closeWindow() {
     window.app?.closeWindow();
 }
 
-// ============================
-// BROWSER COMPATIBILITY CHECK
-// ============================
+// Browser compatibility check
 
 function checkBrowserCompatibility() {
     const userAgent = navigator.userAgent;
@@ -4139,9 +4124,7 @@ function showBrowserNotSupportedMessage() {
     }
 }
 
-// ============================
-// APPLICATION INITIALIZATION
-// ============================
+// Application initialization
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Check if browser was blocked by immediate check
