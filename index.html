@@ -9,24 +9,24 @@
     <meta name="author" content="CodLess">
     <meta name="theme-color" content="#00a8ff">
     
-    <!-- Open Graph / Facebook -->
+
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://rani367.github.io/CodLess/">
     <meta property="og:title" content="CodLess – Free Web App for FLL Teams">
     <meta property="og:description" content="A free web-based coding tool for FLL teams to make robot programming easier. Record, save, and replay robot movements without writing code.">
     <meta property="og:image" content="https://rani367.github.io/CodLess/assets/screenshots/screenshot1.png">
 
-    <!-- Twitter -->
+
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://rani367.github.io/CodLess/">
     <meta property="twitter:title" content="CodLess – Free Web App for FLL Teams">
     <meta property="twitter:description" content="A free web-based coding tool for FLL teams to make robot programming easier. Record, save, and replay robot movements without writing code.">
     <meta property="twitter:image" content="https://rani367.github.io/CodLess/assets/screenshots/screenshot1.png">
 
-    <!-- PWA Support -->
+
     <link rel="manifest" href="manifest.json">
     
-    <!-- Favicon Support -->
+
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon.png">
     <link rel="icon" type="image/png" href="favicon.png">
@@ -39,12 +39,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Preload critical resources -->
+
     <link rel="preload" href="app.js?v=3.0.1" as="script">
     <link rel="preload" href="styles.css" as="style">
     <link rel="preload" href="xbox-controller.glb" as="fetch" crossorigin>
     
-    <!-- Immediate Browser Check - Must run before anything else -->
+
     <script>
         // Immediate check for Bluetooth API support
         function immediateBluetoothCheck() {
@@ -76,13 +76,13 @@
         // Run the check immediately
         immediateBluetoothCheck();
     </script>
-    <!-- Model Viewer for 3D GLB files -->
+
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <!-- Animation System -->
+
     <script src="animations.js" defer></script>
 </head>
 <body>
-    <!-- Page Loading Animation -->
+
     <style>
         .page-loader {
             position: fixed;
@@ -146,7 +146,7 @@
             }, 500);
         });
     </script>
-    <!-- Browser Compatibility Check -->
+
     <div id="browserNotSupported" class="browser-not-supported" style="display: none;">
         <div class="browser-not-supported-content">
             <div class="browser-not-supported-icon">
@@ -182,7 +182,7 @@
         </div>
     </div>
 
-    <!-- Main Application -->
+
     <div class="app-container" id="appContainer">
         <div class="title-bar">
             <div class="title-content">
@@ -501,7 +501,7 @@
         </div>
     </div>
 
-    <!-- Configuration Modal -->
+
     <div id="configModal" class="modal" role="dialog" aria-labelledby="configModalTitle" aria-hidden="true">
         <div class="modal-content">
             <div class="modal-header">
@@ -631,7 +631,7 @@
         </div>
     </div>
 
-    <!-- Xbox Controller Connection Modal -->
+
     <div id="xboxConnectModal" class="modal xbox-modal" role="dialog" aria-labelledby="xboxModalTitle" aria-hidden="true">
         <div class="modal-content xbox-modal-content">
             <div class="xbox-scene">
@@ -667,10 +667,10 @@
         </div>
     </div>
 
-    <!-- Toast Notifications -->
+
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-    <!-- Service Worker Registration -->
+
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -685,7 +685,7 @@
         }
     </script>
 
-    <!-- Browser Detection Script -->
+
     <script>
         (function() {
             // Detect Safari
