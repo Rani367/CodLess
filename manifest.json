@@ -1,13 +1,13 @@
 {
-  "name": "CodLess - FLL Robotics Control Center",
-  "short_name": "CodLess Robotics",
+  "name": "Smurfs #966 - FLL Robotics Control Center",
+  "short_name": "Smurfs #966",
   "description": "Professional FLL Robotics Control Center with advanced robot control, recording, and simulation capabilities",
   "version": "3.0.0",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape-primary",
-  "theme_color": "#00a8ff",
+  "theme_color": "#1F75FE",
   "background_color": "#1e1e1e",
   "categories": ["robotics", "education", "utility"],
   "icons": [
@@ -92,14 +92,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "CodLess Robotics Control Center main interface"
+      "label": "Smurfs #966 Robotics Control Center main interface"
     },
     {
       "src": "assets/screenshot-narrow.png",
       "sizes": "540x720",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "CodLess Robotics mobile view"
+      "label": "Smurfs #966 Robotics mobile view"
     }
   ],
   "related_applications": [],
