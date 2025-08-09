@@ -1,6 +1,3 @@
-// CodLess FLL Robotics Control Center - Professional JavaScript Application
-// Version 3.0.0 - Stable release with enhanced browser compatibility and bug fixes
-
 'use strict';
 
 
