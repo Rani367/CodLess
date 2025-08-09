@@ -42,9 +42,9 @@ body {
 }
 
 .title-content i {
-    color: #00a8ff;
+    color: #1F75FE;
     font-size: 20px;
-    filter: drop-shadow(0 2px 4px rgba(0, 168, 255, 0.3));
+    filter: drop-shadow(0 2px 4px rgba(31, 117, 254, 0.35));
 }
 
 .title-content h1 {
@@ -137,7 +137,7 @@ body {
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(180deg, #1F75FE 0%, #1558B0 100%);
     border-radius: 3px;
 }
 
@@ -166,9 +166,9 @@ body {
 }
 
 .section-header i {
-    color: #00a8ff;
+    color: #1F75FE;
     font-size: 18px;
-    filter: drop-shadow(0 2px 4px rgba(0, 168, 255, 0.3));
+    filter: drop-shadow(0 2px 4px rgba(31, 117, 254, 0.35));
 }
 
 .section-header h3 {
@@ -227,9 +227,9 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(135deg, #1F75FE 0%, #1558B0 100%);
     color: #ffffff;
-    box-shadow: 0 4px 15px rgba(0, 168, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(31, 117, 254, 0.3);
 }
 
 .btn-primary:hover {
@@ -307,7 +307,7 @@ body {
 .checkbox {
     width: 18px;
     height: 18px;
-    accent-color: #00a8ff;
+    accent-color: #1F75FE;
     cursor: pointer;
 }
 
@@ -375,8 +375,8 @@ body {
 
 .select-box:focus {
     outline: none;
-    border-color: #00a8ff;
-    box-shadow: 0 0 0 3px rgba(0, 168, 255, 0.2);
+    border-color: #1F75FE;
+    box-shadow: 0 0 0 3px rgba(31, 117, 254, 0.25);
 }
 
 .button-group {
@@ -407,7 +407,7 @@ body {
 }
 
 .main-content::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(180deg, #1F75FE 0%, #1558B0 100%);
     border-radius: 4px;
 }
 
@@ -523,8 +523,8 @@ body {
 
 .input-field:focus {
     outline: none;
-    border-color: #00a8ff;
-    box-shadow: 0 0 0 3px rgba(0, 168, 255, 0.2);
+    border-color: #1F75FE;
+    box-shadow: 0 0 0 3px rgba(31, 117, 254, 0.25);
 }
 
 .status-display {
@@ -550,7 +550,7 @@ body {
 }
 
 .status-display::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(180deg, #1F75FE 0%, #1558B0 100%);
     border-radius: 3px;
 }
 
@@ -569,7 +569,7 @@ body {
 
 .control-group h4 {
     margin-bottom: 16px;
-    color: #00a8ff;
+    color: #1F75FE;
     font-size: 14px;
     font-weight: 600;
 }
@@ -608,9 +608,9 @@ kbd {
 }
 
 kbd:hover {
-    background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
-    border-color: rgba(0, 168, 255, 0.5);
-    box-shadow: 0 6px 15px rgba(0, 168, 255, 0.3);
+    background: linear-gradient(135deg, #1F75FE 0%, #1558B0 100%);
+    border-color: rgba(31, 117, 254, 0.5);
+    box-shadow: 0 6px 15px rgba(31, 117, 254, 0.3);
     transform: translateY(-2px);
 }
 
@@ -741,7 +741,7 @@ kbd:hover {
 }
 
 .modal-body::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(180deg, #1F75FE 0%, #1558B0 100%);
     border-radius: 3px;
 }
 
@@ -768,8 +768,8 @@ kbd:hover {
 }
 
 .tab-btn.active {
-    color: #00a8ff;
-    border-bottom-color: #00a8ff;
+    color: #1F75FE;
+    border-bottom-color: #1F75FE;
 }
 
 .tab-content {
@@ -820,8 +820,8 @@ kbd:hover {
 
 .config-input:focus, .config-select:focus {
     outline: none;
-    border-color: #00a8ff;
-    box-shadow: 0 0 0 3px rgba(0, 168, 255, 0.2);
+    border-color: #1F75FE;
+    box-shadow: 0 0 0 3px rgba(31, 117, 254, 0.25);
 }
 
 
@@ -839,13 +839,27 @@ kbd:hover {
 
 /* Version Badge */
 .version-badge {
-    background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(135deg, #1F75FE 0%, #1558B0 100%);
     color: #ffffff;
     font-size: 10px;
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 500;
     margin-left: 8px;
+}
+
+/* Team Badge */
+.team-badge {
+    background: linear-gradient(135deg, #1F75FE 0%, #1558B0 100%);
+    color: #ffffff;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    margin-left: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Enhanced Section Headers - Additional Styles */
@@ -903,9 +917,9 @@ kbd:hover {
 .controls-help {
     margin-top: 16px;
     padding: 12px;
-    background: rgba(0, 168, 255, 0.1);
+    background: rgba(31, 117, 254, 0.1);
     border-radius: 8px;
-    border-left: 4px solid #00a8ff;
+    border-left: 4px solid #1F75FE;
 }
 
 
@@ -986,7 +1000,7 @@ kbd:hover {
     top: 0;
     width: 4px;
     height: 100%;
-    background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
+    background: linear-gradient(135deg, #1F75FE 0%, #1558B0 100%);
 }
 
 .toast.success::before {
@@ -1320,22 +1334,22 @@ kbd:hover {
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    background: rgba(0, 168, 255, 0.1);
+    background: rgba(31, 117, 254, 0.1);
     border-radius: 8px;
-    border: 1px solid rgba(0, 168, 255, 0.2);
+    border: 1px solid rgba(31, 117, 254, 0.2);
     color: #ffffff;
     font-weight: 500;
     transition: all 0.3s ease;
 }
 
 .browser-item:hover {
-    background: rgba(0, 168, 255, 0.2);
+    background: rgba(31, 117, 254, 0.2);
     transform: translateY(-2px);
 }
 
 .browser-item i {
     font-size: 20px;
-    color: #00a8ff;
+    color: #1F75FE;
 }
 
 .technical-details {
@@ -1442,7 +1456,7 @@ kbd:hover {
     height: 300px;
     background: transparent;
     --poster-color: transparent;
-    --progress-bar-color: #00a8ff;
+    --progress-bar-color: #1F75FE;
     --progress-bar-height: 3px;
     --progress-mask: transparent;
     /* Center the model properly */
@@ -1456,7 +1470,7 @@ kbd:hover {
 }
 
 #xboxController3D::part(default-progress-bar) {
-    background-color: #00a8ff;
+    background-color: #1F75FE;
 }
 
 .xbox-scene {
@@ -2201,4 +2215,47 @@ kbd:hover {
     0% { transform: scale(1) rotateY(0deg) rotateX(-10deg); }
     50% { transform: scale(1.2) rotateY(180deg) rotateX(-10deg); }
     100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
+}
+
+/* Smurfs #966 Theme Overrides */
+:root {
+    --smurf-blue: #1F75FE;
+    --smurf-blue-dark: #1558B0;
+}
+
+.title-content i,
+.section-header i {
+    color: var(--smurf-blue);
+    filter: drop-shadow(0 2px 4px rgba(31, 117, 254, 0.35));
+}
+
+.btn-primary,
+.version-badge {
+    background: linear-gradient(135deg, var(--smurf-blue) 0%, var(--smurf-blue-dark) 100%);
+    box-shadow: 0 4px 15px rgba(31, 117, 254, 0.3);
+}
+
+.checkbox {
+    accent-color: var(--smurf-blue);
+}
+
+.btn-icon:hover {
+    background: rgba(31, 117, 254, 0.2);
+}
+
+.select-box:focus {
+    border-color: var(--smurf-blue);
+    box-shadow: 0 0 0 3px rgba(31, 117, 254, 0.25);
+}
+
+.main-content::-webkit-scrollbar-thumb,
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--smurf-blue) 0%, var(--smurf-blue-dark) 100%);
+}
+
+#robotSimulator,
+.simulator-container:hover,
+.content-section:hover {
+    border-color: rgba(31, 117, 254, 0.35);
+    box-shadow: 0 12px 30px rgba(31, 117, 254, 0.12);
 }

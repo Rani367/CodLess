@@ -454,7 +454,7 @@
     width: 20px;
     height: 20px;
     border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #00a8ff;
+                border-top-color: #1F75FE;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -467,7 +467,7 @@
 .loading-dots span {
     width: 8px;
     height: 8px;
-    background: #00a8ff;
+    background: #1F75FE;
     border-radius: 50%;
     animation: bounce 1.4s infinite ease-in-out both;
 }
