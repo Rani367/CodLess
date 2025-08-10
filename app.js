@@ -1499,10 +1499,15 @@ class FLLRoboticsApp extends EventEmitter {
             console.log('Setting up event listeners...');
             // Setup event listeners
             this.setupEventListeners();
+
+            // Initialize seamless canvas (load mode, calibration, default map)
+            this.initSeamlessCanvas();
             
             console.log('Setting up robot simulator...');
             // Setup robot simulator
-            this.setupRobotSimulator();
+            if (this.mode === 'seamless') {
+                this.setupRobotSimulator();
+            }
             
             console.log('Setting up BLE controller events...');
             // Setup BLE controller events
@@ -1526,11 +1531,10 @@ class FLLRoboticsApp extends EventEmitter {
             console.log('Updating UI...');
             // Initialize UI
             this.updateUI();
-            this.initSeamlessCanvas();
             
             // Removed hideLoadingScreen() - app is already visible
             // Setup robot simulator now that app is visible (delayed to ensure DOM is ready)
-            if (!this.robotSimulator) {
+            if (!this.robotSimulator && this.mode === 'seamless') {
                 setTimeout(() => this.setupRobotSimulator(), 100);
             }
             
@@ -2188,7 +2192,6 @@ class FLLRoboticsApp extends EventEmitter {
         document.getElementById('importBtn')?.addEventListener('click', () => this.importRun());
         
         // Simulator controls
-        document.getElementById('uploadMapBtn')?.addEventListener('click', () => this.uploadMap());
         document.getElementById('resetSimBtn')?.addEventListener('click', () => this.resetSimulator());
         document.getElementById('fullscreenSimBtn')?.addEventListener('click', () => this.toggleSimulatorFullscreen());
         
@@ -2222,6 +2225,10 @@ class FLLRoboticsApp extends EventEmitter {
         }
         
         const canvas = document.getElementById('robotSimulator');
+        
+        if (this.mode !== 'seamless') {
+            return;
+        }
         
         if (canvas) {
             const rect = canvas.getBoundingClientRect();
@@ -3040,8 +3047,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!simulatorSection) return;
         
-        // Show simulator when in Seamless Mode or when simulation mode is active
-        if (this.mode === 'seamless' || this.isDeveloperMode || this.bleController.isSimulatingConnection) {
+        // Show simulator only in Seamless Mode
+        if (this.mode === 'seamless') {
             simulatorSection.classList.remove('hidden');
             
             // Give the DOM time to update before starting simulator
@@ -3070,8 +3077,7 @@ class FLLRoboticsApp extends EventEmitter {
 
     enableSimulatorControls(enabled) {
         const controls = [
-            'resetSimBtn',
-            'uploadMapBtn'
+            'resetSimBtn'
         ];
         
         controls.forEach(id => {
@@ -3819,23 +3825,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.logger.log('Application shutting down', 'info');
     }
 
-    uploadMap() {
-        const input = document.createElement('input');
-        input.type = 'file'; input.accept = 'image/*';
-        input.onchange = () => {
-            const file = input.files?.[0]; if (!file) return;
-            const url = URL.createObjectURL(file);
-            const img = new Image();
-            img.onload = () => {
-                this.canvasBgImage = img;
-                if (this.robotSimulator) this.robotSimulator.backgroundMap = img;
-                this.toastManager.show('Map updated', 'success');
-                URL.revokeObjectURL(url);
-            };
-            img.src = url;
-        };
-        input.click();
-    }
+    // Map upload disabled; default map from repository is always used
 
 }
 
