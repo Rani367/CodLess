@@ -2202,3 +2202,33 @@ kbd:hover {
     50% { transform: scale(1.2) rotateY(180deg) rotateX(-10deg); }
     100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
 }
+
+/* Global hat animation for all buttons */
+button {
+    position: relative;
+}
+
+button::after {
+    content: "🎩";
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 18px;
+    line-height: 1;
+    transform: translateY(100%) rotate(0deg);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    opacity: 0;
+    pointer-events: none;
+    filter: grayscale(1) brightness(1.2) contrast(1.1);
+    z-index: 2;
+}
+
+button:hover::after {
+    transform: translateY(-50%) rotate(-5deg);
+    opacity: 1;
+}
+
+button:active::after {
+    transform: translateY(-50%) rotate(360deg);
+    opacity: 1;
+}
