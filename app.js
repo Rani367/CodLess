@@ -1446,9 +1446,17 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Application state
         this.isDeveloperMode = false;
+        this.mode = 'seamless'; // 'seamless' | 'controller'
+        this.canvasBgImage = null;
+        this.canvasCalibration = null; // { originPx:{x,y}, originField:{x,y}, refPx:{x,y}, refField:{x,y}, scale:{xPerPx,yPerPx} }
+        this.waypoints = []; // [{x,y} in field coords]
+        this.history = { past: [], future: [] };
+        this.selectedIndex = -1;
+        this.isDragging = false;
         this.isCalibrated = false;
         this.isRecording = false;
-        this.recordedCommands = [];
+        this.recordedPath = []; // array of {x,y,heading?}
+        this.recordedCommands = []; // legacy
         this.recordingStartTime = 0;
         this.recordingTimer = null;
         this.savedRuns = new Map();
@@ -1518,6 +1526,7 @@ class FLLRoboticsApp extends EventEmitter {
             console.log('Updating UI...');
             // Initialize UI
             this.updateUI();
+            this.initSeamlessCanvas();
             
             // Removed hideLoadingScreen() - app is already visible
             // Setup robot simulator now that app is visible (delayed to ensure DOM is ready)
@@ -1567,6 +1576,326 @@ class FLLRoboticsApp extends EventEmitter {
             // Re-throw the error so it can be caught by the DOMContentLoaded handler
             throw error;
         }
+    }
+
+    initSeamlessCanvas() {
+        // Load persisted mode/calibration/paths
+        try {
+            const prefsRaw = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
+            if (prefsRaw) {
+                const prefs = JSON.parse(prefsRaw);
+                if (prefs.lastMode) this.mode = prefs.lastMode;
+            }
+            const calibRaw = localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA);
+            if (calibRaw) {
+                this.canvasCalibration = JSON.parse(calibRaw);
+                this.isCalibrated = true;
+            }
+            const wpRaw = localStorage.getItem('fllWaypoints_v1');
+            if (wpRaw) this.waypoints = JSON.parse(wpRaw);
+        } catch {}
+
+        const select = document.getElementById('modeSelect');
+        if (select) {
+            select.value = this.mode;
+            select.addEventListener('change', (e) => {
+                this.mode = e.target.value;
+                this.persistPrefs();
+                this.updateSimulatorVisibility();
+            });
+        }
+
+        // Default background image Map.jpg
+        const canvas = document.getElementById('robotSimulator');
+        if (canvas && !this.canvasBgImage) {
+            const img = new Image();
+            img.onload = () => {
+                this.canvasBgImage = img;
+                if (this.robotSimulator) {
+                    this.robotSimulator.backgroundMap = img;
+                }
+            };
+            img.src = 'Map.jpg';
+        }
+
+        // Attach canvas interactions for Seamless mode
+        this.attachSeamlessInteractions();
+
+        // Calibrate / import-export buttons
+        document.getElementById('calibrateBtn')?.addEventListener('click', () => this.startCalibration());
+        document.getElementById('exportProjectBtn')?.addEventListener('click', () => this.exportProject());
+        document.getElementById('importProjectBtn')?.addEventListener('click', () => this.importProject());
+    }
+
+    persistPrefs() {
+        try {
+            const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES) || '{}');
+            existing.developerMode = this.isDeveloperMode;
+            existing.lastMode = this.mode;
+            localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(existing));
+        } catch {}
+    }
+
+    attachSeamlessInteractions() {
+        const canvas = document.getElementById('robotSimulator');
+        if (!canvas) return;
+        const getMouse = (e) => {
+            const r = canvas.getBoundingClientRect();
+            return { x: e.clientX - r.left, y: e.clientY - r.top };
+        };
+        const toField = (p) => this.pixelToField(p);
+        const fromField = (f) => this.fieldToPixel(f);
+
+        const onDown = (e) => {
+            if (this.mode !== 'seamless') return;
+            const p = getMouse(e);
+            // hit test existing points
+            const hit = this.hitTestPoint(p, fromField);
+            if (hit.index !== -1) {
+                this.pushHistory();
+                this.selectedIndex = hit.index;
+                this.isDragging = true;
+            } else {
+                // add new point
+                const field = toField(p);
+                this.pushHistory();
+                this.waypoints.push({ x: field.x, y: field.y });
+                this.selectedIndex = this.waypoints.length - 1;
+                this.isDragging = true;
+                this.persistWaypoints();
+            }
+        };
+        const onMove = (e) => {
+            if (this.mode !== 'seamless') return;
+            if (!this.isDragging || this.selectedIndex < 0) return;
+            const p = getMouse(e);
+            const field = toField(p);
+            this.waypoints[this.selectedIndex] = { x: field.x, y: field.y };
+            this.persistWaypoints();
+        };
+        const onUp = () => {
+            if (this.mode !== 'seamless') return;
+            this.isDragging = false;
+        };
+        const onKey = (e) => {
+            if (this.mode !== 'seamless') return;
+            if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedIndex >= 0) {
+                this.pushHistory();
+                this.waypoints.splice(this.selectedIndex, 1);
+                this.selectedIndex = -1;
+                this.persistWaypoints();
+            }
+            // Undo/Redo
+            const isMac = navigator.platform.toLowerCase().includes('mac');
+            const mod = isMac ? e.metaKey : e.ctrlKey;
+            if (mod && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) this.redo(); else this.undo();
+            }
+        };
+
+        // Remove previous to avoid duplicates
+        canvas.onmousedown = null; canvas.onmousemove = null; canvas.onmouseup = null;
+        document.removeEventListener('keydown', this._seamlessKeyHandler);
+        // Bind
+        canvas.addEventListener('mousedown', onDown);
+        canvas.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        this._seamlessKeyHandler = onKey;
+        document.addEventListener('keydown', this._seamlessKeyHandler);
+
+        // Augment render to draw map, waypoints, and rope
+        const sim = this.robotSimulator;
+        if (sim) {
+            sim.backgroundMap = this.canvasBgImage || sim.backgroundMap;
+            const baseRender = sim.render.bind(sim);
+            sim.render = () => {
+                baseRender();
+                if (this.mode === 'seamless') {
+                    this.drawSeamlessOverlay(sim.ctx, sim.canvas);
+                }
+            };
+        }
+    }
+
+    drawSeamlessOverlay(ctx, canvas) {
+        // Draw waypoints and segments
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0, 188, 212, 0.9)';
+        ctx.fillStyle = 'rgba(0, 188, 212, 0.9)';
+        const toPx = (f) => this.fieldToPixel(f);
+        // segments with wobbly rope effect while dragging
+        if (this.waypoints.length > 1) {
+            ctx.beginPath();
+            for (let i = 0; i < this.waypoints.length; i++) {
+                const p = toPx(this.waypoints[i]);
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+            // rope wobble effect
+            if (this.isDragging && this.selectedIndex >= 0) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(0, 188, 212, 0.35)';
+                ctx.setLineDash([6, 6]);
+                // simple sinusoidal offset along segments
+                for (let i = 0; i < this.waypoints.length - 1; i++) {
+                    const a = toPx(this.waypoints[i]);
+                    const b = toPx(this.waypoints[i + 1]);
+                    const midX = (a.x + b.x) / 2;
+                    const midY = (a.y + b.y) / 2;
+                    const t = performance.now() / 300;
+                    const amp = 6;
+                    const offX = Math.sin(t + i) * amp;
+                    const offY = Math.cos(t + i) * amp;
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.quadraticCurveTo(midX + offX, midY + offY, b.x, b.y);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+        // points
+        for (let i = 0; i < this.waypoints.length; i++) {
+            const p = toPx(this.waypoints[i]);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, i === this.selectedIndex ? 6 : 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    hitTestPoint(pixel, fromField) {
+        for (let i = 0; i < this.waypoints.length; i++) {
+            const p = fromField(this.waypoints[i]);
+            const dx = p.x - pixel.x;
+            const dy = p.y - pixel.y;
+            if (dx * dx + dy * dy <= 10 * 10) return { index: i };
+        }
+        return { index: -1 };
+    }
+
+    pushHistory() {
+        this.history.past.push(JSON.stringify(this.waypoints));
+        this.history.future = [];
+    }
+    undo() {
+        if (this.history.past.length === 0) return;
+        const prev = this.history.past.pop();
+        this.history.future.push(JSON.stringify(this.waypoints));
+        this.waypoints = JSON.parse(prev);
+        this.persistWaypoints();
+    }
+    redo() {
+        if (this.history.future.length === 0) return;
+        const nxt = this.history.future.pop();
+        this.history.past.push(JSON.stringify(this.waypoints));
+        this.waypoints = JSON.parse(nxt);
+        this.persistWaypoints();
+    }
+
+    persistWaypoints() {
+        try { localStorage.setItem('fllWaypoints_v1', JSON.stringify(this.waypoints)); } catch {}
+    }
+
+    startCalibration() {
+        this.toastManager.show('Click two known points on the map to calibrate', 'info');
+        const canvas = document.getElementById('robotSimulator');
+        if (!canvas) return;
+        let step = 0;
+        const calib = { originPx: null, originField: null, refPx: null, refField: null, scale: null };
+        const handler = async (e) => {
+            const r = canvas.getBoundingClientRect();
+            const px = { x: e.clientX - r.left, y: e.clientY - r.top };
+            if (step === 0) {
+                calib.originPx = px;
+                // Prompt field coords for origin
+                const fx = parseFloat(prompt('Field X for first point (mm):', '0') || '0');
+                const fy = parseFloat(prompt('Field Y for first point (mm):', '0') || '0');
+                calib.originField = { x: fx, y: fy };
+                step = 1;
+                this.toastManager.show('Select second point with known field coordinates', 'info');
+            } else if (step === 1) {
+                calib.refPx = px;
+                const fx = parseFloat(prompt('Field X for second point (mm):', '300') || '300');
+                const fy = parseFloat(prompt('Field Y for second point (mm):', '0') || '0');
+                calib.refField = { x: fx, y: fy };
+                // Compute scale assuming axis-aligned mapping
+                const dxPx = calib.refPx.x - calib.originPx.x;
+                const dyPx = -(calib.refPx.y - calib.originPx.y); // invert Y (pixel down = field up)
+                const dxField = calib.refField.x - calib.originField.x;
+                const dyField = calib.refField.y - calib.originField.y;
+                const xPerPx = dxField / (dxPx || 1);
+                const yPerPx = dyField / (dyPx || 1);
+                calib.scale = { xPerPx, yPerPx };
+                this.canvasCalibration = calib;
+                this.isCalibrated = true;
+                try { localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(calib)); } catch {}
+                this.toastManager.show('Calibration saved', 'success');
+                canvas.removeEventListener('click', handler);
+            }
+        };
+        canvas.addEventListener('click', handler);
+    }
+
+    pixelToField(pixel) {
+        if (!this.canvasCalibration || !this.canvasCalibration.scale) {
+            // fallback: 1 px = 1 unit; Y inverted
+            return { x: pixel.x, y: (this.robotSimulator?.canvas?.height ? this.robotSimulator.canvas.height - pixel.y : pixel.y) };
+        }
+        const { originPx, originField, scale } = this.canvasCalibration;
+        const dxPx = pixel.x - originPx.x;
+        const dyPx = -(pixel.y - originPx.y);
+        return { x: originField.x + dxPx * scale.xPerPx, y: originField.y + dyPx * scale.yPerPx };
+    }
+    fieldToPixel(field) {
+        if (!this.canvasCalibration || !this.canvasCalibration.scale) {
+            // identity, invert Y best-effort
+            const h = this.robotSimulator?.canvas?.height || 0;
+            return { x: field.x, y: h - field.y };
+        }
+        const { originPx, originField, scale } = this.canvasCalibration;
+        const dxField = field.x - originField.x;
+        const dyField = field.y - originField.y;
+        return { x: originPx.x + dxField / scale.xPerPx, y: originPx.y - dyField / scale.yPerPx };
+    }
+
+    exportProject() {
+        const data = {
+            waypoints: this.waypoints,
+            calibration: this.canvasCalibration,
+            mode: this.mode,
+            runs: this.getSavedRunsArray(),
+            exportedAt: new Date().toISOString()
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'codless-project.json'; a.click();
+        URL.revokeObjectURL(url);
+        this.toastManager.show('Project exported', 'success');
+    }
+    importProject() {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'application/json';
+        input.onchange = async () => {
+            const file = input.files?.[0]; if (!file) return;
+            const text = await file.text();
+            try {
+                const data = JSON.parse(text);
+                if (Array.isArray(data.waypoints)) this.waypoints = data.waypoints;
+                if (data.calibration) { this.canvasCalibration = data.calibration; this.isCalibrated = true; localStorage.setItem(STORAGE_KEYS.CALIBRATION_DATA, JSON.stringify(data.calibration)); }
+                if (data.mode) { this.mode = data.mode; this.persistPrefs(); const select = document.getElementById('modeSelect'); if (select) select.value = this.mode; }
+                if (Array.isArray(data.runs)) { localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(data.runs)); }
+                this.updateRunsList();
+                this.persistWaypoints();
+                this.toastManager.show('Project imported', 'success');
+            } catch (e) {
+                this.toastManager.show('Import failed: invalid file', 'error');
+            }
+        };
+        input.click();
     }
 
     checkBrowserCompatibility() {
@@ -1910,6 +2239,18 @@ class FLLRoboticsApp extends EventEmitter {
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
+        }
+    }
+
+    onSimulatorUpdate(data) {
+        // When recording, optionally sample at event time as well
+        if (this.isRecording) {
+            const field = this.pixelToField({ x: data.x, y: data.y });
+            const pose = { x: field.x, y: field.y, heading: data.angle };
+            const last = this.recordedPath[this.recordedPath.length - 1];
+            if (!last || Math.hypot(pose.x - last.x, pose.y - last.y) > 5) {
+                this.recordedPath.push(pose);
+            }
         }
     }
 
@@ -2699,8 +3040,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!simulatorSection) return;
         
-        // Show simulator in developer mode OR when simulation mode is active
-        if (this.isDeveloperMode || this.bleController.isSimulatingConnection) {
+        // Show simulator when in Seamless Mode or when simulation mode is active
+        if (this.mode === 'seamless' || this.isDeveloperMode || this.bleController.isSimulatingConnection) {
             simulatorSection.classList.remove('hidden');
             
             // Give the DOM time to update before starting simulator
@@ -2860,6 +3201,7 @@ class FLLRoboticsApp extends EventEmitter {
 
     startRecording() {
         this.isRecording = true;
+        this.recordedPath = [];
         this.recordedCommands = [];
         this.recordingStartTime = Date.now();
         
@@ -2875,12 +3217,18 @@ class FLLRoboticsApp extends EventEmitter {
         const saveBtn = document.getElementById('saveBtn');
         if (saveBtn) saveBtn.disabled = true;
         
-        this.toastManager.show('🔴 Recording started - all robot movements will be captured', 'info');
-        this.logger.log('Recording started');
+        this.toastManager.show('🔴 Recording started - capturing coordinates', 'info');
+        this.logger.log('Recording started (coordinates)');
+        // sample robot position periodically in simulator mode
+        this._recordInterval = setInterval(() => {
+            const pos = this.getCurrentRobotPose();
+            if (pos) this.recordedPath.push(pos);
+        }, 100);
     }
 
     stopRecording() {
         this.isRecording = false;
+        if (this._recordInterval) { clearInterval(this._recordInterval); this._recordInterval = null; }
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -2892,109 +3240,49 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Enable save button only if there are commands to save
         const saveBtn = document.getElementById('saveBtn');
-        if (saveBtn) {
-            saveBtn.disabled = this.recordedCommands.length === 0;
-        }
+        if (saveBtn) { saveBtn.disabled = (this.recordedPath.length === 0); }
         
         const duration = (Date.now() - this.recordingStartTime) / 1000;
-        this.toastManager.show(`⏹️ Recording stopped - captured ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`, 'success');
-        this.logger.log(`Recording stopped: ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`);
+        this.toastManager.show(`⏹️ Recording stopped - captured ${this.recordedPath.length} points in ${duration.toFixed(1)}s`, 'success');
+        this.logger.log(`Recording stopped: ${this.recordedPath.length} points in ${duration.toFixed(1)}s`);
+    }
+
+    getCurrentRobotPose() {
+        if (this.robotSimulator) {
+            // Convert simulator pixel to field coordinates
+            const px = { x: this.robotSimulator.robotX, y: this.robotSimulator.robotY };
+            const field = this.pixelToField(px);
+            return { x: field.x, y: field.y, heading: this.robotSimulator.robotAngle };
+        }
+        return null;
     }
 
     saveCurrentRun() {
-        if (!this.recordedCommands || this.recordedCommands.length === 0) {
-            this.toastManager.show('No recorded commands to save', 'warning');
+        if ((!this.recordedPath || this.recordedPath.length === 0) && (!this.waypoints || this.waypoints.length === 0)) {
+            this.toastManager.show('No path to save', 'warning');
             return;
         }
-
-        // Get name from input field instead of prompt
         const runNameInput = document.getElementById('runNameInput');
-        if (!runNameInput) {
-            this.toastManager.show('Run name input not found', 'error');
-            return;
-        }
-
+        if (!runNameInput) { this.toastManager.show('Run name input not found', 'error'); return; }
         const name = runNameInput.value.trim();
-        if (!name) {
-            this.toastManager.show('Please enter a run name', 'warning');
-            runNameInput.focus();
-            return;
-        }
-
-        // Check for duplicate names
+        if (!name) { this.toastManager.show('Please enter a run name', 'warning'); runNameInput.focus(); return; }
         const savedRuns = this.getSavedRunsArray();
-        const isDuplicate = savedRuns.some(run => run.name.toLowerCase() === name.toLowerCase());
-        
-        if (isDuplicate) {
-            this.toastManager.show(`A run named "${name}" already exists. Please choose a different name.`, 'warning');
-            runNameInput.focus();
-            runNameInput.select();
-            return;
-        }
-
-        const run = {
-            id: Date.now().toString(),
-            name: name,
-            commands: this.recordedCommands.map(cmd => {
-                if (cmd.eventType === 'keyboard') {
-                    // Handle keyboard events
-                    return {
-                        command_type: cmd.type, // 'keydown' or 'keyup'
-                        parameters: {
-                            key: cmd.key,
-                            eventType: cmd.eventType,
-                            duration: cmd.timestamp / 1000 // Convert to seconds
-                        }
-                    };
-                } else if (cmd.eventType === 'robot') {
-                    // Handle robot commands
-                    return {
-                        command_type: cmd.command.type,
-                        parameters: {
-                            ...cmd.command,
-                            duration: cmd.timestamp / 1000 // Convert to seconds
-                        }
-                    };
-                } else {
-                    // Fallback for unknown types
-                    console.warn('Unknown event type:', cmd);
-                    return {
-                        command_type: cmd.type || 'unknown',
-                        parameters: {
-                            ...cmd,
-                            duration: cmd.timestamp / 1000 // Convert to seconds
-                        }
-                    };
-                }
-            }),
-            createdAt: new Date().toISOString(),
-            duration: this.recordedCommands.length > 0 ? 
-                this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
-        };
-
-        // Save to localStorage
+        if (savedRuns.some(r => r.name.toLowerCase() === name.toLowerCase())) { this.toastManager.show(`A run named "${name}" already exists.`, 'warning'); return; }
+        const path = (this.waypoints && this.waypoints.length > 0) ? this.waypoints : this.recordedPath;
+        const run = { id: Date.now().toString(), name, path, createdAt: new Date().toISOString() };
         try {
             savedRuns.push(run);
             localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
-        } catch (error) {
-            console.error('Error saving to localStorage:', error);
-            this.toastManager.show('Failed to save run - storage error', 'error');
+        } catch {
+            this.toastManager.show('Failed to save run', 'error');
             return;
         }
-
-        // Update UI
         this.updateRunsList();
-        this.recordedCommands = [];
-        
-        // Disable save button until next recording
-        const saveBtn = document.getElementById('saveBtn');
-        if (saveBtn) saveBtn.disabled = true;
-
-        // Generate next run name
+        this.recordedPath = [];
         const nextRunNumber = savedRuns.length + 1;
         runNameInput.value = `Run ${nextRunNumber}`;
-
-        this.toastManager.show(`✅ Run "${name}" saved successfully!`, 'success');
+        const saveBtn = document.getElementById('saveBtn'); if (saveBtn) saveBtn.disabled = true;
+        this.toastManager.show(`✅ Run "${name}" saved`, 'success');
         this.logger.log(`Run saved: ${name}`);
     }
 
@@ -3078,387 +3366,63 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     generateHubCode() {
-        // Get saved runs for competition code generation
         const savedRuns = this.getSavedRunsArray();
-        
-        // Get calibration data
-        const calibrationData = this.calibrationData || JSON.parse(localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA) || 'null');
-        
+        const calibrationData = this.canvasCalibration || JSON.parse(localStorage.getItem(STORAGE_KEYS.CALIBRATION_DATA) || 'null');
         if (!Array.isArray(savedRuns) || savedRuns.length === 0) {
-            // Generate basic hub control code if no saved runs
-            return `from pybricks.hubs import PrimeHub
-from pybricks.pupdevices import Motor
-from pybricks.parameters import Port, Color
-from pybricks.robotics import DriveBase
-from pybricks.tools import wait
-from usys import stdin, stdout
-from uselect import poll
-import ujson
-
-hub = PrimeHub()
-
-hub.display.icon([
-    [100, 100, 100, 100, 100],
-    [100, 0, 100, 0, 100], 
-    [100, 100, 100, 100, 100],
-    [100, 0, 0, 0, 100],
-    [100, 100, 100, 100, 100]
-])
-
-motors = {}
-drive_base = None
-
-left_motor_port = Port.${this.config.leftMotorPort}
-right_motor_port = Port.${this.config.rightMotorPort}
-arm1_motor_port = Port.${this.config.arm1MotorPort}
-arm2_motor_port = Port.${this.config.arm2MotorPort}
-
-try:
-    left_motor = Motor(left_motor_port)
-    right_motor = Motor(right_motor_port)
-    drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})
-    
-    drive_base.settings(
-        straight_speed=${this.config.straightSpeed},
-        straight_acceleration=${this.config.straightAcceleration},
-        turn_rate=${this.config.turnRate},
-        turn_acceleration=${this.config.turnAcceleration}
-    )
-    
-    hub.light.on(Color.GREEN)
-except:
-    hub.light.on(Color.YELLOW)
-
-try:
-    motors['arm1'] = Motor(arm1_motor_port)
-except:
-    pass
-
-try:
-    motors['arm2'] = Motor(arm2_motor_port)
-except:
-    pass
-
-keyboard = poll()
-keyboard.register(stdin)
-
-hub.display.icon([
-    [0, 100, 0, 100, 0],
-    [100, 100, 100, 100, 100],
-    [0, 100, 100, 100, 0],
-    [0, 0, 100, 0, 0],
-    [0, 0, 100, 0, 0]
-])
-
-while True:
-    stdout.buffer.write(b"rdy")
-    
-    while not keyboard.poll(10):
-        wait(1)
-    
-    try:
-        data = stdin.buffer.read()
-        if data:
-            command_str = data.decode('utf-8')
-            command = ujson.loads(command_str)
-            
-            cmd_type = command.get('type', '')
-            
-            if cmd_type == 'drive' and drive_base:
-                speed = command.get('speed', 0)
-                turn_rate = command.get('turn_rate', 0)
-                drive_base.drive(speed, turn_rate)
-                stdout.buffer.write(b"DRIVE_OK")
-                
-            elif cmd_type in ['arm1', 'arm2'] and cmd_type in motors:
-                motor = motors[cmd_type]
-                speed = command.get('speed', 0)
-                if speed == 0:
-                    motor.stop()
-                else:
-                    motor.run(speed)
-                stdout.buffer.write(b"ARM_OK")
-                
-            elif cmd_type == 'config':
-                try:
-                    axle_track = command.get('axle_track', ${this.config.axleTrack})
-                    wheel_diameter = command.get('wheel_diameter', ${this.config.wheelDiameter})
-                    if drive_base:
-                        drive_base = DriveBase(left_motor, right_motor, 
-                                             wheel_diameter=wheel_diameter, 
-                                             axle_track=axle_track)
-                        
-                        straight_speed = command.get('straight_speed', ${this.config.straightSpeed})
-                        straight_acceleration = command.get('straight_acceleration', ${this.config.straightAcceleration})
-                        turn_rate = command.get('turn_rate', ${this.config.turnRate})
-                        turn_acceleration = command.get('turn_acceleration', ${this.config.turnAcceleration})
-                        
-                        drive_base.settings(
-                            straight_speed=straight_speed,
-                            straight_acceleration=straight_acceleration,
-                            turn_rate=turn_rate,
-                            turn_acceleration=turn_acceleration
-                        )
-                        
-                    stdout.buffer.write(b"CONFIG_OK")
-                except:
-                    stdout.buffer.write(b"CONFIG_ERROR")
-            else:
-                stdout.buffer.write(b"UNKNOWN_CMD")
-                
-    except Exception as e:
-        stdout.buffer.write(b"ERROR")
-    
-    wait(10)`;
+            return `from pybricks.hubs import PrimeHub\nfrom pybricks.pupdevices import Motor\nfrom pybricks.parameters import Port, Color\nfrom pybricks.robotics import DriveBase\nfrom pybricks.tools import wait\n\nhub = PrimeHub()\nleft_motor = Motor(Port.${this.config.leftMotorPort})\nright_motor = Motor(Port.${this.config.rightMotorPort})\ndrive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})\n`; 
         }
-
-        // Generate competition code with saved runs
-                 const codeLines = [
-             "from pybricks.hubs import PrimeHub",
-             "from pybricks.pupdevices import Motor",
-             "from pybricks.parameters import Port, Color, Button",
-             "from pybricks.robotics import DriveBase",
-             "from pybricks.tools import wait",
-             "",
-             "# --- ROBOT SETUP ---",
-             "hub = PrimeHub()",
-            "",
-            "# Initialize motors and drive base",
+        const codeLines = [
+            'from pybricks.hubs import PrimeHub',
+            'from pybricks.pupdevices import Motor',
+            'from pybricks.parameters import Port, Color, Button',
+            'from pybricks.robotics import DriveBase',
+            'from pybricks.tools import wait',
+            'import math',
+            '',
+            'hub = PrimeHub()',
             `left_motor = Motor(Port.${this.config.leftMotorPort})`,
             `right_motor = Motor(Port.${this.config.rightMotorPort})`,
             `drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})`,
-            "",
-            "# Configure drive base settings",
-            "drive_base.settings(",
-            `    straight_speed=${this.config.straightSpeed},`,
-            `    straight_acceleration=${this.config.straightAcceleration},`,
-            `    turn_rate=${this.config.turnRate},`,
-            `    turn_acceleration=${this.config.turnAcceleration}`,
-            ")",
-            "",
-            "# Initialize arm motors",
-            `arm1_motor = Motor(Port.${this.config.arm1MotorPort})`,
-            `arm2_motor = Motor(Port.${this.config.arm2MotorPort})`,
-            "",
-            ...this.generateCalibrationCode(calibrationData),
-            "# --- HELPER FUNCTIONS ---",
-            "def apply_calibration(speed, turn_rate):",
-            "    \"\"\"Apply calibration compensation to drive commands\"\"\"",
-            "    calibrated_speed = speed * SPEED_CALIBRATION",
-            "    calibrated_turn = turn_rate * TURN_CALIBRATION",
-            "    ",
-            "    # Apply drift compensation for straight movement",
-            "    if turn_rate == 0 and speed != 0:",
-            "        calibrated_turn += DRIFT_COMPENSATION",
-            "    ",
-            "    return calibrated_speed, calibrated_turn",
-            "",
-            "def move_forward(speed, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(speed, 0)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def move_backward(speed, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(-speed, 0)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def turn_left(angle, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(0, -angle)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def turn_right(angle, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(0, angle)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def arm1_up(speed, duration_ms):",
-            "    arm1_motor.run(speed)",
-            "    wait(duration_ms)",
-            "    arm1_motor.stop()",
-            "",
-            "def arm1_down(speed, duration_ms):",
-            "    arm1_motor.run(-speed)",
-            "    wait(duration_ms)",
-            "    arm1_motor.stop()",
-            "",
-            "def arm2_up(speed, duration_ms):",
-            "    arm2_motor.run(speed)",
-            "    wait(duration_ms)",
-            "    arm2_motor.stop()",
-            "",
-            "def arm2_down(speed, duration_ms):",
-            "    arm2_motor.run(-speed)",
-            "    wait(duration_ms)",
-            "    arm2_motor.stop()",
-            "",
-            "# --- RUN FUNCTIONS ---"
+            '',
+            '# Follow a path of absolute field coordinates assuming perfect odometry',
+            'def follow_points(points):',
+            '    if not points or len(points) < 2:',
+            '        return',
+            '    heading = 0.0',
+            '    for i in range(1, len(points)):',
+            '        x0, y0 = points[i-1]',
+            '        x1, y1 = points[i]',
+            '        dx = x1 - x0',
+            '        dy = y1 - y0',
+            '        distance = (dx*dx + dy*dy) ** 0.5',
+            '        target = math.degrees(math.atan2(dy, dx))',
+            '        turn_delta = target - heading',
+            '        drive_base.turn(turn_delta)',
+            '        heading = target',
+            '        drive_base.straight(distance)',
+            '        wait(10)',
+            '',
+            '# --- RUN FUNCTIONS ---'
         ];
-
-        // Generate run functions from saved runs
         const runFunctions = [];
         const runsDict = [];
-
-        // Safety check: ensure savedRuns is an array
-        if (Array.isArray(savedRuns)) {
-            savedRuns.forEach((run, index) => {
-            const funcName = `run_${index + 1}`;
-            const funcLines = [`def ${funcName}():`];
-            funcLines.push(`    # ${run.name}`);
-            
-            if (run.commands && run.commands.length > 0) {
-                run.commands.forEach(cmd => {
-                    const cmdType = cmd.command_type || cmd.type;
-                    const params = cmd.parameters || cmd;
-                    const duration = params.duration ? Math.round(params.duration * 1000) : 0;
-
-                    if (cmdType === "drive") {
-                        const speed = params.speed || 0;
-                        const turnRate = params.turn_rate || 0;
-
-                        if (speed !== 0 || turnRate !== 0) {
-                            funcLines.push(`    drive_base.drive(${speed}, ${turnRate})`);
-                            if (duration > 0) {
-                                funcLines.push(`    wait(${duration})`);
-                            }
-                            funcLines.push("    drive_base.stop()");
-                        } else {
-                            funcLines.push("    drive_base.stop()");
-                        }
-
-                    } else if (cmdType === "arm1") {
-                        const speed = params.speed || 0;
-                        if (speed !== 0) {
-                            funcLines.push(`    arm1_motor.run(${speed})`);
-                            if (duration > 0) {
-                                funcLines.push(`    wait(${duration})`);
-                            }
-                            funcLines.push("    arm1_motor.stop()");
-                        } else {
-                            funcLines.push("    arm1_motor.stop()");
-                        }
-
-                    } else if (cmdType === "arm2") {
-                        const speed = params.speed || 0;
-                        if (speed !== 0) {
-                            funcLines.push(`    arm2_motor.run(${speed})`);
-                            if (duration > 0) {
-                                funcLines.push(`    wait(${duration})`);
-                            }
-                            funcLines.push("    arm2_motor.stop()");
-                        } else {
-                            funcLines.push("    arm2_motor.stop()");
-                        }
-                    }
-                });
-            } else {
-                funcLines.push("    # No commands recorded for this run");
-                funcLines.push("    pass");
+        savedRuns.forEach((run, idx) => {
+            const func = `run_${idx + 1}`;
+            runFunctions.push(`def ${func}():`);
+            runFunctions.push(`    # ${run.name}`);
+            const path = Array.isArray(run.path) ? run.path : [];
+            if (path.length === 0) { runFunctions.push('    pass'); }
+            else {
+                const tuples = path.map(pt => `(${Math.round(pt.x)}, ${Math.round(pt.y)})`).join(', ');
+                runFunctions.push(`    follow_points([${tuples}])`);
             }
-
-            funcLines.push("    wait(100)");
-
-            runFunctions.push(...funcLines, "");
-            runsDict.push(`    ${index + 1}: ${funcName},  # ${run.name}`);
+            runFunctions.push('');
+            runsDict.push(`    ${idx + 1}: ${func},  # ${run.name}`);
         });
-        }
-
         codeLines.push(...runFunctions);
-
-        codeLines.push(
-            "# --- MAIN EXECUTION ---",
-            "",
-            "runs = {",
-            ...runsDict,
-            "}",
-            "",
-            `# Use hub buttons to run missions (${Array.isArray(savedRuns) ? savedRuns.length : 0} runs available)`,
-            (Array.isArray(savedRuns) && savedRuns.length <= 3) ? 
-                `# LEFT=Run1, CENTER=Run2, RIGHT=Run3` :
-                `# LEFT=Previous, RIGHT=Next, CENTER=Execute (hub shows selected run number)`,
-            "hub.light.on(Color.WHITE)",
-            "",
-            "while True:",
-            "    pressed_buttons = hub.buttons.pressed()",
-            ""
-        );
-
-        // Add button selection logic
-        if (Array.isArray(savedRuns) && savedRuns.length <= 3) {
-            // Simple button mapping for 1-3 runs
-            savedRuns.forEach((run, index) => {
-                const runNumber = index + 1;
-                let buttonCheck;
-                
-                if (runNumber === 1) {
-                    buttonCheck = "if Button.LEFT in pressed_buttons:";
-                } else if (runNumber === 2) {
-                    buttonCheck = "elif Button.CENTER in pressed_buttons:";
-                } else if (runNumber === 3) {
-                    buttonCheck = "elif Button.RIGHT in pressed_buttons:";
-                }
-
-                codeLines.push(
-                    `    ${buttonCheck}`,
-                    `        hub.light.on(Color.BLUE)`,
-                    `        runs[${runNumber}]()  # ${run.name}`,
-                    `        hub.light.on(Color.GREEN)`,
-                    `        wait(1000)  # Prevent multiple runs`,
-                    ""
-                );
-            });
-        } else {
-            // Simple menu system for 4+ runs - much more reliable
-            codeLines.push(
-                "    # Menu navigation system for multiple runs",
-                "    if not hasattr(hub, '_selected_run'):",
-                "        hub._selected_run = 1",
-                "        hub._last_button_time = 0",
-                "    ",
-                "    current_time = hub.system.time()",
-                "    ",
-                "    # Only process button presses if enough time has passed (debounce)",
-                "    if current_time - hub._last_button_time > 300:",
-                "        if Button.LEFT in pressed_buttons:",
-                "            # Previous run",
-                `            hub._selected_run = max(1, hub._selected_run - 1)`,
-                "            hub.display.number(hub._selected_run)",
-                "            hub._last_button_time = current_time",
-                "            hub.light.on(Color.YELLOW)",
-                "            wait(200)",
-                "            hub.light.on(Color.WHITE)",
-                "        ",
-                "        elif Button.RIGHT in pressed_buttons:",
-                "            # Next run", 
-                `            hub._selected_run = min(${Array.isArray(savedRuns) ? savedRuns.length : 0}, hub._selected_run + 1)`,
-                "            hub.display.number(hub._selected_run)",
-                "            hub._last_button_time = current_time",
-                "            hub.light.on(Color.YELLOW)",
-                "            wait(200)",
-                "            hub.light.on(Color.WHITE)",
-                "        ",
-                "        elif Button.CENTER in pressed_buttons:",
-                "            # Execute selected run",
-                "            hub.light.on(Color.BLUE)",
-                "            runs[hub._selected_run]()",
-                "            hub.light.on(Color.GREEN)",
-                "            wait(1000)",
-                "            hub._last_button_time = current_time",
-                ""
-            );
-        }
-
-        codeLines.push(
-            "    wait(50)  # Small delay for button polling",
-            "",
-            "# --- END OF COMPETITION CODE ---"
-        );
-
+        codeLines.push('runs = {');
+        codeLines.push(...runsDict);
+        codeLines.push('}', '', 'hub.light.on(Color.WHITE)', 'while True:', '    pressed = hub.buttons.pressed()', '    wait(50)');
         return codeLines.join('\n');
     }
 
@@ -3606,19 +3570,16 @@ while True:
 
         const exportData = {
             name: selectedRun.name,
-            description: selectedRun.description || '',
-            commands: selectedRun.commands,
-            duration: selectedRun.duration,
+            path: selectedRun.path || [],
             createdAt: selectedRun.createdAt,
             exportedAt: new Date().toISOString(),
-            version: APP_CONFIG.VERSION
         };
 
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `codless-run-${selectedRun.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `${selectedRun.name.replace(/\s+/g, '_')}.json`;
         a.click();
         URL.revokeObjectURL(url);
         this.toastManager.show(`Run "${selectedRun.name}" exported successfully!`, 'success');
@@ -3670,7 +3631,7 @@ while True:
                     const importData = JSON.parse(e.target.result);
                     
                     // Validate the imported data
-                    if (!importData.name || !importData.commands || !Array.isArray(importData.commands)) {
+                    if (!importData.name || !Array.isArray(importData.path)) {
                         throw new Error('Invalid run file format');
                     }
 
@@ -3681,21 +3642,16 @@ while True:
                     let counter = 1;
                     
                     // Check for duplicates and increment counter if needed
-                    while (savedRuns.some(run => run.name.toLowerCase() === importedName.toLowerCase())) {
-                        counter++;
-                        importedName = `${importData.name} (Imported ${counter})`;
+                    while (savedRuns.some(run => run.name === importedName)) {
+                        importedName = `${importData.name} (Imported ${counter++})`;
                     }
                     
                     // Create a new run with imported data
                     const newRun = {
-                        id: 'run_' + Date.now(),
+                        id: Date.now().toString(),
                         name: importedName,
-                        description: importData.description || '',
-                        commands: importData.commands,
-                        duration: importData.duration || 0,
-                        createdAt: new Date().toISOString(),
-                        importedAt: new Date().toISOString(),
-                        originalCreatedAt: importData.createdAt
+                        path: importData.path,
+                        createdAt: new Date().toISOString()
                     };
 
                     savedRuns.push(newRun);
@@ -3704,10 +3660,9 @@ while True:
                     // Update the UI
                     this.updateRunsList();
                     
-                    this.toastManager.show(`Run "${newRun.name}" imported successfully!`, 'success');
+                    this.toastManager.show(`Run "${importData.name}" imported successfully!`, 'success');
                 } catch (error) {
-                    console.error('Import error:', error);
-                    this.toastManager.show('Failed to import run: ' + error.message, 'error');
+                    this.toastManager.show(`Failed to import run: ${error.message}`, 'error');
                 }
             };
             reader.readAsText(file);
@@ -3747,75 +3702,27 @@ while True:
         }
 
         this.toastManager.show(`Playing run "${selectedRun.name}"...`, 'info');
-        this.logger.log(`Playing run: ${selectedRun.name} (${selectedRun.commands.length} commands)`, 'info');
+        this.logger.log(`Playing run: ${selectedRun.name}`, 'info');
         
-        // Execute the recorded commands
-        this.executeRecordedCommands(selectedRun.commands);
+        // Follow path coordinates
+        this.followPath(selectedRun.path || []);
     }
     
-    async executeRecordedCommands(commands) {
-        if (!commands || commands.length === 0) return;
-        
-        let currentIndex = 0;
-        const startTime = Date.now();
-        
-        const executeNext = () => {
-            if (currentIndex >= commands.length) {
-                this.toastManager.show('Playback completed', 'success');
-                this.logger.log('Run playback completed', 'info');
-                return;
+    async followPath(path) {
+        if (!Array.isArray(path) || path.length === 0) return;
+        let idx = 0;
+        const step = () => {
+            if (idx >= path.length) { this.toastManager.show('Playback completed', 'success'); this.logger.log('Run playback completed', 'info'); return; }
+            const pt = path[idx++];
+            if (this.robotSimulator) {
+                const px = this.fieldToPixel(pt);
+                this.robotSimulator.robotX = px.x; this.robotSimulator.robotY = px.y;
+                if (typeof pt.heading === 'number') this.robotSimulator.robotAngle = pt.heading;
             }
-            
-            const cmd = commands[currentIndex];
-            const elapsedTime = Date.now() - startTime;
-            const delay = cmd.timestamp - elapsedTime;
-            
-            if (delay > 0) {
-                setTimeout(() => {
-                    this.executeCommand(cmd);
-                    currentIndex++;
-                    executeNext();
-                }, delay);
-            } else {
-                this.executeCommand(cmd);
-                currentIndex++;
-                executeNext();
-            }
+            setTimeout(step, 100);
         };
-        
-        executeNext();
+        step();
     }
-    
-    executeCommand(cmd) {
-        if (cmd.eventType === 'keyboard') {
-            // Handle keyboard events
-            if (cmd.type === 'keydown') {
-                this.pressedKeys.add(cmd.key);
-            } else if (cmd.type === 'keyup') {
-                this.pressedKeys.delete(cmd.key);
-            }
-            this.processMovementKeys();
-        } else if (cmd.eventType === 'xbox') {
-            // Handle Xbox controller events
-            if (cmd.type === 'buttonPress') {
-                this.xboxButtonsPressed.add(cmd.button);
-                if (cmd.axes) {
-                    this.xboxAxisValues = cmd.axes;
-                }
-            } else if (cmd.type === 'buttonRelease') {
-                this.xboxButtonsPressed.delete(cmd.button);
-                if (cmd.axes) {
-                    this.xboxAxisValues = cmd.axes;
-                }
-            }
-            this.processXboxMovement();
-        } else if (cmd.eventType === 'robot') {
-            // Handle direct robot commands
-            this.sendRobotCommand(cmd.command);
-        }
-    }
-
-
 
     clearLog() {
         this.logger.clear();
@@ -3910,6 +3817,24 @@ while True:
         }
         
         this.logger.log('Application shutting down', 'info');
+    }
+
+    uploadMap() {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/*';
+        input.onchange = () => {
+            const file = input.files?.[0]; if (!file) return;
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                this.canvasBgImage = img;
+                if (this.robotSimulator) this.robotSimulator.backgroundMap = img;
+                this.toastManager.show('Map updated', 'success');
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        };
+        input.click();
     }
 
 }

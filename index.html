@@ -306,6 +306,19 @@
                         <i class="fas fa-eye" aria-hidden="true"></i>
                         <h3>Robot Simulator</h3>
                         <div class="section-actions">
+                            <select id="modeSelect" class="select-box" aria-label="Control mode">
+                                <option value="seamless">Seamless Mode</option>
+                                <option value="controller">Keyboard/Xbox Mode</option>
+                            </select>
+                            <button id="calibrateBtn" class="btn-icon" aria-label="Calibrate field mapping" title="Calibrate field mapping">
+                                <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                            </button>
+                            <button id="exportProjectBtn" class="btn-icon" aria-label="Export paths & calibration" title="Export paths & calibration">
+                                <i class="fas fa-file-export" aria-hidden="true"></i>
+                            </button>
+                            <button id="importProjectBtn" class="btn-icon" aria-label="Import paths & calibration" title="Import paths & calibration">
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                            </button>
                             <button id="simulatorSettingsBtn" class="btn-icon" aria-label="Simulator settings">
                                 <i class="fas fa-cog" aria-hidden="true"></i>
                             </button>
@@ -322,11 +335,11 @@
                                 </div>
                             </div>
                             <div class="button-group">
-                                <button id="uploadMapBtn" class="btn btn-primary" disabled>
+                                <button id="uploadMapBtn" class="btn btn-primary">
                                     <i class="fas fa-upload" aria-hidden="true"></i>
                                     Upload Map
                                 </button>
-                                <button id="resetSimBtn" class="btn btn-success" disabled>
+                                <button id="resetSimBtn" class="btn btn-success">
                                     <i class="fas fa-refresh" aria-hidden="true"></i>
                                     Reset Position
                                 </button>
