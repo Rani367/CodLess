@@ -45,37 +45,18 @@
     <link rel="preload" href="xbox-controller.glb" as="fetch" crossorigin>
     
 
-    <script>
-        // Immediate check for Bluetooth API support
-        function immediateBluetoothCheck() {
-            // Check if browser supports Bluetooth API
-            if (!navigator.bluetooth || !window.isSecureContext) {
-                // Show the browser not supported screen immediately
-                document.addEventListener('DOMContentLoaded', function() {
-                    const appContainer = document.getElementById('appContainer');
-                    const browserNotSupported = document.getElementById('browserNotSupported');
-                    
-                    // Hide app
-                    if (appContainer) appContainer.style.display = 'none';
-                    
-                    // Show browser not supported screen
-                    if (browserNotSupported) {
-                        browserNotSupported.style.display = 'flex';
-                    }
-                });
-                
-                // Prevent main app from loading
-                window.BROWSER_BLOCKED = true;
-                
-                // Block any attempts to load the main application
-                return false;
+            <script>
+            // Non-blocking check for Bluetooth API support (debug mode)
+            function immediateBluetoothCheck() {
+                if (!navigator.bluetooth || !window.isSecureContext) {
+                    window.BT_UNAVAILABLE = true; // Used to show a debug warning later
+                }
+                return true;
             }
-            return true;
-        }
-        
-        // Run the check immediately
-        immediateBluetoothCheck();
-    </script>
+            
+            // Run the check immediately (does not block app load)
+            immediateBluetoothCheck();
+        </script>
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
@@ -147,40 +128,7 @@
         });
     </script>
 
-    <div id="browserNotSupported" class="browser-not-supported" style="display: none;">
-        <div class="browser-not-supported-content">
-            <div class="browser-not-supported-icon">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <h1>Browser Not Supported</h1>
-            <p>This application requires <strong>Web Bluetooth API support</strong> to connect to robotics hardware.</p>
-            <p><strong>Your browser does not support the required Bluetooth functionality.</strong></p>
-            <p class="blocked-message">Access to this application is blocked for your security and the best user experience.</p>
-            <div class="supported-browsers">
-                <h3>Please use one of these supported browsers with HTTPS:</h3>
-                <div class="browser-list">
-                    <div class="browser-item">
-                        <i class="fab fa-chrome"></i>
-                        <span>Google Chrome 56+</span>
-                    </div>
-                    <div class="browser-item">
-                        <i class="fab fa-edge"></i>
-                        <span>Microsoft Edge 79+</span>
-                    </div>
-                </div>
-            </div>
-            <div class="technical-details">
-                <p><strong>Required technologies:</strong></p>
-                <ul>
-                    <li><strong>Web Bluetooth API</strong> (Critical - Not supported in Safari, Firefox)</li>
-                    <li>HTTPS Secure Context</li>
-                    <li>Service Workers</li>
-                    <li>Modern JavaScript (ES2020+)</li>
-                </ul>
-                <p class="note">Note: This application cannot function without Web Bluetooth API support.</p>
-            </div>
-        </div>
-    </div>
+    <div id="browserNotSupported" class="browser-not-supported" style="display: none;"></div>
 
 
     <div class="app-container" id="appContainer">
@@ -616,10 +564,7 @@
                             <input type="checkbox" id="simulateConnected" class="checkbox" aria-describedby="simulateConnectedHelp">
                             <small id="simulateConnectedHelp" class="help-text">Make app behave as if robot is connected (for testing without physical robot)</small>
                         </div>
-                        <div class="config-row">
-                            <label for="debugMode">Debug Mode:</label>
-                            <input type="checkbox" id="debugMode" class="checkbox">
-                        </div>
+
                     </div>
                 </div>
             </div>
@@ -742,25 +687,15 @@
                 return true;
             }
             
-            // Show browser not supported message
+            // Disabled: no longer show blocking screen; allow app to load for debugging
             function showBrowserNotSupported() {
-                document.getElementById('browserNotSupported').style.display = 'flex';
-                document.getElementById('loadingScreen').style.display = 'none';
-                document.getElementById('appContainer').style.display = 'none';
-                
-                // Prevent any scripts from loading
-                const scripts = document.querySelectorAll('script[src]');
-                scripts.forEach(script => {
-                    if (script.src.includes('app.js')) {
-                        script.remove();
-                    }
-                });
+                console.warn('Browser reported as unsupported; continuing in debug mode. Bluetooth will be disabled.');
             }
             
-            // Main browser compatibility check
+            // Main browser compatibility check disabled: allow app to load for debugging
             if (isUnsupportedBrowser() || !hasRequiredAPIs()) {
                 showBrowserNotSupported();
-                return; // Stop execution
+                // Do not stop execution
             }
         })();
     </script>

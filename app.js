@@ -420,7 +420,6 @@ class RobotConfig {
         this.commandTimeout = data.commandTimeout || APP_CONFIG.DEFAULT_COMMAND_TIMEOUT;
         this.batteryWarning = data.batteryWarning || 20;
         this.autoSave = data.autoSave || false;
-        this.debugMode = data.debugMode || false;
         this.simulateConnected = data.simulateConnected || false;
         
         // Calibration data
@@ -498,14 +497,9 @@ class BLEController extends EventEmitter {
         this.connectionAttempts++;
 
         try {
-            // Check for Web Bluetooth API support
-            if (!navigator.bluetooth) {
-                throw new Error('Web Bluetooth API is not supported in this browser. Please use Chrome 56+, Edge 79+, or another compatible browser with HTTPS.');
-            }
-
-            // Check if we're in a secure context (HTTPS)
-            if (!window.isSecureContext) {
-                throw new Error('Web Bluetooth requires a secure context (HTTPS). Please access this application over HTTPS.');
+            // Check for Web Bluetooth API support (non-blocking). If unavailable, prompt alert via init and abort connection.
+            if (!navigator.bluetooth || !window.isSecureContext) {
+                throw new Error('Bluetooth unavailable in this browser or context. Use a compatible browser over HTTPS for real robot connectivity.');
             }
 
             this.emit('connecting');
@@ -1095,7 +1089,7 @@ class RobotSimulator extends EventEmitter {
 
         // Draw background map
         if (this.backgroundMap) {
-            this.ctx.globalAlpha = 0.3;
+            this.ctx.globalAlpha = 1.0;
             this.ctx.drawImage(this.backgroundMap, 0, 0, rect.width, rect.height);
             this.ctx.globalAlpha = 1.0;
         }
@@ -1910,6 +1904,17 @@ class FLLRoboticsApp extends EventEmitter {
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
+            
+            // Load default background map image for simulator
+            try {
+                const defaultMap = new Image();
+                defaultMap.onload = () => {
+                    this.robotSimulator.setBackgroundMap(defaultMap);
+                };
+                defaultMap.src = 'Unearthed_Map.png';
+            } catch (e) {
+                console.warn('Failed to load default simulator map:', e);
+            }
         }
     }
 
@@ -2590,14 +2595,14 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!connectBtn || !hubStatus) return;
 
-        // Check if Bluetooth is not supported
+        // If Bluetooth unavailable, keep app interactive but disable connect button with debug message
         if (!navigator.bluetooth || !window.isSecureContext) {
             connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Bluetooth Unavailable';
             connectBtn.disabled = true;
             hubStatus.className = 'status-indicator error';
-            const reason = !navigator.bluetooth ? 'Browser not supported' : 'HTTPS required';
-            hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Bluetooth Unavailable - ${reason}</span>`;
-            if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}`;
+            const reason = !navigator.bluetooth ? 'No Web Bluetooth' : 'HTTPS required';
+            hubStatus.innerHTML = `<div class=\"status-dot\" aria-hidden=\"true\"></div><span>Bluetooth Unavailable - ${reason}. Debug-only mode.</span>`;
+            if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}. Debug-only mode.`;
             this.enableRecordingControls(false);
             return;
         }
@@ -3989,7 +3994,6 @@ function saveConfiguration() {
         config.commandTimeout = parseInt(document.getElementById('commandTimeout')?.value || 1000);
         config.batteryWarning = parseInt(document.getElementById('batteryWarning')?.value || 20);
         config.autoSave = document.getElementById('autoSave')?.checked || false;
-        config.debugMode = document.getElementById('debugMode')?.checked || false;
         
         const simulateConnectedEl = document.getElementById('simulateConnected');
         if (simulateConnectedEl) {
@@ -4127,23 +4131,13 @@ function showBrowserNotSupportedMessage() {
 // Application initialization
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check if browser was blocked by immediate check
-    if (window.BROWSER_BLOCKED) {
-        console.warn('Browser blocked: Bluetooth API not supported');
-        return;
-    }
-    
-    // Secondary check for browser compatibility
+    // Non-blocking warning for browsers without Bluetooth or insecure context
     const browserCheck = checkBrowserCompatibility();
-    
-    if (!browserCheck.isSupported) {
-        console.warn('Browser not supported:', {
-            browser: browserCheck.browserName,
-            bluetooth: browserCheck.hasBluetoothSupport,
-            secure: browserCheck.isSecureContext
-        });
-        showBrowserNotSupportedMessage();
-        return;
+    if (!browserCheck.isSupported || window.BT_UNAVAILABLE) {
+        console.warn('Bluetooth unavailable or insecure context. Continuing in debug mode.');
+        try {
+            alert('Bluetooth is not available in this browser or context. Robot connectivity will not work. This setup is only for debugging.');
+        } catch (e) {}
     }
     
     // Preload the 3D model for faster loading
