@@ -1663,7 +1663,6 @@ class FLLRoboticsApp extends EventEmitter {
                 const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
                 if (preferences) {
                     const prefs = JSON.parse(preferences);
-                    this.isDeveloperMode = prefs.developerMode || false;
                     this.startCorner = prefs.startCorner || 'BL';
                 }
             } catch (prefsError) {
@@ -1683,49 +1682,36 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     applySimulationState() {
-        // Apply simulation state based on current config
+                // Apply simulation state based on current config
         console.log('Applying simulation state:', {
             simulateConnected: this.config.simulateConnected,
             bleConnected: this.bleController.connected,
             isSimulating: this.bleController.isSimulatingConnection
         });
         
-
-        
         if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Start simulation
             this.bleController.isSimulatingConnection = true;
             this.bleController.connected = true;
             this.updateConnectionUI('connected', 'Simulated Robot');
-            this.toastManager.show('🤖 Simulation mode activated! You can now record and test robot movements without a physical robot.', 'success', 8000);
-            this.logger.log('Simulation mode activated', 'info');
-            
-            // Start simulated battery monitoring
+            this.toastManager.show('🤖 Simulated connection enabled.', 'success', 4000);
+            this.logger.log('Simulated connection enabled', 'info');
             this.startSimulatedBatteryMonitoring();
-            
-            // Show visual simulator
             this.updateSimulatorVisibility();
         } else if (!this.config.simulateConnected && this.bleController.isSimulatingConnection) {
             // Stop simulation
             this.bleController.isSimulatingConnection = false;
             this.bleController.connected = false;
             this.updateConnectionUI('disconnected');
-            this.toastManager.show('Simulation mode deactivated - robot controls disabled', 'info');
-            this.logger.log('Simulation mode deactivated', 'info');
-            
-            // Stop simulated battery monitoring
+            this.toastManager.show('Simulated connection disabled', 'info');
+            this.logger.log('Simulated connection disabled', 'info');
             this.stopSimulatedBatteryMonitoring();
-            
-            // Hide visual simulator if not in developer mode
             this.updateSimulatorVisibility();
         } else if (this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
-            // User wants simulation but is connected to real robot - show warning
-            this.toastManager.show('Disconnect from real robot first to enable simulation mode', 'warning');
+            this.toastManager.show('Disconnect from real robot first to enable simulated connection', 'warning');
         } else if (!this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
-            // Real robot connected, simulation disabled - just update UI to reflect current state
             this.updateConnectionUI('connected', this.bleController.device?.name || 'Pybricks Hub');
         } else {
-            // Log when no action is taken
             console.log('No simulation state change needed');
         }
     }
@@ -1812,7 +1798,6 @@ class FLLRoboticsApp extends EventEmitter {
             const savedRunsArray = this.getSavedRunsArray();
             localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRunsArray));
             localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
-                developerMode: this.isDeveloperMode,
                 startCorner: this.startCorner
             }));
             
@@ -1842,7 +1827,6 @@ class FLLRoboticsApp extends EventEmitter {
         // Hub connection
         document.getElementById('connectBtn')?.addEventListener('click', () => this.toggleConnection());
         document.getElementById('connectXboxBtn')?.addEventListener('click', () => this.connectXboxController());
-        document.getElementById('developerMode')?.addEventListener('change', (e) => this.toggleDeveloperMode(e.target.checked));
         
         // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
@@ -2402,10 +2386,7 @@ class FLLRoboticsApp extends EventEmitter {
             const compensatedCommand = this.applyCalibrationCompensation(command);
             
             // Send to appropriate controller
-            if (this.isDeveloperMode) {
-                this.robotSimulator?.updateCommand(compensatedCommand);
-                this.logger.log(`SIM: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
-            } else if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
                 await this.bleController.sendCommand(compensatedCommand);
             } else if (this.bleController.isSimulatingConnection) {
                 // Send to visual simulator if available
@@ -2538,15 +2519,7 @@ class FLLRoboticsApp extends EventEmitter {
         return this.bleController.connected || this.bleController.isSimulatingConnection;
     }
 
-    toggleDeveloperMode(enabled) {
-        this.isDeveloperMode = enabled;
-        this.updateSimulatorVisibility();
-        this.saveUserData();
-        
-        const message = enabled ? 'Simulation mode enabled' : 'Simulation mode disabled';
-        this.logger.log(message, 'info');
-        this.toastManager.show(message, 'info');
-    }
+
 
     showTroubleshootingHelp() {
         const troubleshootingSteps = [
@@ -2602,7 +2575,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateRunsList();
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
-        this.updateDeveloperModeCheckbox();
         // Initialize recording controls based on current connection status
         this.enableRecordingControls(this.isRobotConnected());
         // Update corner button active state
@@ -2741,8 +2713,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!simulatorSection) return;
         
-        // Show simulator in developer mode OR when simulation mode is active
-        if (this.isDeveloperMode || this.bleController.isSimulatingConnection) {
+        // Show simulator only when simulated connection is active
+        if (this.bleController.isSimulatingConnection) {
             simulatorSection.classList.remove('hidden');
             
             // Give the DOM time to update before starting simulator
@@ -2797,12 +2769,7 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    updateDeveloperModeCheckbox() {
-        const developerModeCheckbox = document.getElementById('developerMode');
-        if (developerModeCheckbox) {
-            developerModeCheckbox.checked = this.isDeveloperMode;
-        }
-    }
+
 
     updateBatteryUI(level) {
         const batteryStatus = document.getElementById('batteryStatus');
@@ -4352,7 +4319,7 @@ document.addEventListener('visibilitychange', () => {
             window.app.robotSimulator?.stop();
         } else {
             // Page is visible, resume
-            if (window.app.isDeveloperMode) {
+            if (window.app.bleController?.isSimulatingConnection) {
                 window.app.robotSimulator?.start();
             }
         }
