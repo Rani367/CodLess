@@ -1675,6 +1675,14 @@ class FLLRoboticsApp extends EventEmitter {
             this.clearCorruptedData();
         }
         
+        // Auto-enable simulation if Bluetooth is unavailable
+        if (!navigator.bluetooth && !this.config.simulateConnected) {
+            this.config.simulateConnected = true;
+            try { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config)); } catch (e) {}
+            this.logger.log('Bluetooth not supported; enabling simulated connection automatically.', 'warning');
+            this.toastManager.show('Bluetooth not supported in this browser. Simulated connection has been enabled automatically.', 'warning', 8000);
+        }
+        
         // Apply simulation state after loading config
         console.log('Loading user data complete, applying simulation state...');
         this.applySimulationState();
@@ -2603,7 +2611,7 @@ class FLLRoboticsApp extends EventEmitter {
         if (!connectBtn || !hubStatus) return;
 
         // If Bluetooth unavailable, keep app interactive but disable connect button with debug message
-        if (!navigator.bluetooth || !window.isSecureContext) {
+        if ((!navigator.bluetooth || !window.isSecureContext) && !this.bleController.isSimulatingConnection && !this.config.simulateConnected) {
             connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Bluetooth Unavailable';
             connectBtn.disabled = true;
             hubStatus.className = 'status-indicator error';
