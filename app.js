@@ -1439,7 +1439,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.config = new RobotConfig();
         
         // Application state
-        this.isDeveloperMode = false;
         this.isCalibrated = false;
         this.isRecording = false;
         this.recordedCommands = [];
@@ -1753,7 +1752,6 @@ class FLLRoboticsApp extends EventEmitter {
             this.savedRuns = new Map();
             this.config = new RobotConfig();
             this.isCalibrated = false;
-            this.isDeveloperMode = false;
         } catch (clearError) {
             console.error('Error clearing corrupted data:', clearError);
         }
