@@ -166,11 +166,7 @@
                             <i class="fas fa-gamepad" aria-hidden="true"></i>
                             Connect Xbox Controller
                         </button>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="developerMode" class="checkbox" aria-describedby="simModeDesc">
-                            <label for="developerMode">Simulation Mode</label>
-                        </div>
-                        <small id="simModeDesc" class="help-text">Enable to test without physical robot</small>
+
                         <div id="hubStatus" class="status-indicator disconnected" role="status" aria-live="polite">
                             <div class="status-dot" aria-hidden="true"></div>
                             <span>Hub Disconnected</span>
@@ -202,12 +198,8 @@
                     </div>
                     <div class="section-content">
                         <p class="info-text">
-                            Download your competition code as a .py file, or upload it directly to your connected hub and run it immediately. The code includes all your saved runs as executable functions.
+                            Upload your competition code to your connected hub and run it immediately. The code includes all your saved runs as executable functions.
                         </p>
-                        <button id="downloadCompetitionCodeBtn" class="btn btn-primary">
-                            <i class="fas fa-download" aria-hidden="true"></i>
-                            Download Competition Code
-                        </button>
                         <button id="uploadToHubBtn" class="btn btn-success">
                             <i class="fas fa-rocket" aria-hidden="true"></i>
                             Upload & Run on Hub
@@ -301,6 +293,20 @@
                             <label for="runNameInput">Run Name:</label>
                             <input type="text" id="runNameInput" value="Run 1" class="input-field" maxlength="50" aria-describedby="runNameHelp">
                             <small id="runNameHelp" class="help-text">Maximum 50 characters</small>
+                        </div>
+                        <div class="input-group">
+                            <label>Start Corner:</label>
+                            <div class="button-group">
+                                <button id="cornerBLBtn" class="btn btn-secondary">
+                                    <i class="fas fa-location-arrow" aria-hidden="true"></i>
+                                    Bottom Left
+                                </button>
+                                <button id="cornerBRBtn" class="btn btn-secondary">
+                                    <i class="fas fa-location-arrow" aria-hidden="true"></i>
+                                    Bottom Right
+                                </button>
+                            </div>
+                            <small class="help-text">Sets the coordinate origin for recordings (under the hood only)</small>
                         </div>
                         <div class="button-group">
                             <button id="recordBtn" class="btn btn-danger" disabled>

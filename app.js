@@ -1439,7 +1439,6 @@ class FLLRoboticsApp extends EventEmitter {
         this.config = new RobotConfig();
         
         // Application state
-        this.isDeveloperMode = false;
         this.isCalibrated = false;
         this.isRecording = false;
         this.recordedCommands = [];
@@ -1465,6 +1464,15 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Simulation
         this.simulatedBatteryInterval = null;
+        
+        // Coordinate system
+        this.startCorner = 'BL'; // 'BL' or 'BR'
+        this.recordedPath = [];
+        this.odom = { x: 0, y: 0, thetaDeg: 0 };
+        this.lastOdomTimestamp = 0;
+        this.simCanvasSize = { width: 0, height: 0 };
+        this.lastDriveCmd = { speed: 0, turn_rate: 0 };
+        this.odomTimer = null;
         
         // Note: init() will be called explicitly after construction
     }
@@ -1654,7 +1662,7 @@ class FLLRoboticsApp extends EventEmitter {
                 const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
                 if (preferences) {
                     const prefs = JSON.parse(preferences);
-                    this.isDeveloperMode = prefs.developerMode || false;
+                    this.startCorner = prefs.startCorner || 'BL';
                 }
             } catch (prefsError) {
                 console.error('Error loading user preferences:', prefsError);
@@ -1673,49 +1681,36 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     applySimulationState() {
-        // Apply simulation state based on current config
+                // Apply simulation state based on current config
         console.log('Applying simulation state:', {
             simulateConnected: this.config.simulateConnected,
             bleConnected: this.bleController.connected,
             isSimulating: this.bleController.isSimulatingConnection
         });
         
-
-        
         if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Start simulation
             this.bleController.isSimulatingConnection = true;
             this.bleController.connected = true;
             this.updateConnectionUI('connected', 'Simulated Robot');
-            this.toastManager.show('🤖 Simulation mode activated! You can now record and test robot movements without a physical robot.', 'success', 8000);
-            this.logger.log('Simulation mode activated', 'info');
-            
-            // Start simulated battery monitoring
+            this.toastManager.show('🤖 Simulated connection enabled.', 'success', 4000);
+            this.logger.log('Simulated connection enabled', 'info');
             this.startSimulatedBatteryMonitoring();
-            
-            // Show visual simulator
             this.updateSimulatorVisibility();
         } else if (!this.config.simulateConnected && this.bleController.isSimulatingConnection) {
             // Stop simulation
             this.bleController.isSimulatingConnection = false;
             this.bleController.connected = false;
             this.updateConnectionUI('disconnected');
-            this.toastManager.show('Simulation mode deactivated - robot controls disabled', 'info');
-            this.logger.log('Simulation mode deactivated', 'info');
-            
-            // Stop simulated battery monitoring
+            this.toastManager.show('Simulated connection disabled', 'info');
+            this.logger.log('Simulated connection disabled', 'info');
             this.stopSimulatedBatteryMonitoring();
-            
-            // Hide visual simulator if not in developer mode
             this.updateSimulatorVisibility();
         } else if (this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
-            // User wants simulation but is connected to real robot - show warning
-            this.toastManager.show('Disconnect from real robot first to enable simulation mode', 'warning');
+            this.toastManager.show('Disconnect from real robot first to enable simulated connection', 'warning');
         } else if (!this.config.simulateConnected && this.bleController.connected && !this.bleController.isSimulatingConnection) {
-            // Real robot connected, simulation disabled - just update UI to reflect current state
             this.updateConnectionUI('connected', this.bleController.device?.name || 'Pybricks Hub');
         } else {
-            // Log when no action is taken
             console.log('No simulation state change needed');
         }
     }
@@ -1757,7 +1752,6 @@ class FLLRoboticsApp extends EventEmitter {
             this.savedRuns = new Map();
             this.config = new RobotConfig();
             this.isCalibrated = false;
-            this.isDeveloperMode = false;
         } catch (clearError) {
             console.error('Error clearing corrupted data:', clearError);
         }
@@ -1802,7 +1796,7 @@ class FLLRoboticsApp extends EventEmitter {
             const savedRunsArray = this.getSavedRunsArray();
             localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRunsArray));
             localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
-                developerMode: this.isDeveloperMode
+                startCorner: this.startCorner
             }));
             
             if (this.isCalibrated) {
@@ -1831,14 +1825,16 @@ class FLLRoboticsApp extends EventEmitter {
         // Hub connection
         document.getElementById('connectBtn')?.addEventListener('click', () => this.toggleConnection());
         document.getElementById('connectXboxBtn')?.addEventListener('click', () => this.connectXboxController());
-        document.getElementById('developerMode')?.addEventListener('change', (e) => this.toggleDeveloperMode(e.target.checked));
         
         // Configuration
         document.getElementById('configBtn')?.addEventListener('click', () => this.openConfigModal());
         
         // Competition code
-        document.getElementById('downloadCompetitionCodeBtn')?.addEventListener('click', () => this.downloadCompetitionCode());
         document.getElementById('uploadToHubBtn')?.addEventListener('click', () => this.uploadToHub());
+        
+        // Start corner selection
+        document.getElementById('cornerBLBtn')?.addEventListener('click', () => this.setStartCorner('BL'));
+        document.getElementById('cornerBRBtn')?.addEventListener('click', () => this.setStartCorner('BR'));
         
         // Recording controls
         document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
@@ -1890,6 +1886,7 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (canvas) {
             const rect = canvas.getBoundingClientRect();
+            this.simCanvasSize = { width: rect.width, height: rect.height };
             
             // Check if the canvas is visible and has dimensions
             // If not, we'll set it up later when the app container becomes visible
@@ -2387,10 +2384,7 @@ class FLLRoboticsApp extends EventEmitter {
             const compensatedCommand = this.applyCalibrationCompensation(command);
             
             // Send to appropriate controller
-            if (this.isDeveloperMode) {
-                this.robotSimulator?.updateCommand(compensatedCommand);
-                this.logger.log(`SIM: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
-            } else if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
+            if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
                 await this.bleController.sendCommand(compensatedCommand);
             } else if (this.bleController.isSimulatingConnection) {
                 // Send to visual simulator if available
@@ -2401,6 +2395,12 @@ class FLLRoboticsApp extends EventEmitter {
             // Record if recording
             if (this.isRecording) {
                 this.recordCommand(compensatedCommand);
+            }
+            
+            // Keep last drive command for odometry if not in simulator
+            if (compensatedCommand.type === 'drive') {
+                this.lastDriveCmd = { speed: compensatedCommand.speed || 0, turn_rate: compensatedCommand.turn_rate || 0 };
+                this.startOdomIntegration();
             }
             
         } catch (error) {
@@ -2517,15 +2517,7 @@ class FLLRoboticsApp extends EventEmitter {
         return this.bleController.connected || this.bleController.isSimulatingConnection;
     }
 
-    toggleDeveloperMode(enabled) {
-        this.isDeveloperMode = enabled;
-        this.updateSimulatorVisibility();
-        this.saveUserData();
-        
-        const message = enabled ? 'Simulation mode enabled' : 'Simulation mode disabled';
-        this.logger.log(message, 'info');
-        this.toastManager.show(message, 'info');
-    }
+
 
     showTroubleshootingHelp() {
         const troubleshootingSteps = [
@@ -2581,9 +2573,24 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateRunsList();
         this.updateSimulatorVisibility();
         this.updateConfigurationUI();
-        this.updateDeveloperModeCheckbox();
         // Initialize recording controls based on current connection status
         this.enableRecordingControls(this.isRobotConnected());
+        // Update corner button active state
+        const bl = document.getElementById('cornerBLBtn');
+        const br = document.getElementById('cornerBRBtn');
+        if (bl && br) {
+            if (this.startCorner === 'BL') {
+                bl.classList.add('btn-primary');
+                bl.classList.remove('btn-secondary');
+                br.classList.add('btn-secondary');
+                br.classList.remove('btn-primary');
+            } else {
+                br.classList.add('btn-primary');
+                br.classList.remove('btn-secondary');
+                bl.classList.add('btn-secondary');
+                bl.classList.remove('btn-primary');
+            }
+        }
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
@@ -2704,8 +2711,8 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!simulatorSection) return;
         
-        // Show simulator in developer mode OR when simulation mode is active
-        if (this.isDeveloperMode || this.bleController.isSimulatingConnection) {
+        // Show simulator only when simulated connection is active
+        if (this.bleController.isSimulatingConnection) {
             simulatorSection.classList.remove('hidden');
             
             // Give the DOM time to update before starting simulator
@@ -2760,12 +2767,7 @@ class FLLRoboticsApp extends EventEmitter {
         });
     }
 
-    updateDeveloperModeCheckbox() {
-        const developerModeCheckbox = document.getElementById('developerMode');
-        if (developerModeCheckbox) {
-            developerModeCheckbox.checked = this.isDeveloperMode;
-        }
-    }
+
 
     updateBatteryUI(level) {
         const batteryStatus = document.getElementById('batteryStatus');
@@ -2867,6 +2869,10 @@ class FLLRoboticsApp extends EventEmitter {
         this.isRecording = true;
         this.recordedCommands = [];
         this.recordingStartTime = Date.now();
+        this.recordedPath = [];
+        this.lastOdomTimestamp = this.recordingStartTime;
+        // Reset odom to origin based on startCorner
+        this.odom = { x: 0, y: 0, thetaDeg: 0 };
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -2972,6 +2978,8 @@ class FLLRoboticsApp extends EventEmitter {
                     };
                 }
             }),
+            path: this.recordedPath,
+            startCorner: this.startCorner,
             createdAt: new Date().toISOString(),
             duration: this.recordedCommands.length > 0 ? 
                 this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
@@ -3068,18 +3076,6 @@ class FLLRoboticsApp extends EventEmitter {
             modal.setAttribute('aria-hidden', 'false');
             this.updateConfigurationUI();
         }
-    }
-
-    downloadCompetitionCode() {
-        const code = this.generateHubCode();
-        const blob = new Blob([code], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `competition-robot-code-${new Date().toISOString().split('T')[0]}.py`;
-        a.click();
-        URL.revokeObjectURL(url);
-        this.toastManager.show('Competition code downloaded successfully!', 'success');
     }
 
     generateHubCode() {
@@ -3316,45 +3312,52 @@ while True:
             const funcLines = [`def ${funcName}():`];
             funcLines.push(`    # ${run.name}`);
             
-            if (run.commands && run.commands.length > 0) {
+            if (Array.isArray(run.path) && run.path.length > 1) {
+                funcLines.push("    # Follow recorded coordinate path using dead-reckoning");
+                const waypoints = run.path.map(p => `(${Math.round(p.x)}, ${Math.round(p.y)})`).join(', ');
+                funcLines.push(`    waypoints = [${waypoints}]`);
+                funcLines.push("    mm_per_unit = 1.0  # scale recorded units to mm");
+                funcLines.push("    cur_x, cur_y, cur_heading = 0.0, 0.0, 0.0  # deg");
+                funcLines.push("    def normalize_deg(a):\n        while a > 180: a -= 360\n        while a < -180: a += 360\n        return a");
+                funcLines.push("    for tx, ty in waypoints:");
+                funcLines.push("        dx = (tx - cur_x) * mm_per_unit");
+                funcLines.push("        dy = (ty - cur_y) * mm_per_unit");
+                funcLines.push("        import math");
+                funcLines.push("        target = math.degrees(math.atan2(dy, dx))");
+                funcLines.push("        turn = normalize_deg(target - cur_heading)");
+                funcLines.push("        dist = int(round((dx*dx + dy*dy) ** 0.5))");
+                funcLines.push("        if abs(turn) > 1: drive_base.turn(turn)");
+                funcLines.push("        if dist != 0: drive_base.straight(dist)");
+                funcLines.push("        cur_heading = target\n        cur_x, cur_y = tx, ty");
+            } else if (run.commands && run.commands.length > 0) {
                 run.commands.forEach(cmd => {
                     const cmdType = cmd.command_type || cmd.type;
                     const params = cmd.parameters || cmd;
                     const duration = params.duration ? Math.round(params.duration * 1000) : 0;
-
                     if (cmdType === "drive") {
                         const speed = params.speed || 0;
                         const turnRate = params.turn_rate || 0;
-
                         if (speed !== 0 || turnRate !== 0) {
                             funcLines.push(`    drive_base.drive(${speed}, ${turnRate})`);
-                            if (duration > 0) {
-                                funcLines.push(`    wait(${duration})`);
-                            }
+                            if (duration > 0) funcLines.push(`    wait(${duration})`);
                             funcLines.push("    drive_base.stop()");
                         } else {
                             funcLines.push("    drive_base.stop()");
                         }
-
                     } else if (cmdType === "arm1") {
                         const speed = params.speed || 0;
                         if (speed !== 0) {
                             funcLines.push(`    arm1_motor.run(${speed})`);
-                            if (duration > 0) {
-                                funcLines.push(`    wait(${duration})`);
-                            }
+                            if (duration > 0) funcLines.push(`    wait(${duration})`);
                             funcLines.push("    arm1_motor.stop()");
                         } else {
                             funcLines.push("    arm1_motor.stop()");
                         }
-
                     } else if (cmdType === "arm2") {
                         const speed = params.speed || 0;
                         if (speed !== 0) {
                             funcLines.push(`    arm2_motor.run(${speed})`);
-                            if (duration > 0) {
-                                funcLines.push(`    wait(${duration})`);
-                            }
+                            if (duration > 0) funcLines.push(`    wait(${duration})`);
                             funcLines.push("    arm2_motor.stop()");
                         } else {
                             funcLines.push("    arm2_motor.stop()");
@@ -3759,22 +3762,28 @@ while True:
     }
     
     async executeRecordedCommands(commands) {
+        // If the selected run has a coordinate path, follow it; otherwise use time-stamped commands
+        const runsList = document.getElementById('savedRunsList');
+        const savedRuns = this.getSavedRunsArray();
+        const selectedRun = runsList && savedRuns.find(r => r.id === runsList.value);
+        if (selectedRun && Array.isArray(selectedRun.path) && selectedRun.path.length > 1) {
+            await this.followPath(selectedRun);
+            this.toastManager.show('Playback completed', 'success');
+            this.logger.log('Run playback completed (path mode)', 'info');
+            return;
+        }
         if (!commands || commands.length === 0) return;
-        
         let currentIndex = 0;
         const startTime = Date.now();
-        
         const executeNext = () => {
             if (currentIndex >= commands.length) {
                 this.toastManager.show('Playback completed', 'success');
                 this.logger.log('Run playback completed', 'info');
                 return;
             }
-            
             const cmd = commands[currentIndex];
             const elapsedTime = Date.now() - startTime;
             const delay = cmd.timestamp - elapsedTime;
-            
             if (delay > 0) {
                 setTimeout(() => {
                     this.executeCommand(cmd);
@@ -3787,8 +3796,48 @@ while True:
                 executeNext();
             }
         };
-        
         executeNext();
+    }
+    
+    async followPath(run) {
+        // Move the robot by sending continuous drive commands to steer towards successive path points
+        const path = run.path;
+        const corner = run.startCorner || 'BL';
+        // Reset internal pressed keys and stop
+        this.pressedKeys.clear();
+        await this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+        let idx = 0;
+        const tickMs = 50;
+        return new Promise((resolve) => {
+            const timer = setInterval(() => {
+                if (idx >= path.length) {
+                    clearInterval(timer);
+                    // stop robot
+                    this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+                    resolve();
+                    return;
+                }
+                // Desired target point in world coords for this path tick
+                const target = path[idx];
+                // Compute current world odom (already kept up to date by onSimulatorUpdate)
+                const current = this.odom;
+                const dx = (target.x) - current.x;
+                const dy = (target.y) - current.y;
+                const distance = Math.hypot(dx, dy);
+                // Heading to target in degrees, convert to turn command
+                const heading = Math.atan2(dy, dx) * 180 / Math.PI;
+                let errHeading = heading - current.thetaDeg;
+                while (errHeading > 180) errHeading -= 360;
+                while (errHeading < -180) errHeading += 360;
+                // Simple P controller
+                const maxSpeed = this.config.straightSpeed || 500;
+                const maxTurn = this.config.turnRate || 200;
+                const speed = Math.max(Math.min(distance * 3, maxSpeed), -maxSpeed);
+                const turn = Math.max(Math.min(errHeading * 3, maxTurn), -maxTurn);
+                this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
+                idx++;
+            }, tickMs);
+        });
     }
     
     executeCommand(cmd) {
@@ -3917,6 +3966,59 @@ while True:
         this.logger.log('Application shutting down', 'info');
     }
 
+    setStartCorner(corner) {
+        this.startCorner = corner;
+        this.saveUserData();
+        this.toastManager.show(`Start corner set to ${corner}`, 'success');
+        const bl = document.getElementById('cornerBLBtn');
+        const br = document.getElementById('cornerBRBtn');
+        if (bl && br) {
+            if (corner === 'BL') {
+                bl.classList.add('btn-primary');
+                bl.classList.remove('btn-secondary');
+                br.classList.add('btn-secondary');
+                br.classList.remove('btn-primary');
+            } else {
+                br.classList.add('btn-primary');
+                br.classList.remove('btn-secondary');
+                bl.classList.add('btn-secondary');
+                bl.classList.remove('btn-primary');
+            }
+        }
+    }
+
+    onSimulatorUpdate(data) {
+        // Track coordinates with origin at bottom-left or bottom-right
+        const { x: simX, y: simY, angle } = data;
+        const width = this.simCanvasSize.width || this.robotSimulator?.canvas?.getBoundingClientRect()?.width || 0;
+        const height = this.simCanvasSize.height || this.robotSimulator?.canvas?.getBoundingClientRect()?.height || 0;
+        // Convert simulator coordinates (origin top-left) to bottom origin with selected corner
+        const worldY = Math.max(0, height - simY);
+        const worldX = this.startCorner === 'BL' ? simX : Math.max(0, width - simX);
+        this.odom = { x: worldX, y: worldY, thetaDeg: angle };
+        const now = Date.now();
+        this.lastOdomTimestamp = now;
+        if (this.isRecording) {
+            this.recordedPath.push({ t: now - this.recordingStartTime, x: worldX, y: worldY, theta: angle });
+        }
+    }
+
+    startOdomIntegration() {
+        if (this.robotSimulator) return; // simulator provides position updates
+        if (this.odomTimer) return;
+        this.lastOdomTimestamp = Date.now();
+        this.odomTimer = setInterval(() => {
+            const now = Date.now();
+            const dt = (now - this.lastOdomTimestamp) / 1000;
+            this.lastOdomTimestamp = now;
+            const speed = this.lastDriveCmd.speed || 0; // mm/s
+            const turn = this.lastDriveCmd.turn_rate || 0; // deg/s
+            const angleRad = (this.odom.thetaDeg * Math.PI) / 180;
+            this.odom.x += Math.cos(angleRad) * speed * dt;
+            this.odom.y += Math.sin(angleRad) * speed * dt;
+            this.odom.thetaDeg += turn * dt;
+        }, 50);
+    }
 }
 
 // Global functions
@@ -4215,7 +4317,7 @@ document.addEventListener('visibilitychange', () => {
             window.app.robotSimulator?.stop();
         } else {
             // Page is visible, resume
-            if (window.app.isDeveloperMode) {
+            if (window.app.bleController?.isSimulatingConnection) {
                 window.app.robotSimulator?.start();
             }
         }
