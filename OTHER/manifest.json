@@ -65,7 +65,7 @@
       "name": "Quick Connect",
       "short_name": "Connect",
       "description": "Quickly connect to your robot",
-      "url": "/?action=connect",
+      "url": "/HTML/index.html?action=connect",
       "icons": [
         {
           "src": "favicon.png",
@@ -77,7 +77,7 @@
       "name": "Simulator",
       "short_name": "Simulator",
       "description": "Open robot simulator",
-      "url": "/?action=simulator",
+      "url": "/HTML/index.html?action=simulator",
       "icons": [
         {
           "src": "favicon.png",
