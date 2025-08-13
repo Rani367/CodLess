@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+
+:root {
+    --greenish-blue: #0097B2;
+    --white: #F1FAEE;
+    --light-green: #A8DADC;
+    --blue: #457B9D;
+    --dark-blue: #1D3557;
+    --bebas-neue: Bebas Neue;
+    --border-radius: 24px;
+    --hat-width: 25%;
+    --button-size: 200px;
+}
+
+body {
+    display: flex;
+    align-items: flex-start;
+    height: 100vh;
+    flex-shrink: 1;
+    flex-grow: 1;
+    background-color: var(--white);
+}
+
+.section {
+    display: flex;
+    background: none;
+    border: 1px solid var(--dark-blue);
+    border-radius: var(--border-radius);
+    position: relative;
+    align-items: center;
+    height: 200px;
+    min-height: 100px;
+    margin-top: 5vw;
+}
+
+.title {
+    color: var(--greenish-blue);
+    font-size: 100px;
+    font-family: var(--bebas-neue);
+}
+
+.hat {
+    position: absolute;
+    top: 0;
+    left: 0;
+    aspect-ratio: 346/300;
+    width: 80px;
+    transition: all 0.2s ease;
+    transform: translateY(0) rotate(0deg);
+    filter: grayscale(1) brightness(2.2) contrast(1.2);
+}
+
+.button__hat {
+    transform: translateY(100%);
+    visibility: visible !important;
+}
+
+.title:hover + .title__hat {
+    transform: translateY(-55%) rotate(-5deg);
+    visibility: visible;
+}
+
+.button__section:hover .button__hat {
+    transform: translateY(-50%) rotate(-5deg);
+    visibility: visible;
+}
+
+.button__section:active .button__hat {
+    transform: translateY(-50%) rotate(360deg);
+    visibility: visible;
+}
+
+.button {
+    aspect-ratio: 2/1;
+    min-height: 50px;
+    height: 100px;
+    border-radius: var(--border-radius);
+    background-color: var(--greenish-blue);
+    border: 3px solid var(--dark-blue);
+    font-family: var(--bebas-neue);
+    font-size: 50px;
+    color: var(--white);
+    z-index: 2;
+}

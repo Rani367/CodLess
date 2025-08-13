@@ -8,6 +8,8 @@ const urlsToCache = [
   '/app.js',
   '/styles.css',
   '/animations.css',
+  '/codless.css',
+  '/hat.html',
   '/hat.png',
   '/manifest.json',
   '/favicon.png',
