@@ -7,6 +7,8 @@ const urlsToCache = [
   '/index.html',
   '/app.js',
   '/styles.css',
+  '/animations.css',
+  '/hat.png',
   '/manifest.json',
   '/favicon.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
