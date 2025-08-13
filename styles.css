@@ -2203,38 +2203,38 @@ kbd:hover {
     100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
 }
 
-/* Global hat animation for all buttons */
-button {
-    position: relative;
-}
+/* Hat animation (Smurf-style) */
+.title-content { position: relative; }
+.button__section { position: relative; display: inline-block; }
 
-button::after {
-    content: "";
+.hat {
     position: absolute;
     top: 0;
     left: 0;
-    width: 22px;
-    height: 22px;
-    background-image: url('hat.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    line-height: 1;
-    transform: translateY(100%) rotate(0deg);
-    transform-origin: 20% 90%;
-    transition: transform 0.25s ease, opacity 0.2s ease;
-    opacity: 0;
+    aspect-ratio: 346/300;
+    width: 80px;
+    transition: all 0.2s ease;
+    transform: translateY(0) rotate(0deg);
+    filter: grayscale(1) brightness(2.2) contrast(1.2);
     pointer-events: none;
-    z-index: 2;
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
 }
 
-button:hover::after {
-    transform: translateY(-50%) rotate(-15deg);
-    opacity: 1;
+.button__hat {
+    transform: translateY(100%);
+    visibility: visible !important;
 }
 
-button:active::after {
-    transform: translateY(-50%) rotate(-360deg);
-    opacity: 1;
+.title:hover + .title__hat {
+    transform: translateY(-55%) rotate(-5deg);
+    visibility: visible;
+}
+
+.button__section:hover .button__hat {
+    transform: translateY(-50%) rotate(-5deg);
+    visibility: visible;
+}
+
+.button__section:active .button__hat {
+    transform: translateY(-50%) rotate(360deg);
+    visibility: visible;
 }
