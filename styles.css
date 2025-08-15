@@ -2202,3 +2202,273 @@ kbd:hover {
     50% { transform: scale(1.2) rotateY(180deg) rotateX(-10deg); }
     100% { transform: scale(1) rotateY(360deg) rotateX(-10deg); }
 }
+
+/* =============================================================
+   Modern UI Upgrades (2025-08)
+   - Theme tokens
+   - Aurora background overlay
+   - Gradient borders and enhanced shadows
+   - Accessible focus states
+   - Utility helpers (shadows, gradient text, borders)
+   ============================================================= */
+
+:root {
+    /* Color tokens */
+    --bg-0: #0c0d10;
+    --bg-1: #14161a;
+    --bg-2: #1b1f24;
+    --surface-0: rgba(255, 255, 255, 0.02);
+    --surface-1: rgba(255, 255, 255, 0.04);
+    --surface-2: rgba(255, 255, 255, 0.06);
+    --text-0: #ffffff;
+    --text-muted: #b0b0b0;
+    --accent-0: #00a8ff;
+    --accent-1: #7c4dff;
+    --success-0: #28a745;
+    --warning-0: #ffc107;
+    --danger-0: #dc3545;
+
+    /* Gradients */
+    --grad-primary: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
+    --grad-accent: linear-gradient(135deg, rgba(0,168,255,0.75), rgba(124,77,255,0.75));
+    --grad-surface: linear-gradient(135deg, #2d2d2d 0%, #1e1e1e 100%);
+    --grad-aurora: radial-gradient(800px 400px at 0% 0%, rgba(0,168,255,0.10), transparent 60%),
+        radial-gradient(800px 400px at 100% 100%, rgba(124,77,255,0.10), transparent 60%),
+        radial-gradient(600px 300px at 0% 100%, rgba(40,167,69,0.10), transparent 60%);
+
+    /* Shadows */
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 8px 25px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
+    --shadow-glow-accent: 0 0 0 0 rgba(0,168,255,0), 0 10px 30px rgba(0,168,255,0.18);
+
+    /* Radii */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+}
+
+/* Subtle animated aurora overlay and grain for depth */
+body {
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: var(--grad-aurora);
+    filter: blur(40px) saturate(110%);
+    opacity: 0.6;
+    animation: auroraShift 22s ease-in-out infinite;
+    z-index: 0;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 4px 4px;
+    mix-blend-mode: overlay;
+    opacity: 0.18;
+    z-index: 0;
+}
+
+@keyframes auroraShift {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(0, -2%, 0) scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; }
+}
+
+/* Elevate the app container and add a gradient border ring */
+.app-container {
+    position: relative;
+    box-shadow: var(--shadow-lg);
+}
+
+.app-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    padding: 1px; /* thickness of the gradient ring */
+    background: linear-gradient(135deg, rgba(0,168,255,0.35), rgba(124,77,255,0.20));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* Enhance cards and panels */
+.content-section,
+.sidebar-section,
+.simulator-container,
+.status-display,
+.modal-content,
+.toast {
+    background: var(--surface-0);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--shadow-md);
+}
+
+/* Gradient dividers for section headers */
+.section-header::after {
+    content: '';
+    display: block;
+    height: 1px;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(0,168,255,0.6), rgba(124,77,255,0.0));
+}
+
+/* Buttons: stronger glow and clearer focus */
+.btn {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+.btn:hover {
+    box-shadow: 0 10px 28px rgba(0,0,0,0.45), var(--shadow-glow-accent);
+}
+
+.window-btn,
+.btn-icon {
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+
+/* Accessible focus states across interactive elements */
+.btn:focus-visible,
+.window-btn:focus-visible,
+.btn-icon:focus-visible,
+.tab-btn:focus-visible,
+.select-box:focus-visible,
+.input-field:focus-visible,
+.config-input:focus-visible,
+.config-select:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 2px rgba(0, 0, 0, 0.4),
+        0 0 0 4px rgba(0,168,255,0.35),
+        0 8px 25px rgba(0,168,255,0.25);
+    border-color: rgba(0,168,255,0.6);
+}
+
+/* Gradient text utility */
+.text-gradient {
+    background: linear-gradient(135deg, #ffffff 0%, #c7c7c7 40%, #8bcdfc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Gradient border utility */
+.gradient-border {
+    position: relative;
+    border-radius: var(--radius-md);
+}
+
+.gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--grad-accent);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+/* Shadow utilities (opt-in) */
+.shadow-sm { box-shadow: var(--shadow-sm) !important; }
+.shadow-md { box-shadow: var(--shadow-md) !important; }
+.shadow-lg { box-shadow: var(--shadow-lg) !important; }
+.shadow-glow { box-shadow: var(--shadow-glow-accent) !important; }
+
+/* Softer keycap and card hover depth */
+kbd,
+.control-group,
+.content-section:hover,
+.simulator-container:hover {
+    box-shadow: 0 14px 34px rgba(0,0,0,0.45), 0 0 14px rgba(0,168,255,0.08);
+}
+
+/* Title bar subtle bottom glow */
+.title-bar {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.06);
+}
+
+/* Status bar glass polish */
+.status-bar {
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Enhanced simulator canvas aura on hover */
+#robotSimulator:hover {
+    box-shadow:
+        0 12px 32px rgba(0,0,0,0.55),
+        0 0 18px rgba(0,168,255,0.12),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* Inputs and selects surfaces */
+.input-field,
+.select-box,
+.config-input,
+.config-select {
+    background: var(--surface-1);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Section subtitles and helper text refinement */
+.info-text,
+.help-text,
+.simulator-info .performance-stats {
+    color: var(--text-muted);
+}
+
+/* Modals: stronger elevation and ring */
+.modal-content {
+    box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+
+/* Toasters: bolder presence */
+.toast {
+    box-shadow: 0 18px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+
+/* Section headers use gradient title text subtly */
+.section-header h3 {
+    background: linear-gradient(135deg, #ffffff 0%, #d9d9d9 60%, #8bcdfc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Status indicator subtle glow intensity */
+.status-indicator {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.35);
+}
+
+/* Scrollbar polish globally */
+body::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+body::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #00a8ff 0%, #7c4dff 100%);
+    border-radius: 6px;
+}
+
+body::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
