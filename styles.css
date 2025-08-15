@@ -2209,7 +2209,7 @@ button {
 }
 
 button::after {
-    content: "🎩";
+    content: none;
     position: absolute;
     top: 0;
     left: 0;
@@ -2221,14 +2221,4 @@ button::after {
     pointer-events: none;
     filter: grayscale(1) brightness(1.2) contrast(1.1);
     z-index: 2;
-}
-
-button:hover::after {
-    transform: translateY(-50%) rotate(-5deg);
-    opacity: 1;
-}
-
-button:active::after {
-    transform: translateY(-50%) rotate(360deg);
-    opacity: 1;
 }
