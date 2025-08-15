@@ -2289,6 +2289,7 @@ body::after {
 /* Elevate the app container and add a gradient border ring */
 .app-container {
     position: relative;
+    z-index: 1;
     box-shadow: var(--shadow-lg);
 }
 
