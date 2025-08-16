@@ -418,18 +418,18 @@
                                 <div style="display: flex; gap: 10px;">
                                     <div style="flex: 1;">
                                         <div style="font-size: 11px; color: #aaa;">L Trigger (Reverse)</div>
-                                        <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                                            <div id="leftTriggerBar" style="background: #ff5252; height: 100%; width: 0%; transition: width 0.1s;"></div>
+                                        <div class="meter">
+                                            <div id="leftTriggerBar" class="meter-fill is-reverse" style="width: 0%;"></div>
                                         </div>
                                     </div>
                                     <div style="flex: 1;">
                                         <div style="font-size: 11px; color: #aaa;">R Trigger (Forward)</div>
-                                        <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                                            <div id="rightTriggerBar" style="background: #4caf50; height: 100%; width: 0%; transition: width 0.1s;"></div>
+                                        <div class="meter">
+                                            <div id="rightTriggerBar" class="meter-fill is-forward" style="width: 0%;"></div>
                                         </div>
                                     </div>
                                 </div>
-                                <div style="text-align: center; margin-top: 5px; font-size: 12px; color: #00bcd4;">
+                                <div class="stat-value" style="text-align: center; margin-top: 5px;">
                                     Speed: <span id="xboxSpeedDisplay">0</span> mm/s
                                 </div>
                             </div>
