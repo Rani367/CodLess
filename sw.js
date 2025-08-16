@@ -5,8 +5,11 @@ const OFFLINE_URL = '/offline.html';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/app.js',
+  '/offline.html',
   '/styles.css',
+  '/animations.css',
+  '/app.js',
+  '/app.js?v=3.0.1',
   '/manifest.json',
   '/favicon.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',

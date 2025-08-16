@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Offline - CodLess Robotics</title>
     <meta name="theme-color" content="#00a8ff">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Favicon Support -->
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
@@ -130,60 +135,7 @@
             margin-top: 2rem;
         }
         
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s;
-        }
-        
-        .btn:hover::before {
-            left: 100%;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #00a8ff 0%, #0078d4 100%);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 168, 255, 0.3);
-        }
-        
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #0098e6 0%, #0068bd 100%);
-            box-shadow: 0 6px 20px rgba(0, 168, 255, 0.4);
-            transform: translateY(-2px);
-        }
-        
-        .btn-secondary {
-            background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
-        }
-        
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
-            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
-            transform: translateY(-2px);
-        }
+        /* Using shared button styles from styles.css */
         
         .connection-status {
             margin-top: 2rem;
@@ -241,7 +193,7 @@
     </style>
 </head>
 <body>
-    <div class="offline-container">
+    <div class="offline-container content-section gradient-border">
         <div class="robot-icon">🤖</div>
         
         <h1>You're Offline</h1>

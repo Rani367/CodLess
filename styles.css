@@ -2473,3 +2473,31 @@ body::-webkit-scrollbar-thumb {
 body::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.05);
 }
+
+/* Controller trigger meters */
+.meter {
+    background: rgba(255, 255, 255, 0.06);
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.meter-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.1s ease;
+}
+
+.meter-fill.is-reverse {
+    background: linear-gradient(90deg, #ff5252 0%, #ff6b6b 100%);
+}
+
+.meter-fill.is-forward {
+    background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+}
+
+/* Text utilities */
+.text-accent { color: var(--accent-0) !important; }
+.text-muted { color: var(--text-muted) !important; }
+.stat-value { font-size: 12px; color: rgba(0,168,255,0.9); font-weight: 500; }
