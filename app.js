@@ -419,7 +419,7 @@ class RobotConfig {
         // Advanced settings
         this.commandTimeout = data.commandTimeout || APP_CONFIG.DEFAULT_COMMAND_TIMEOUT;
         this.batteryWarning = data.batteryWarning || 20;
-        this.autoSave = data.autoSave || false;
+        this.autoSave = true;
         this.simulateConnected = data.simulateConnected || false;
         
         // Calibration data
@@ -2013,11 +2013,9 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     setupAutoSave() {
-        if (this.config.autoSave) {
-            this.autoSaveTimer = setInterval(() => {
-                this.saveUserData();
-            }, APP_CONFIG.AUTO_SAVE_INTERVAL);
-        }
+        this.autoSaveTimer = setInterval(() => {
+            this.saveUserData();
+        }, APP_CONFIG.AUTO_SAVE_INTERVAL);
     }
 
     setupKeyboardControls() {
@@ -2918,6 +2916,11 @@ class FLLRoboticsApp extends EventEmitter {
         const duration = (Date.now() - this.recordingStartTime) / 1000;
         this.toastManager.show(`⏹️ Recording stopped - captured ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`, 'success');
         this.logger.log(`Recording stopped: ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`);
+        
+        // Automatically save run if any commands were recorded
+        if (this.recordedCommands.length > 0) {
+            this.saveCurrentRun();
+        }
     }
 
     saveCurrentRun() {
@@ -4103,7 +4106,7 @@ function saveConfiguration() {
         // Advanced settings
         config.commandTimeout = parseInt(document.getElementById('commandTimeout')?.value || 1000);
         config.batteryWarning = parseInt(document.getElementById('batteryWarning')?.value || 20);
-        config.autoSave = document.getElementById('autoSave')?.checked || false;
+        config.autoSave = true;
         
         const simulateConnectedEl = document.getElementById('simulateConnected');
         if (simulateConnectedEl) {
