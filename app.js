@@ -3,7 +3,7 @@
 
 
 const APP_CONFIG = {
-    VERSION: '3.0.0',
+    VERSION: '1.0.0',
     NAME: 'CodLess FLL Robotics Control Center',
     BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
     HUB_NAME_PREFIX: 'Pybricks',
