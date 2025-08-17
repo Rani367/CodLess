@@ -1,4 +1,4 @@
-const CACHE_NAME = 'codless-robotics-v3.0.0';
+const CACHE_NAME = 'codless-robotics-v1.0.0';
 const OFFLINE_URL = '/offline.html';
 
 // Files to cache for offline functionality
@@ -9,7 +9,7 @@ const urlsToCache = [
   '/styles.css',
   '/animations.css',
   '/app.js',
-  '/app.js?v=3.0.1',
+  '/app.js?v=1.0.0',
   '/manifest.json',
   '/favicon.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',

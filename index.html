@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
 
-    <link rel="preload" href="app.js?v=3.0.1" as="script">
+    <link rel="preload" href="app.js?v=1.0.0" as="script">
     <link rel="preload" href="styles.css" as="style">
     <link rel="preload" href="xbox-controller.glb" as="fetch" crossorigin>
     
@@ -136,7 +136,7 @@
             <div class="title-content">
                 <i class="fas fa-robot" aria-hidden="true"></i>
                 <h1>CodLess - FLL Robotics Control Center</h1>
-                <span class="version-badge">v3.0.0</span>
+                <span class="version-badge">v1.0</span>
             </div>
             <div class="window-controls">
                 <button class="window-btn minimize-btn" onclick="minimizeWindow()" aria-label="Minimize window">
@@ -561,10 +561,7 @@
                             <label for="batteryWarning">Battery Warning Level (%):</label>
                             <input type="number" id="batteryWarning" value="20" min="5" max="50" class="config-input">
                         </div>
-                        <div class="config-row">
-                            <label for="autoSave">Auto-save recordings:</label>
-                            <input type="checkbox" id="autoSave" class="checkbox">
-                        </div>
+
                         <div class="config-row">
                             <label for="simulateConnected">Simulate Connected:</label>
                             <input type="checkbox" id="simulateConnected" class="checkbox" aria-describedby="simulateConnectedHelp">
@@ -706,6 +703,6 @@
         })();
     </script>
 
-    <script src="app.js?v=3.0.1"></script>
+    <script src="app.js?v=1.0.0"></script>
 </body>
 </html>
