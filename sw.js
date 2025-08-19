@@ -1,4 +1,4 @@
-const CACHE_NAME = 'codless-robotics-v1.0.0';
+const CACHE_NAME = 'codless-robotics-v1.0.1';
 const OFFLINE_URL = '/offline.html';
 
 // Files to cache for offline functionality
@@ -12,8 +12,20 @@ const urlsToCache = [
   '/app.js?v=1.0.0',
   '/manifest.json',
   '/favicon.png',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  '/vendor/fonts/inter.css',
+  '/vendor/fonts/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuOKfMZg.ttf',
+  '/vendor/fonts/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf',
+  '/vendor/fonts/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fMZg.ttf',
+  '/vendor/fonts/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf',
+  '/vendor/fonts/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf',
+  '/vendor/fontawesome/css/all.min.css',
+  '/vendor/fontawesome/webfonts/fa-solid-900.woff2',
+  '/vendor/fontawesome/webfonts/fa-regular-400.woff2',
+  '/vendor/fontawesome/webfonts/fa-brands-400.woff2',
+  '/vendor/model-viewer/model-viewer.min.js'
+  ,'/xbox-controller.glb'
+  ,'/Unearthed_Map.png'
+  ,'/hat.png'
 ];
 
 // Install event - cache resources
@@ -64,7 +76,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle navigation requests
+  // Handle navigation requests with offline-first
   if (event.request.mode === 'navigate') {
     event.respondWith(
       caches.match(event.request)
@@ -89,10 +101,7 @@ self.addEventListener('fetch', (event) => {
 
               return response;
             })
-            .catch(() => {
-              // Return offline page if available
-              return caches.match(OFFLINE_URL);
-            });
+            .catch(() => caches.match(OFFLINE_URL))
         })
     );
     return;
@@ -107,7 +116,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         }
 
-        // Otherwise, fetch from network
+        // Otherwise, fetch from network and cache if possible; fall back silently
         return fetch(event.request)
           .then((response) => {
             // Check if we received a valid response
@@ -124,19 +133,7 @@ self.addEventListener('fetch', (event) => {
 
             return response;
           })
-          .catch((error) => {
-            console.log('[SW] Fetch failed:', error);
-            
-            // For images, return a fallback
-            if (event.request.destination === 'image') {
-              return new Response(
-                '<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#1e1e1e"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#666">Image Unavailable</text></svg>',
-                { headers: { 'Content-Type': 'image/svg+xml' } }
-              );
-            }
-            
-            throw error;
-          });
+          .catch(() => caches.match(OFFLINE_URL));
       })
   );
 });
