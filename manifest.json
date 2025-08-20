@@ -1,7 +1,7 @@
 {
-  "name": "CodLess™ - FLL Robotics Control Center",
-  "short_name": "CodLess™ Robotics",
-  "description": "Professional FLL Robotics Control Center with advanced robot control, recording, and simulation capabilities",
+  "name": "CodLess™",
+  "short_name": "CodLess™",
+  "description": "Professional robotics platform with advanced robot control, recording, and simulation capabilities",
   "version": "1.0.0",
   "start_url": "/",
   "scope": "/",
@@ -92,14 +92,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "CodLess™ Robotics Control Center main interface"
+      "label": "CodLess™ main interface"
     },
     {
       "src": "assets/screenshot-narrow.png",
       "sizes": "540x720",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "CodLess™ Robotics mobile view"
+      "label": "CodLess™ mobile view"
     }
   ],
   "related_applications": [],
