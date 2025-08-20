@@ -207,7 +207,7 @@ self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received');
   
   const options = {
-    body: event.data ? event.data.text() : 'New notification from CodLess Robotics',
+    body: event.data ? event.data.text() : 'New notification from CodLess™ Robotics',
     icon: '/favicon.png',
     badge: '/favicon.png',
     tag: 'codless-notification',
@@ -227,7 +227,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('CodLess Robotics', options)
+    self.registration.showNotification('CodLess™ Robotics', options)
   );
 });
 

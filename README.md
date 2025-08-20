@@ -1,4 +1,4 @@
-# CodLess
+# CodLess™
 
 [![GitHub stars](https://img.shields.io/github/stars/rani367/CodLess?style=social)](https://github.com/rani367/CodLess)
 [![GitHub issues](https://img.shields.io/github/issues/rani367/CodLess)](https://github.com/rani367/CodLess/issues)
@@ -6,9 +6,9 @@
 
 **Visual programming for FLL teams**
 
-CodLess is a web-based tool that helps FIRST LEGO League teams program their robots without writing complex code. You can connect your LEGO hub, record movements, save them as reusable runs, and use them during competitions.
+CodLess™ is a web-based tool that helps FIRST LEGO League teams program their robots without writing complex code. You can connect your LEGO hub, record movements, save them as reusable runs, and use them during competitions.
 
-## [Live Demo](https://rani367.github.io/CodLess/)
+## [Live Demo – CodLess™](https://rani367.github.io/CodLess/)
 
 ---
 
@@ -27,7 +27,7 @@ CodLess is a web-based tool that helps FIRST LEGO League teams program their rob
 
 ## Quick Start
 
-1. Open [CodLess](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera
+1. Open [CodLess™](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera
 2. Click **Connect Robot** to pair with your Pybricks hub
 3. Configure motor ports in the settings
 4. Record movements using the control panel

@@ -4,7 +4,7 @@
 
 const APP_CONFIG = {
     VERSION: '1.0.0',
-    NAME: 'CodLess FLL Robotics Control Center',
+    NAME: 'CodLess™ FLL Robotics Control Center',
     BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
     HUB_NAME_PREFIX: 'Pybricks',
     DEFAULT_COMMAND_TIMEOUT: 1000,
@@ -1529,7 +1529,7 @@ class FLLRoboticsApp extends EventEmitter {
             
             console.log('Application initialized successfully!');
             this.logger.log('Application initialized successfully', 'success');
-            this.toastManager.show('Welcome to CodLess Robotics Control Center!', 'success');
+            this.toastManager.show('Welcome to CodLess™ Robotics Control Center!', 'success');
             
         } catch (error) {
             console.error('Failed to initialize application:', error);
@@ -3945,7 +3945,7 @@ while True:
 
 
     closeWindow() {
-        if (confirm('Close CodLess FLL Robotics Control Center?')) {
+        if (confirm('Close CodLess™ FLL Robotics Control Center?')) {
             this.cleanup();
             window.close();
         }
@@ -4347,7 +4347,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-console.log(`%cCodLess FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'color: #00a8ff; font-size: 16px; font-weight: bold;');
+console.log(`%cCodLess™ FLL Robotics Control Center v${APP_CONFIG.VERSION}`, 'color: #00a8ff; font-size: 16px; font-weight: bold;');
 console.log('🤖 Professional robotics control and simulation platform');
 console.log('📖 Documentation: https://github.com/codless-robotics/fll-control-center');
 console.log('%cIf you encounter "savedRuns.forEach is not a function" error, try: window.app?.clearCorruptedData()', 'color: #ff9800; font-size: 12px;');
