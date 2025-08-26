@@ -951,27 +951,8 @@ class RobotSimulator extends EventEmitter {
     }
 
     updateCommand(command) {
-        // Apply calibration factors if available
+        // Pass commands directly to simulator targets without calibration
         let calibratedCommand = { ...command };
-        
-        if (this.calibrationFactors) {
-            if (command.type === 'drive') {
-                // Apply speed and turn calibration
-                calibratedCommand.speed = (command.speed || 0) * this.calibrationFactors.speedMultiplier;
-                calibratedCommand.turn_rate = (command.turn_rate || 0) * this.calibrationFactors.turnMultiplier;
-                
-                // Apply drift compensation for straight movement
-                if (command.turn_rate === 0 && command.speed !== 0) {
-                    // Add slight turn to compensate for drift
-                    const driftCompensation = this.calibrationFactors.driftCompensation;
-                    if (driftCompensation && (driftCompensation.x !== 0 || driftCompensation.y !== 0)) {
-                        // Calculate drift compensation angle
-                        const driftAngle = Math.atan2(driftCompensation.y, driftCompensation.x) * 180 / Math.PI;
-                        calibratedCommand.turn_rate = -driftAngle * 0.1; // Small compensation
-                    }
-                }
-            }
-        }
         
         // Update simulator targets based on command type
         if (calibratedCommand.type === 'drive') {
