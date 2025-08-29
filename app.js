@@ -1087,10 +1087,24 @@ class RobotSimulator extends EventEmitter {
         
         this.ctx.save();
 
-        // Draw background map
+        // Draw background map with preserved aspect ratio (letterbox/pillarbox)
         if (this.backgroundMap) {
             this.ctx.globalAlpha = 1.0;
-            this.ctx.drawImage(this.backgroundMap, 0, 0, rect.width, rect.height);
+            const img = this.backgroundMap;
+            const canvasW = rect.width;
+            const canvasH = rect.height;
+            const imgW = img.naturalWidth || img.width;
+            const imgH = img.naturalHeight || img.height;
+            if (imgW > 0 && imgH > 0) {
+                const scale = Math.min(canvasW / imgW, canvasH / imgH);
+                const drawW = Math.floor(imgW * scale);
+                const drawH = Math.floor(imgH * scale);
+                const offsetX = Math.floor((canvasW - drawW) / 2);
+                const offsetY = Math.floor((canvasH - drawH) / 2);
+                this.ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+            } else {
+                this.ctx.drawImage(img, 0, 0, canvasW, canvasH);
+            }
             this.ctx.globalAlpha = 1.0;
         }
 
@@ -1368,6 +1382,34 @@ class RobotSimulator extends EventEmitter {
         this.backgroundMap = image;
     }
 
+    setPose(x, y, angle = 0, options = { clearTrail: true, resetMotion: true }) {
+        const rect = this.canvas.getBoundingClientRect();
+        const margin = 30;
+        const clampedX = this.clamp(x, margin, Math.max(margin, rect.width - margin));
+        const clampedY = this.clamp(y, margin, Math.max(margin, rect.height - margin));
+        this.robotX = clampedX;
+        this.robotY = clampedY;
+        this.robotAngle = angle;
+        if (options && options.resetMotion) {
+            this.velocity = { x: 0, y: 0, angular: 0 };
+            this.targetSpeed = 0;
+            this.targetTurn = 0;
+            this.targetArm1Speed = 0;
+            this.targetArm2Speed = 0;
+        }
+        if (options && options.clearTrail) {
+            this.trail = [];
+        }
+        this.emit('positionUpdate', {
+            x: this.robotX,
+            y: this.robotY,
+            angle: this.robotAngle,
+            arm1Angle: this.arm1Angle,
+            arm2Angle: this.arm2Angle,
+            velocity: { ...this.velocity }
+        });
+    }
+
     toggleTrail() {
         this.showTrail = !this.showTrail;
         if (!this.showTrail) {
@@ -1384,6 +1426,7 @@ class RobotSimulator extends EventEmitter {
     }
 
     reset() {
+        // Default reset centers the robot; callers in app may reposition after
         this.robotX = this.canvas.clientWidth / 2;
         this.robotY = this.canvas.clientHeight / 2;
         this.robotAngle = 0;
@@ -1856,11 +1899,8 @@ class FLLRoboticsApp extends EventEmitter {
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportSelectedRun());
         document.getElementById('importBtn')?.addEventListener('click', () => this.importRun());
         
-        // Simulator controls
-        document.getElementById('uploadMapBtn')?.addEventListener('click', () => this.uploadMap());
-        document.getElementById('resetSimBtn')?.addEventListener('click', () => this.resetSimulator());
-        document.getElementById('fullscreenSimBtn')?.addEventListener('click', () => this.toggleSimulatorFullscreen());
-        
+        // Simulator controls removed (upload map, reset, fullscreen)
+
         // Emergency controls
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
         
@@ -1909,6 +1949,16 @@ class FLLRoboticsApp extends EventEmitter {
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
+            // Initialize robot pose to the selected start corner at simulator creation
+            try {
+                const rect2 = canvas.getBoundingClientRect();
+                const margin = 30;
+                const startX = this.startCorner === 'BL' ? margin : Math.max(margin, rect2.width - margin);
+                const startY = Math.max(margin, rect2.height - margin);
+                this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
+            } catch (e) {
+                console.warn('Failed to set initial simulator pose:', e);
+            }
             
             // Load default background map image for simulator
             try {
@@ -2732,7 +2782,6 @@ class FLLRoboticsApp extends EventEmitter {
                 
                 // Setup and start the simulator
                 this.setupRobotSimulator();
-                this.enableSimulatorControls(true);
             }, 10);
         } else {
             simulatorSection.classList.add('hidden');
@@ -2741,23 +2790,11 @@ class FLLRoboticsApp extends EventEmitter {
                 this.robotSimulator.destroy();
                 this.robotSimulator = null;
             }
-            this.enableSimulatorControls(false);
+            // controls removed
         }
     }
 
-    enableSimulatorControls(enabled) {
-        const controls = [
-            'resetSimBtn',
-            'uploadMapBtn'
-        ];
-        
-        controls.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.disabled = !enabled;
-            }
-        });
-    }
+    enableSimulatorControls(enabled) {}
 
     updateConfigurationUI() {
         // Update form values with current config
@@ -3777,6 +3814,26 @@ while True:
         const runsList = document.getElementById('savedRunsList');
         const savedRuns = this.getSavedRunsArray();
         const selectedRun = runsList && savedRuns.find(r => r.id === runsList.value);
+        // Ensure simulator starts from the same starting pose as when recording began
+        if (this.robotSimulator && selectedRun) {
+            const rect = this.robotSimulator.canvas.getBoundingClientRect();
+            const margin = 30;
+            const corner = selectedRun.startCorner || this.startCorner || 'BL';
+            const startXCorner = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
+            const startYCorner = Math.max(margin, rect.height - margin);
+            // If a path exists, we will override with exact first point below; otherwise, set to corner origin
+            this.robotSimulator.setPose(startXCorner, startYCorner, 0, { clearTrail: true, resetMotion: true });
+            // If path has at least one point, set exact recorded starting pose before command playback
+            if (Array.isArray(selectedRun.path) && selectedRun.path.length >= 1) {
+                const width = this.simCanvasSize.width || rect.width || 0;
+                const height = this.simCanvasSize.height || rect.height || 0;
+                const startWorld = selectedRun.path[0];
+                const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
+                const simY = Math.max(0, height - startWorld.y);
+                this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
+                this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
+            }
+        }
         if (selectedRun && Array.isArray(selectedRun.path) && selectedRun.path.length > 1) {
             await this.followPath(selectedRun);
             this.toastManager.show('Playback completed', 'success');
@@ -3814,6 +3871,22 @@ while True:
         // Move the robot by sending continuous drive commands to steer towards successive path points
         const path = run.path;
         const corner = run.startCorner || 'BL';
+        // Temporarily use the run's start corner for coordinate transforms
+        const prevCorner = this.startCorner;
+        this.startCorner = corner;
+        // Initialize simulator pose to the recorded starting point
+        if (this.robotSimulator && Array.isArray(path) && path.length > 0) {
+            // Path coordinates are in world space (bottom origin with corner transform)
+            const width = this.simCanvasSize.width || this.robotSimulator.canvas.getBoundingClientRect().width || 0;
+            const height = this.simCanvasSize.height || this.robotSimulator.canvas.getBoundingClientRect().height || 0;
+            const startWorld = path[0];
+            // Convert world coords back to simulator canvas coords
+            const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
+            const simY = Math.max(0, height - startWorld.y);
+            this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
+            // Also sync odom immediately
+            this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
+        }
         // Reset internal pressed keys and stop
         this.pressedKeys.clear();
         await this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
@@ -3825,6 +3898,8 @@ while True:
                     clearInterval(timer);
                     // stop robot
                     this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+                    // Restore previous corner preference
+                    this.startCorner = prevCorner;
                     resolve();
                     return;
                 }
@@ -3915,32 +3990,9 @@ while True:
         }
     }
 
-    toggleSimulatorFullscreen() {
-        const canvas = document.getElementById('robotSimulator');
-        if (!canvas) {
-            this.toastManager.show('Simulator not available', 'warning');
-            return;
-        }
+    toggleSimulatorFullscreen() {}
 
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            canvas.requestFullscreen().catch(err => {
-                this.toastManager.show(`Fullscreen not supported: ${err.message}`, 'error');
-            });
-        }
-    }
-
-    resetSimulator() {
-        if (!this.robotSimulator) {
-            this.toastManager.show('Simulator not available', 'warning');
-            return;
-        }
-        
-        this.robotSimulator.reset();
-        this.toastManager.show('Simulator reset', 'success');
-        this.logger.log('Simulator position reset');
-    }
+    resetSimulator() {}
 
 
 
@@ -3995,6 +4047,14 @@ while True:
                 bl.classList.add('btn-secondary');
                 bl.classList.remove('btn-primary');
             }
+        }
+        // Move current simulator pose to the selected corner
+        if (this.robotSimulator && this.robotSimulator.canvas) {
+            const rect = this.robotSimulator.canvas.getBoundingClientRect();
+            const margin = 30;
+            const x = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
+            const y = Math.max(margin, rect.height - margin);
+            this.robotSimulator.setPose(x, y, 0, { clearTrail: true, resetMotion: true });
         }
     }
 
