@@ -113,10 +113,23 @@ class MicroInteractions {
 
     addHoverEffects() {
         const hoverElements = document.querySelectorAll('.btn, .tab-btn, .control-item');
-        
+
         hoverElements.forEach(element => {
             if (!element.classList.contains('hover-scale')) {
                 element.classList.add('hover-lift');
+            }
+
+            // Ensure an inner wrapper exists so visual lift does not change hitbox
+            if (!element.querySelector('.hover-lift-inner')) {
+                const inner = document.createElement('span');
+                inner.className = 'hover-lift-inner';
+
+                // Move all existing child nodes into the inner wrapper
+                while (element.firstChild) {
+                    inner.appendChild(element.firstChild);
+                }
+
+                element.appendChild(inner);
             }
         });
     }
@@ -125,15 +138,29 @@ class MicroInteractions {
         document.addEventListener('mousedown', (e) => {
             const clickable = e.target.closest('button, .btn, [role="button"]');
             if (clickable && !clickable.disabled) {
-                clickable.style.transform = 'scale(0.95)';
+                const inner = clickable.querySelector('.hover-lift-inner');
+                if (inner) {
+                    // Preserve any translate from hover while scaling
+                    const currentTransform = getComputedStyle(inner).transform;
+                    inner.style.transform = currentTransform === 'none' ? 'scale(0.95)' : currentTransform + ' scale(0.95)';
+                } else {
+                    clickable.style.transform = 'scale(0.95)';
+                }
             }
         });
 
         document.addEventListener('mouseup', () => {
-            const pressed = document.querySelector('[style*="scale(0.95)"]');
-            if (pressed) {
-                pressed.style.transform = '';
-            }
+            // Reset any inner wrappers first
+            document.querySelectorAll('.hover-lift-inner[style*="scale(0.95)"]').forEach(node => {
+                node.style.transform = '';
+            });
+
+            // Fallback reset if any clickable itself was scaled
+            document.querySelectorAll('[style*="scale(0.95)"]').forEach(node => {
+                if (!node.classList || !node.classList.contains('hover-lift-inner')) {
+                    node.style.transform = '';
+                }
+            });
         });
     }
 }

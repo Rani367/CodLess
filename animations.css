@@ -346,10 +346,21 @@
 
 /* Hover Lift */
 .hover-lift {
-    transition: transform var(--anim-duration-fast) var(--anim-easing-default);
+    position: relative;
 }
 
-.hover-lift:hover {
+/* Inner wrapper to move visually while outer hitbox stays static */
+.hover-lift .hover-lift-inner {
+    display: inline-flex;
+    align-items: inherit;
+    justify-content: inherit;
+    width: 100%;
+    height: 100%;
+    transition: transform var(--anim-duration-fast) var(--anim-easing-default);
+    will-change: transform;
+}
+
+.hover-lift:hover .hover-lift-inner {
     transform: translateY(-4px);
 }
 
