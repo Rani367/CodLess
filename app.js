@@ -1380,6 +1380,24 @@ class RobotSimulator extends EventEmitter {
 
     setBackgroundMap(image) {
         this.backgroundMap = image;
+        try {
+            const imgW = image.naturalWidth || image.width || 0;
+            const imgH = image.naturalHeight || image.height || 0;
+            if (imgW > 0 && imgH > 0) {
+                const aspect = imgW / imgH;
+                // Hint layout to match the image aspect to avoid letterboxing
+                this.canvas.style.aspectRatio = aspect.toString();
+                // Remove any fixed min-heights to allow aspect to control height
+                this.canvas.style.minHeight = '';
+                this.canvas.style.height = '';
+                // Trigger a resize/update for high-DPI and internal sizing
+                if (this.updateCanvasSize) {
+                    this.updateCanvasSize();
+                }
+            }
+        } catch (e) {
+            // no-op
+        }
     }
 
     setPose(x, y, angle = 0, options = { clearTrail: true, resetMotion: true }) {
