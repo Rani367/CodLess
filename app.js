@@ -1087,10 +1087,24 @@ class RobotSimulator extends EventEmitter {
         
         this.ctx.save();
 
-        // Draw background map
+        // Draw background map with preserved aspect ratio (letterbox/pillarbox)
         if (this.backgroundMap) {
             this.ctx.globalAlpha = 1.0;
-            this.ctx.drawImage(this.backgroundMap, 0, 0, rect.width, rect.height);
+            const img = this.backgroundMap;
+            const canvasW = rect.width;
+            const canvasH = rect.height;
+            const imgW = img.naturalWidth || img.width;
+            const imgH = img.naturalHeight || img.height;
+            if (imgW > 0 && imgH > 0) {
+                const scale = Math.min(canvasW / imgW, canvasH / imgH);
+                const drawW = Math.floor(imgW * scale);
+                const drawH = Math.floor(imgH * scale);
+                const offsetX = Math.floor((canvasW - drawW) / 2);
+                const offsetY = Math.floor((canvasH - drawH) / 2);
+                this.ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+            } else {
+                this.ctx.drawImage(img, 0, 0, canvasW, canvasH);
+            }
             this.ctx.globalAlpha = 1.0;
         }
 
@@ -1885,11 +1899,8 @@ class FLLRoboticsApp extends EventEmitter {
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportSelectedRun());
         document.getElementById('importBtn')?.addEventListener('click', () => this.importRun());
         
-        // Simulator controls
-        document.getElementById('uploadMapBtn')?.addEventListener('click', () => this.uploadMap());
-        document.getElementById('resetSimBtn')?.addEventListener('click', () => this.resetSimulator());
-        document.getElementById('fullscreenSimBtn')?.addEventListener('click', () => this.toggleSimulatorFullscreen());
-        
+        // Simulator controls removed (upload map, reset, fullscreen)
+
         // Emergency controls
         document.getElementById('emergencyStopBtn')?.addEventListener('click', () => this.emergencyStop());
         
@@ -2771,7 +2782,6 @@ class FLLRoboticsApp extends EventEmitter {
                 
                 // Setup and start the simulator
                 this.setupRobotSimulator();
-                this.enableSimulatorControls(true);
             }, 10);
         } else {
             simulatorSection.classList.add('hidden');
@@ -2780,23 +2790,11 @@ class FLLRoboticsApp extends EventEmitter {
                 this.robotSimulator.destroy();
                 this.robotSimulator = null;
             }
-            this.enableSimulatorControls(false);
+            // controls removed
         }
     }
 
-    enableSimulatorControls(enabled) {
-        const controls = [
-            'resetSimBtn',
-            'uploadMapBtn'
-        ];
-        
-        controls.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.disabled = !enabled;
-            }
-        });
-    }
+    enableSimulatorControls(enabled) {}
 
     updateConfigurationUI() {
         // Update form values with current config
@@ -3992,38 +3990,9 @@ while True:
         }
     }
 
-    toggleSimulatorFullscreen() {
-        const canvas = document.getElementById('robotSimulator');
-        if (!canvas) {
-            this.toastManager.show('Simulator not available', 'warning');
-            return;
-        }
+    toggleSimulatorFullscreen() {}
 
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            canvas.requestFullscreen().catch(err => {
-                this.toastManager.show(`Fullscreen not supported: ${err.message}`, 'error');
-            });
-        }
-    }
-
-    resetSimulator() {
-        if (!this.robotSimulator) {
-            this.toastManager.show('Simulator not available', 'warning');
-            return;
-        }
-        
-        this.robotSimulator.reset();
-        // After reset, reposition to the configured start corner
-        const rect = this.robotSimulator.canvas.getBoundingClientRect();
-        const margin = 30;
-        const x = this.startCorner === 'BL' ? margin : Math.max(margin, rect.width - margin);
-        const y = Math.max(margin, rect.height - margin);
-        this.robotSimulator.setPose(x, y, 0, { clearTrail: true, resetMotion: true });
-        this.toastManager.show('Simulator reset', 'success');
-        this.logger.log('Simulator position reset to start corner');
-    }
+    resetSimulator() {}
 
 
 
