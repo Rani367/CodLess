@@ -822,9 +822,11 @@ class RobotSimulator extends EventEmitter {
         // Physics parameters - will be updated from robot config
         this.robotMass = 2.5;
         this.robotInertia = 0.12;
-        this.friction = 0.05;
+        this.friction = 0.03;
         this.straightAcceleration = 250; // Default from RobotConfig
         this.turnAcceleration = 300; // Default from RobotConfig
+        // Pixels per millimeter scale factor for sim translation
+        this.pixelsPerMm = 0.25;
         
         // Simulation settings
         this.dt = 0.016; // 60 FPS
@@ -876,9 +878,7 @@ class RobotSimulator extends EventEmitter {
             this.canvas.style.cursor = 'default';
         };
         
-        this.canvas.addEventListener('mousedown', this.mouseDownHandler);
-        this.canvas.addEventListener('mousemove', this.mouseMoveHandler);
-        this.canvas.addEventListener('mouseup', this.mouseUpHandler);
+        // Mouse drag should not move the robot; disable drag listeners
         
         this.wheelHandler = (e) => {
             e.preventDefault();
@@ -1011,8 +1011,8 @@ class RobotSimulator extends EventEmitter {
         const turnError = this.targetTurn - this.velocity.angular;
 
         // Calculate desired acceleration based on error
-        let desiredAccelX = speedError * 10;
-        let desiredAccelAngular = turnError * 10;
+        let desiredAccelX = speedError * 3;
+        let desiredAccelAngular = turnError * 3;
         
         // Limit acceleration to match real robot's acceleration settings
         // The robot uses mm/s² for straight and deg/s² for turn
@@ -1029,12 +1029,12 @@ class RobotSimulator extends EventEmitter {
 
         // Update robot position
         const angleRad = (this.robotAngle * Math.PI) / 180;
-        const dx = this.velocity.x * Math.cos(angleRad) * dt * 0.1;
-        const dy = this.velocity.x * Math.sin(angleRad) * dt * 0.1;
+        const dx = this.velocity.x * Math.cos(angleRad) * dt * this.pixelsPerMm;
+        const dy = this.velocity.x * Math.sin(angleRad) * dt * this.pixelsPerMm;
 
         this.robotX += dx;
         this.robotY += dy;
-        this.robotAngle += this.velocity.angular * dt * 0.5;
+        this.robotAngle += this.velocity.angular * dt;
 
         // Update arm physics
         this.arm1Angle += this.targetArm1Speed * dt * 0.2; // Arm movement rate
@@ -1049,10 +1049,7 @@ class RobotSimulator extends EventEmitter {
         this.robotX = this.clamp(this.robotX, 30, rect.width - 30);
         this.robotY = this.clamp(this.robotY, 30, rect.height - 30);
 
-        // Update arm positions
-        this.arm1Angle += this.targetArm1Speed * dt * 0.3;
-        this.arm2Angle += this.targetArm2Speed * dt * 0.3;
-        
+        // Clamp arm ranges
         this.arm1Angle = this.clamp(this.arm1Angle, -90, 90);
         this.arm2Angle = this.clamp(this.arm2Angle, -90, 90);
 
@@ -1126,8 +1123,7 @@ class RobotSimulator extends EventEmitter {
         
         this.ctx.restore();
         
-        // Draw UI overlays in screen space
-        this.drawInfo();
+        // Info overlay removed per request
     }
 
     drawGrid() {
@@ -1534,6 +1530,17 @@ class FLLRoboticsApp extends EventEmitter {
         this.simCanvasSize = { width: 0, height: 0 };
         this.lastDriveCmd = { speed: 0, turn_rate: 0 };
         this.odomTimer = null;
+        // Playback state
+        this.isPlaying = false;
+        this.isPaused = false;
+        this.playbackMode = null; // 'path' | 'commands'
+        this.playbackIndex = 0;
+        this.playbackTimerId = null; // setInterval for path mode
+        this.playbackCurrentTimeout = null; // setTimeout for commands mode
+        this.playbackStartEpoch = 0; // Date.now() at start/resume
+        this.playbackElapsedBeforePause = 0; // ms accumulated before pause
+        this.playbackRun = null; // currently playing run
+        this.playbackCommands = null; // commands array if in commands mode
         
         // Note: init() will be called explicitly after construction
     }
@@ -2630,6 +2637,21 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Send emergency stop command
         this.sendRobotCommand({ type: 'emergency_stop' });
+        // Stop any active playback
+        if (this.isPlaying) {
+            if (this.playbackTimerId) clearInterval(this.playbackTimerId);
+            if (this.playbackCurrentTimeout) clearTimeout(this.playbackCurrentTimeout);
+            this.playbackTimerId = null;
+            this.playbackCurrentTimeout = null;
+            this.isPlaying = false;
+            this.isPaused = false;
+            this.playbackMode = null;
+            this.playbackIndex = 0;
+            this.playbackRun = null;
+            this.playbackCommands = null;
+            this.playbackElapsedBeforePause = 0;
+            this.updatePlayButtonUI();
+        }
         
         // Reset emergency stop after brief delay
         setTimeout(() => {
@@ -3807,82 +3829,211 @@ while True:
 
     playSelectedRun() {
         const runsList = document.getElementById('savedRunsList');
-        if (!runsList || !runsList.value) {
-            this.toastManager.show('Please select a run to play', 'warning');
-            return;
-        }
-
-        const savedRuns = this.getSavedRunsArray();
-        const selectedRun = savedRuns.find(run => run.id === runsList.value);
-        
-        if (!selectedRun) {
-            this.toastManager.show('Selected run not found', 'error');
-            return;
-        }
-
-        this.toastManager.show(`Playing run "${selectedRun.name}"...`, 'info');
-        this.logger.log(`Playing run: ${selectedRun.name} (${selectedRun.commands.length} commands)`, 'info');
-        
-        // Execute the recorded commands
-        this.executeRecordedCommands(selectedRun.commands);
-    }
-    
-    async executeRecordedCommands(commands) {
-        // If the selected run has a coordinate path, follow it; otherwise use time-stamped commands
-        const runsList = document.getElementById('savedRunsList');
-        const savedRuns = this.getSavedRunsArray();
-        const selectedRun = runsList && savedRuns.find(r => r.id === runsList.value);
-        // Ensure simulator starts from the same starting pose as when recording began
-        if (this.robotSimulator && selectedRun) {
-            const rect = this.robotSimulator.canvas.getBoundingClientRect();
-            const margin = 30;
-            const corner = selectedRun.startCorner || this.startCorner || 'BL';
-            const startXCorner = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
-            const startYCorner = Math.max(margin, rect.height - margin);
-            // If a path exists, we will override with exact first point below; otherwise, set to corner origin
-            this.robotSimulator.setPose(startXCorner, startYCorner, 0, { clearTrail: true, resetMotion: true });
-            // If path has at least one point, set exact recorded starting pose before command playback
-            if (Array.isArray(selectedRun.path) && selectedRun.path.length >= 1) {
-                const width = this.simCanvasSize.width || rect.width || 0;
-                const height = this.simCanvasSize.height || rect.height || 0;
-                const startWorld = selectedRun.path[0];
-                const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
-                const simY = Math.max(0, height - startWorld.y);
-                this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
-                this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
-            }
-        }
-        if (selectedRun && Array.isArray(selectedRun.path) && selectedRun.path.length > 1) {
-            await this.followPath(selectedRun);
-            this.toastManager.show('Playback completed', 'success');
-            this.logger.log('Run playback completed (path mode)', 'info');
-            return;
-        }
-        if (!commands || commands.length === 0) return;
-        let currentIndex = 0;
-        const startTime = Date.now();
-        const executeNext = () => {
-            if (currentIndex >= commands.length) {
-                this.toastManager.show('Playback completed', 'success');
-                this.logger.log('Run playback completed', 'info');
+        if (!this.isPlaying) {
+            if (!runsList || !runsList.value) {
+                this.toastManager.show('Please select a run to play', 'warning');
                 return;
             }
-            const cmd = commands[currentIndex];
-            const elapsedTime = Date.now() - startTime;
-            const delay = cmd.timestamp - elapsedTime;
-            if (delay > 0) {
-                setTimeout(() => {
-                    this.executeCommand(cmd);
-                    currentIndex++;
-                    executeNext();
-                }, delay);
-            } else {
-                this.executeCommand(cmd);
-                currentIndex++;
-                executeNext();
+            const savedRuns = this.getSavedRunsArray();
+            const selectedRun = savedRuns.find(run => run.id === runsList.value);
+            if (!selectedRun) {
+                this.toastManager.show('Selected run not found', 'error');
+                return;
             }
-        };
-        executeNext();
+            this.startRunPlayback(selectedRun);
+        } else if (!this.isPaused) {
+            this.pausePlayback();
+        } else {
+            this.resumePlayback();
+        }
+    }
+    
+    startRunPlayback(selectedRun) {
+        try {
+            this.playbackRun = selectedRun;
+            // Initialize pose
+            this.initializePlaybackPose(selectedRun);
+            // Decide mode
+            if (Array.isArray(selectedRun.path) && selectedRun.path.length > 1) {
+                this.playbackMode = 'path';
+                this.playbackIndex = 0;
+                this.isPlaying = true;
+                this.isPaused = false;
+                this.playbackElapsedBeforePause = 0;
+                this.playbackStartEpoch = Date.now();
+                this.toastManager.show(`Playing run "${selectedRun.name}" (path)`, 'info');
+                this.logger.log(`Playing run (path): ${selectedRun.name}`, 'info');
+                this.startPathInterval();
+            } else {
+                const commands = Array.isArray(selectedRun.commands) ? selectedRun.commands : [];
+                this.playbackMode = 'commands';
+                this.playbackCommands = commands;
+                this.playbackIndex = 0;
+                this.isPlaying = true;
+                this.isPaused = false;
+                this.playbackElapsedBeforePause = 0;
+                this.playbackStartEpoch = Date.now();
+                this.toastManager.show(`Playing run "${selectedRun.name}"`, 'info');
+                this.logger.log(`Playing run: ${selectedRun.name} (${commands.length} commands)`, 'info');
+                this.scheduleNextCommand();
+            }
+            this.updatePlayButtonUI();
+        } catch (e) {
+            this.toastManager.show('Failed to start playback', 'error');
+        }
+    }
+
+    initializePlaybackPose(run) {
+        if (!this.robotSimulator || !run) return;
+        const rect = this.robotSimulator.canvas.getBoundingClientRect();
+        const margin = 30;
+        const corner = run.startCorner || this.startCorner || 'BL';
+        const startXCorner = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
+        const startYCorner = Math.max(margin, rect.height - margin);
+        this.robotSimulator.setPose(startXCorner, startYCorner, 0, { clearTrail: true, resetMotion: true });
+        if (Array.isArray(run.path) && run.path.length >= 1) {
+            const width = this.simCanvasSize.width || rect.width || 0;
+            const height = this.simCanvasSize.height || rect.height || 0;
+            const startWorld = run.path[0];
+            const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
+            const simY = Math.max(0, height - startWorld.y);
+            this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
+            this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
+        }
+    }
+
+    startPathInterval() {
+        if (!this.playbackRun || !Array.isArray(this.playbackRun.path)) return;
+        const path = this.playbackRun.path;
+        const prevCorner = this.startCorner;
+        this.startCorner = this.playbackRun.startCorner || 'BL';
+        // Ensure robot stopped before starting tick
+        this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+        const tickMs = 50;
+        if (this.playbackTimerId) clearInterval(this.playbackTimerId);
+        this.playbackTimerId = setInterval(() => {
+            if (!this.isPlaying || this.isPaused) return;
+            if (this.playbackIndex >= path.length) {
+                clearInterval(this.playbackTimerId);
+                this.playbackTimerId = null;
+                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+                this.startCorner = prevCorner;
+                this.onPlaybackComplete();
+                return;
+            }
+            const target = path[this.playbackIndex];
+            const current = this.odom;
+            const dx = (target.x) - current.x;
+            const dy = (target.y) - current.y;
+            const distance = Math.hypot(dx, dy);
+            const heading = Math.atan2(dy, dx) * 180 / Math.PI;
+            let errHeading = heading - current.thetaDeg;
+            while (errHeading > 180) errHeading -= 360;
+            while (errHeading < -180) errHeading += 360;
+            const maxSpeed = this.config.straightSpeed || 500;
+            const maxTurn = this.config.turnRate || 200;
+            const speed = Math.max(Math.min(distance * 3, maxSpeed), -maxSpeed);
+            const turn = Math.max(Math.min(errHeading * 3, maxTurn), -maxTurn);
+            this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
+            this.playbackIndex++;
+        }, tickMs);
+    }
+
+    scheduleNextCommand() {
+        if (!this.isPlaying || this.isPaused) return;
+        if (!Array.isArray(this.playbackCommands)) {
+            this.onPlaybackComplete();
+            return;
+        }
+        // Execute any overdue commands immediately
+        while (this.playbackIndex < this.playbackCommands.length) {
+            const cmd = this.playbackCommands[this.playbackIndex];
+            const elapsed = (Date.now() - this.playbackStartEpoch) + this.playbackElapsedBeforePause;
+            const delay = Math.max(0, (cmd.timestamp || 0) - elapsed);
+            if (delay === 0) {
+                this.executeCommand(cmd);
+                this.playbackIndex++;
+                continue;
+            }
+            if (this.playbackCurrentTimeout) clearTimeout(this.playbackCurrentTimeout);
+            this.playbackCurrentTimeout = setTimeout(() => {
+                if (!this.isPlaying || this.isPaused) return;
+                this.executeCommand(cmd);
+                this.playbackIndex++;
+                if (this.playbackIndex >= this.playbackCommands.length) {
+                    this.onPlaybackComplete();
+                } else {
+                    this.scheduleNextCommand();
+                }
+            }, delay);
+            break;
+        }
+        if (this.playbackIndex >= this.playbackCommands.length) {
+            this.onPlaybackComplete();
+        }
+    }
+
+    pausePlayback() {
+        if (!this.isPlaying || this.isPaused) return;
+        this.isPaused = true;
+        // Stop timers
+        if (this.playbackTimerId) {
+            clearInterval(this.playbackTimerId);
+            this.playbackTimerId = null;
+        }
+        if (this.playbackCurrentTimeout) {
+            clearTimeout(this.playbackCurrentTimeout);
+            this.playbackCurrentTimeout = null;
+        }
+        // Accumulate elapsed
+        this.playbackElapsedBeforePause += (Date.now() - this.playbackStartEpoch);
+        // Send stop motion to robot
+        this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+        this.toastManager.show('⏸️ Run paused', 'info');
+        this.updatePlayButtonUI();
+    }
+
+    resumePlayback() {
+        if (!this.isPlaying || !this.isPaused) return;
+        this.isPaused = false;
+        this.playbackStartEpoch = Date.now();
+        if (this.playbackMode === 'path') {
+            this.startPathInterval();
+        } else if (this.playbackMode === 'commands') {
+            this.scheduleNextCommand();
+        }
+        this.toastManager.show('▶️ Run resumed', 'info');
+        this.updatePlayButtonUI();
+    }
+
+    onPlaybackComplete() {
+        this.isPlaying = false;
+        this.isPaused = false;
+        this.playbackMode = null;
+        this.playbackIndex = 0;
+        this.playbackRun = null;
+        this.playbackCommands = null;
+        this.playbackElapsedBeforePause = 0;
+        if (this.playbackTimerId) clearInterval(this.playbackTimerId);
+        if (this.playbackCurrentTimeout) clearTimeout(this.playbackCurrentTimeout);
+        this.playbackTimerId = null;
+        this.playbackCurrentTimeout = null;
+        this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+        this.toastManager.show('Playback completed', 'success');
+        this.logger.log('Run playback completed', 'info');
+        this.updatePlayButtonUI();
+    }
+
+    updatePlayButtonUI() {
+        const playBtn = document.getElementById('playBtn');
+        if (!playBtn) return;
+        if (!this.isPlaying) {
+            playBtn.innerHTML = '<i class="fas fa-play" aria-hidden="true"></i> Play';
+        } else if (this.isPaused) {
+            playBtn.innerHTML = '<i class="fas fa-play" aria-hidden="true"></i> Resume';
+        } else {
+            playBtn.innerHTML = '<i class="fas fa-pause" aria-hidden="true"></i> Pause';
+        }
     }
     
     async followPath(run) {
