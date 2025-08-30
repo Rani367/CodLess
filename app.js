@@ -2475,6 +2475,24 @@ class FLLRoboticsApp extends EventEmitter {
                 // Send to visual simulator if available
                 this.robotSimulator?.updateCommand(compensatedCommand);
                 this.logger.log(`SIMULATED: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
+            } else {
+                // No real robot and simulation not enabled: auto-enable simulator and route command
+                try {
+                    this.logger.log('No robot connected; enabling simulator automatically.', 'warning');
+                    this.config.simulateConnected = true;
+                    try { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config)); } catch (e) {}
+                    this.applySimulationState();
+                    // Give the simulator a moment to initialize, then send the command
+                    setTimeout(() => {
+                        if (this.robotSimulator) {
+                            this.robotSimulator.updateCommand(compensatedCommand);
+                            this.logger.log(`SIMULATED: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
+                        }
+                    }, 30);
+                } catch (e) {
+                    // Swallow and report any issues enabling simulation
+                    this.logger.log(`Failed to auto-enable simulator: ${e?.message || e}`, 'error');
+                }
             }
             
             // Record if recording
