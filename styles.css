@@ -457,7 +457,7 @@ body {
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     image-rendering: auto;
-    cursor: grab;
+    cursor: default;
     touch-action: none;
 }
 
@@ -469,9 +469,7 @@ body {
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-#robotSimulator:active {
-    cursor: grabbing;
-}
+#robotSimulator:active {}
 
 .simulator-controls {
     display: flex;
