@@ -1522,9 +1522,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Simulation
         this.simulatedBatteryInterval = null;
         
-        // Coordinate system
-        this.startCorner = 'BL'; // 'BL' or 'BR'
-        this.recordedPath = [];
+        // Odometry for simulator/integration
         this.odom = { x: 0, y: 0, thetaDeg: 0 };
         this.lastOdomTimestamp = 0;
         this.simCanvasSize = { width: 0, height: 0 };
@@ -1715,7 +1713,7 @@ class FLLRoboticsApp extends EventEmitter {
                 localStorage.removeItem(STORAGE_KEYS.CONFIG);
             }
             
-            // Load saved runs
+            // Load saved runs (no coordinate dependency)
             const savedRuns = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
             if (savedRuns) {
                 try {
@@ -1743,17 +1741,7 @@ class FLLRoboticsApp extends EventEmitter {
                 localStorage.removeItem(STORAGE_KEYS.CALIBRATION_DATA);
             }
             
-            // Load user preferences
-            try {
-                const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
-                if (preferences) {
-                    const prefs = JSON.parse(preferences);
-                    this.startCorner = prefs.startCorner || 'BL';
-                }
-            } catch (prefsError) {
-                console.error('Error loading user preferences:', prefsError);
-                localStorage.removeItem(STORAGE_KEYS.USER_PREFERENCES);
-            }
+            // User preferences no longer include coordinate corner
             
         } catch (error) {
             console.error('Error loading user data:', error);
@@ -1889,9 +1877,6 @@ class FLLRoboticsApp extends EventEmitter {
             // Use array format for consistency
             const savedRunsArray = this.getSavedRunsArray();
             localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRunsArray));
-            localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
-                startCorner: this.startCorner
-            }));
             
             if (this.isCalibrated) {
                 const calibrationData = {
@@ -1926,9 +1911,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Competition code
         document.getElementById('uploadToHubBtn')?.addEventListener('click', () => this.uploadToHub());
         
-        // Start corner selection
-        document.getElementById('cornerBLBtn')?.addEventListener('click', () => this.setStartCorner('BL'));
-        document.getElementById('cornerBRBtn')?.addEventListener('click', () => this.setStartCorner('BR'));
+        // Start corner selection removed (coordinate system deprecated)
         
         // Recording controls
         document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
@@ -1995,11 +1978,11 @@ class FLLRoboticsApp extends EventEmitter {
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
-            // Initialize robot pose to the selected start corner at simulator creation
+            // Initialize robot pose to a fixed bottom-left position at simulator creation
             try {
                 const rect2 = canvas.getBoundingClientRect();
                 const margin = 30;
-                const startX = this.startCorner === 'BL' ? margin : Math.max(margin, rect2.width - margin);
+                const startX = margin;
                 const startY = Math.max(margin, rect2.height - margin);
                 this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
             } catch (e) {
@@ -2692,22 +2675,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateConfigurationUI();
         // Initialize recording controls based on current connection status
         this.enableRecordingControls(this.isRobotConnected());
-        // Update corner button active state
-        const bl = document.getElementById('cornerBLBtn');
-        const br = document.getElementById('cornerBRBtn');
-        if (bl && br) {
-            if (this.startCorner === 'BL') {
-                bl.classList.add('btn-primary');
-                bl.classList.remove('btn-secondary');
-                br.classList.add('btn-secondary');
-                br.classList.remove('btn-primary');
-            } else {
-                br.classList.add('btn-primary');
-                br.classList.remove('btn-secondary');
-                bl.classList.add('btn-secondary');
-                bl.classList.remove('btn-primary');
-            }
-        }
+        // Corner UI removed
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
@@ -2974,7 +2942,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.recordedCommands = [];
         this.segmentedCommands = [];
         this.recordingStartTime = Date.now();
-        this.recordedPath = [];
+        // recordedPath removed
         this.lastOdomTimestamp = this.recordingStartTime;
         // Reset odom to origin based on startCorner
         this.odom = { x: 0, y: 0, thetaDeg: 0 };
@@ -3078,8 +3046,7 @@ class FLLRoboticsApp extends EventEmitter {
                 command_type: seg.type, // 'move' | 'turn' | 'arc'
                 parameters: { ...seg.params, durationMs: seg.durationMs }
             })),
-            path: this.recordedPath,
-            startCorner: this.startCorner,
+            // path removed; no coordinate dependency
             createdAt: new Date().toISOString(),
             duration: (this.segmentedCommands && this.segmentedCommands.length > 0) ? 
                 (this.segmentedCommands[this.segmentedCommands.length - 1].endOffsetMs || 0) / 1000 : 0
@@ -3849,56 +3816,13 @@ while True:
         if (!this.robotSimulator || !run) return;
         const rect = this.robotSimulator.canvas.getBoundingClientRect();
         const margin = 30;
-        const corner = run.startCorner || this.startCorner || 'BL';
-        const startXCorner = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
-        const startYCorner = Math.max(margin, rect.height - margin);
-        this.robotSimulator.setPose(startXCorner, startYCorner, 0, { clearTrail: true, resetMotion: true });
-        if (Array.isArray(run.path) && run.path.length >= 1) {
-            const width = this.simCanvasSize.width || rect.width || 0;
-            const height = this.simCanvasSize.height || rect.height || 0;
-            const startWorld = run.path[0];
-            const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
-            const simY = Math.max(0, height - startWorld.y);
-            this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
-            this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
-        }
+        const startX = margin;
+        const startY = Math.max(margin, rect.height - margin);
+        this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
     }
 
     startPathInterval() {
-        if (!this.playbackRun || !Array.isArray(this.playbackRun.path)) return;
-        const path = this.playbackRun.path;
-        const prevCorner = this.startCorner;
-        this.startCorner = this.playbackRun.startCorner || 'BL';
-        // Ensure robot stopped before starting tick
-        this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-        const tickMs = 50;
-        if (this.playbackTimerId) clearInterval(this.playbackTimerId);
-        this.playbackTimerId = setInterval(() => {
-            if (!this.isPlaying || this.isPaused) return;
-            if (this.playbackIndex >= path.length) {
-                clearInterval(this.playbackTimerId);
-                this.playbackTimerId = null;
-                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-                this.startCorner = prevCorner;
-                this.onPlaybackComplete();
-                return;
-            }
-            const target = path[this.playbackIndex];
-            const current = this.odom;
-            const dx = (target.x) - current.x;
-            const dy = (target.y) - current.y;
-            const distance = Math.hypot(dx, dy);
-            const heading = Math.atan2(dy, dx) * 180 / Math.PI;
-            let errHeading = heading - current.thetaDeg;
-            while (errHeading > 180) errHeading -= 360;
-            while (errHeading < -180) errHeading += 360;
-            const maxSpeed = this.config.straightSpeed || 500;
-            const maxTurn = this.config.turnRate || 200;
-            const speed = Math.max(Math.min(distance * 3, maxSpeed), -maxSpeed);
-            const turn = Math.max(Math.min(errHeading * 3, maxTurn), -maxTurn);
-            this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
-            this.playbackIndex++;
-        }, tickMs);
+        // Path mode removed (coordinate system deprecated)
     }
 
     scheduleNextCommand() {
@@ -3996,64 +3920,7 @@ while True:
         }
     }
     
-    async followPath(run) {
-        // Move the robot by sending continuous drive commands to steer towards successive path points
-        const path = run.path;
-        const corner = run.startCorner || 'BL';
-        // Temporarily use the run's start corner for coordinate transforms
-        const prevCorner = this.startCorner;
-        this.startCorner = corner;
-        // Initialize simulator pose to the recorded starting point
-        if (this.robotSimulator && Array.isArray(path) && path.length > 0) {
-            // Path coordinates are in world space (bottom origin with corner transform)
-            const width = this.simCanvasSize.width || this.robotSimulator.canvas.getBoundingClientRect().width || 0;
-            const height = this.simCanvasSize.height || this.robotSimulator.canvas.getBoundingClientRect().height || 0;
-            const startWorld = path[0];
-            // Convert world coords back to simulator canvas coords
-            const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
-            const simY = Math.max(0, height - startWorld.y);
-            this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
-            // Also sync odom immediately
-            this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
-        }
-        // Reset internal pressed keys and stop
-        this.pressedKeys.clear();
-        await this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-        let idx = 0;
-        const tickMs = 50;
-        return new Promise((resolve) => {
-            const timer = setInterval(() => {
-                if (idx >= path.length) {
-                    clearInterval(timer);
-                    // stop robot
-                    this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-                    // Restore previous corner preference
-                    this.startCorner = prevCorner;
-                    resolve();
-                    return;
-                }
-                // Desired target point in world coords for this path tick
-                const target = path[idx];
-                // Compute current world odom (already kept up to date by onSimulatorUpdate)
-                const current = this.odom;
-                const dx = (target.x) - current.x;
-                const dy = (target.y) - current.y;
-                const distance = Math.hypot(dx, dy);
-                // Heading to target in degrees, convert to turn command
-                const heading = Math.atan2(dy, dx) * 180 / Math.PI;
-                let errHeading = heading - current.thetaDeg;
-                while (errHeading > 180) errHeading -= 360;
-                while (errHeading < -180) errHeading += 360;
-                // Simple P controller
-                const maxSpeed = this.config.straightSpeed || 500;
-                const maxTurn = this.config.turnRate || 200;
-                const speed = Math.max(Math.min(distance * 3, maxSpeed), -maxSpeed);
-                const turn = Math.max(Math.min(errHeading * 3, maxTurn), -maxTurn);
-                this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
-                idx++;
-            }, tickMs);
-        });
-    }
+    async followPath(run) { /* removed */ }
     
     executeCommand(cmd) {
         if (cmd.eventType === 'keyboard') {
@@ -4153,7 +4020,6 @@ while True:
             const margin = 30;
             const startX = margin;
             const startY = Math.max(margin, rect.height - margin);
-            this.setStartCorner('BL');
             this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
             this.toastManager.show('Simulator reset to bottom-left', 'info');
         } catch (e) {
@@ -4196,50 +4062,19 @@ while True:
         this.logger.log('Application shutting down', 'info');
     }
 
-    setStartCorner(corner) {
-        this.startCorner = corner;
-        this.saveUserData();
-        this.toastManager.show(`Start corner set to ${corner}`, 'success');
-        const bl = document.getElementById('cornerBLBtn');
-        const br = document.getElementById('cornerBRBtn');
-        if (bl && br) {
-            if (corner === 'BL') {
-                bl.classList.add('btn-primary');
-                bl.classList.remove('btn-secondary');
-                br.classList.add('btn-secondary');
-                br.classList.remove('btn-primary');
-            } else {
-                br.classList.add('btn-primary');
-                br.classList.remove('btn-secondary');
-                bl.classList.add('btn-secondary');
-                bl.classList.remove('btn-primary');
-            }
-        }
-        // Move current simulator pose to the selected corner
-        if (this.robotSimulator && this.robotSimulator.canvas) {
-            const rect = this.robotSimulator.canvas.getBoundingClientRect();
-            const margin = 30;
-            const x = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
-            const y = Math.max(margin, rect.height - margin);
-            this.robotSimulator.setPose(x, y, 0, { clearTrail: true, resetMotion: true });
-        }
-    }
+    setStartCorner(corner) { /* removed */ }
 
     onSimulatorUpdate(data) {
         // Track coordinates with origin at bottom-left or bottom-right
         const { x: simX, y: simY, angle } = data;
-        const width = this.simCanvasSize.width || this.robotSimulator?.canvas?.getBoundingClientRect()?.width || 0;
-        const height = this.simCanvasSize.height || this.robotSimulator?.canvas?.getBoundingClientRect()?.height || 0;
-        // Convert simulator coordinates (origin top-left) to bottom origin with selected corner
-        const worldY = Math.max(0, height - simY);
-        const worldX = this.startCorner === 'BL' ? simX : Math.max(0, width - simX);
-        this.odom = { x: worldX, y: worldY, thetaDeg: angle };
+        // Directly use simulator coordinate space for odometry
+        this.odom = { x: simX, y: simY, thetaDeg: angle };
         const now = Date.now();
         this.lastOdomTimestamp = now;
         if (this.isRecording) {
-            this.recordedPath.push({ t: now - this.recordingStartTime, x: worldX, y: worldY, theta: angle });
+            // Path recording removed; only segment commands are stored
             try {
-                this.updateSegmentation({ x: worldX, y: worldY, thetaDeg: angle }, now);
+                this.updateSegmentation({ x: simX, y: simY, thetaDeg: angle }, now);
             } catch (e) {
                 // fail-safe: ignore segmentation errors
             }
