@@ -1522,9 +1522,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Simulation
         this.simulatedBatteryInterval = null;
         
-        // Coordinate system
-        this.startCorner = 'BL'; // 'BL' or 'BR'
-        this.recordedPath = [];
+        // Odometry for simulator/integration
         this.odom = { x: 0, y: 0, thetaDeg: 0 };
         this.lastOdomTimestamp = 0;
         this.simCanvasSize = { width: 0, height: 0 };
@@ -1542,6 +1540,24 @@ class FLLRoboticsApp extends EventEmitter {
         this.playbackRun = null; // currently playing run
         this.playbackCommands = null; // commands array if in commands mode
         
+        // High-level recording segmentation state
+        this.segmentation = {
+            active: false,
+            type: null, // 'straight' | 'turn' | 'arc'
+            startTimestamp: 0,
+            lastTimestamp: 0,
+            lastPose: null, // { x, y, thetaDeg }
+            accumDistance: 0, // mm (world units)
+            accumAngle: 0, // deg
+            accumArcLength: 0, // mm
+            arcRadius: null, // mm (signed: + right, - left)
+        };
+        // Thresholds for classification
+        this.recordingThresholds = {
+            minDistanceStep: 0.5, // mm per tick to count movement
+            minAngleStep: 0.5, // deg per tick to count rotation
+            curvatureTolerance: 0.25 // 25% change allowed within one arc segment
+        };
         // Note: init() will be called explicitly after construction
     }
 
@@ -1697,7 +1713,7 @@ class FLLRoboticsApp extends EventEmitter {
                 localStorage.removeItem(STORAGE_KEYS.CONFIG);
             }
             
-            // Load saved runs
+            // Load saved runs (no coordinate dependency)
             const savedRuns = localStorage.getItem(STORAGE_KEYS.SAVED_RUNS);
             if (savedRuns) {
                 try {
@@ -1725,17 +1741,7 @@ class FLLRoboticsApp extends EventEmitter {
                 localStorage.removeItem(STORAGE_KEYS.CALIBRATION_DATA);
             }
             
-            // Load user preferences
-            try {
-                const preferences = localStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
-                if (preferences) {
-                    const prefs = JSON.parse(preferences);
-                    this.startCorner = prefs.startCorner || 'BL';
-                }
-            } catch (prefsError) {
-                console.error('Error loading user preferences:', prefsError);
-                localStorage.removeItem(STORAGE_KEYS.USER_PREFERENCES);
-            }
+            // User preferences no longer include coordinate corner
             
         } catch (error) {
             console.error('Error loading user data:', error);
@@ -1871,9 +1877,6 @@ class FLLRoboticsApp extends EventEmitter {
             // Use array format for consistency
             const savedRunsArray = this.getSavedRunsArray();
             localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRunsArray));
-            localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify({
-                startCorner: this.startCorner
-            }));
             
             if (this.isCalibrated) {
                 const calibrationData = {
@@ -1908,9 +1911,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Competition code
         document.getElementById('uploadToHubBtn')?.addEventListener('click', () => this.uploadToHub());
         
-        // Start corner selection
-        document.getElementById('cornerBLBtn')?.addEventListener('click', () => this.setStartCorner('BL'));
-        document.getElementById('cornerBRBtn')?.addEventListener('click', () => this.setStartCorner('BR'));
+        // Start corner selection removed (coordinate system deprecated)
         
         // Recording controls
         document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
@@ -1923,6 +1924,9 @@ class FLLRoboticsApp extends EventEmitter {
         document.getElementById('deleteBtn')?.addEventListener('click', () => this.deleteSelectedRun());
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportSelectedRun());
         document.getElementById('importBtn')?.addEventListener('click', () => this.importRun());
+
+        // Simulator: Reset Position
+        document.getElementById('resetSimBtn')?.addEventListener('click', () => this.resetSimulatorPosition());
         
         // Simulator controls removed (upload map, reset, fullscreen)
 
@@ -1974,11 +1978,11 @@ class FLLRoboticsApp extends EventEmitter {
             this.robotSimulator = new RobotSimulator(canvas);
             this.robotSimulator.updateConfig(this.config);
             this.robotSimulator.on('positionUpdate', (data) => this.onSimulatorUpdate(data));
-            // Initialize robot pose to the selected start corner at simulator creation
+            // Initialize robot pose to a fixed bottom-left position at simulator creation
             try {
                 const rect2 = canvas.getBoundingClientRect();
                 const margin = 30;
-                const startX = this.startCorner === 'BL' ? margin : Math.max(margin, rect2.width - margin);
+                const startX = margin;
                 const startY = Math.max(margin, rect2.height - margin);
                 this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
             } catch (e) {
@@ -2671,22 +2675,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.updateConfigurationUI();
         // Initialize recording controls based on current connection status
         this.enableRecordingControls(this.isRobotConnected());
-        // Update corner button active state
-        const bl = document.getElementById('cornerBLBtn');
-        const br = document.getElementById('cornerBRBtn');
-        if (bl && br) {
-            if (this.startCorner === 'BL') {
-                bl.classList.add('btn-primary');
-                bl.classList.remove('btn-secondary');
-                br.classList.add('btn-secondary');
-                br.classList.remove('btn-primary');
-            } else {
-                br.classList.add('btn-primary');
-                br.classList.remove('btn-secondary');
-                bl.classList.add('btn-secondary');
-                bl.classList.remove('btn-primary');
-            }
-        }
+        // Corner UI removed
     }
 
     updateConnectionUI(status = 'disconnected', deviceName = '') {
@@ -2951,11 +2940,24 @@ class FLLRoboticsApp extends EventEmitter {
     startRecording() {
         this.isRecording = true;
         this.recordedCommands = [];
+        this.segmentedCommands = [];
         this.recordingStartTime = Date.now();
-        this.recordedPath = [];
+        // recordedPath removed
         this.lastOdomTimestamp = this.recordingStartTime;
         // Reset odom to origin based on startCorner
         this.odom = { x: 0, y: 0, thetaDeg: 0 };
+        // Reset segmentation state
+        this.segmentation = {
+            active: false,
+            type: null,
+            startTimestamp: this.recordingStartTime,
+            lastTimestamp: this.recordingStartTime,
+            lastPose: null,
+            accumDistance: 0,
+            accumAngle: 0,
+            accumArcLength: 0,
+            arcRadius: null
+        };
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -2975,6 +2977,8 @@ class FLLRoboticsApp extends EventEmitter {
 
     stopRecording() {
         this.isRecording = false;
+        // Flush any active segment
+        try { this.flushActiveSegment(true); } catch (e) {}
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -2987,21 +2991,23 @@ class FLLRoboticsApp extends EventEmitter {
         // Enable save button only if there are commands to save
         const saveBtn = document.getElementById('saveBtn');
         if (saveBtn) {
-            saveBtn.disabled = this.recordedCommands.length === 0;
+            const numSegments = Array.isArray(this.segmentedCommands) ? this.segmentedCommands.length : 0;
+            saveBtn.disabled = numSegments === 0;
         }
         
         const duration = (Date.now() - this.recordingStartTime) / 1000;
-        this.toastManager.show(`⏹️ Recording stopped - captured ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`, 'success');
-        this.logger.log(`Recording stopped: ${this.recordedCommands.length} commands in ${duration.toFixed(1)}s`);
+        const numSegments = Array.isArray(this.segmentedCommands) ? this.segmentedCommands.length : 0;
+        this.toastManager.show(`⏹️ Recording stopped - captured ${numSegments} segments in ${duration.toFixed(1)}s`, 'success');
+        this.logger.log(`Recording stopped: ${numSegments} segments in ${duration.toFixed(1)}s`);
         
         // Automatically save run if any commands were recorded
-        if (this.recordedCommands.length > 0) {
+        if (numSegments > 0) {
             this.saveCurrentRun();
         }
     }
 
     saveCurrentRun() {
-        if (!this.recordedCommands || this.recordedCommands.length === 0) {
+        if (!this.segmentedCommands || this.segmentedCommands.length === 0) {
             this.toastManager.show('No recorded commands to save', 'warning');
             return;
         }
@@ -3034,43 +3040,16 @@ class FLLRoboticsApp extends EventEmitter {
         const run = {
             id: Date.now().toString(),
             name: name,
-            commands: this.recordedCommands.map(cmd => {
-                if (cmd.eventType === 'keyboard') {
-                    // Handle keyboard events
-                    return {
-                        command_type: cmd.type, // 'keydown' or 'keyup'
-                        parameters: {
-                            key: cmd.key,
-                            eventType: cmd.eventType,
-                            duration: cmd.timestamp / 1000 // Convert to seconds
-                        }
-                    };
-                } else if (cmd.eventType === 'robot') {
-                    // Handle robot commands
-                    return {
-                        command_type: cmd.command.type,
-                        parameters: {
-                            ...cmd.command,
-                            duration: cmd.timestamp / 1000 // Convert to seconds
-                        }
-                    };
-                } else {
-                    // Fallback for unknown types
-                    console.warn('Unknown event type:', cmd);
-                    return {
-                        command_type: cmd.type || 'unknown',
-                        parameters: {
-                            ...cmd,
-                            duration: cmd.timestamp / 1000 // Convert to seconds
-                        }
-                    };
-                }
-            }),
-            path: this.recordedPath,
-            startCorner: this.startCorner,
+            commands: (this.segmentedCommands || []).map(seg => ({
+                eventType: 'segment',
+                timestamp: seg.startOffsetMs,
+                command_type: seg.type, // 'move' | 'turn' | 'arc'
+                parameters: { ...seg.params, durationMs: seg.durationMs }
+            })),
+            // path removed; no coordinate dependency
             createdAt: new Date().toISOString(),
-            duration: this.recordedCommands.length > 0 ? 
-                this.recordedCommands[this.recordedCommands.length - 1].timestamp / 1000 : 0
+            duration: (this.segmentedCommands && this.segmentedCommands.length > 0) ? 
+                (this.segmentedCommands[this.segmentedCommands.length - 1].endOffsetMs || 0) / 1000 : 0
         };
 
         // Save to localStorage
@@ -3086,6 +3065,7 @@ class FLLRoboticsApp extends EventEmitter {
         // Update UI
         this.updateRunsList();
         this.recordedCommands = [];
+        this.segmentedCommands = [];
         
         // Disable save button until next recording
         const saveBtn = document.getElementById('saveBtn');
@@ -3331,41 +3311,6 @@ while True:
             "",
             ...this.generateCalibrationCode(calibrationData),
             "# --- HELPER FUNCTIONS ---",
-            "def apply_calibration(speed, turn_rate):",
-            "    \"\"\"Apply calibration compensation to drive commands\"\"\"",
-            "    calibrated_speed = speed * SPEED_CALIBRATION",
-            "    calibrated_turn = turn_rate * TURN_CALIBRATION",
-            "    ",
-            "    # Apply drift compensation for straight movement",
-            "    if turn_rate == 0 and speed != 0:",
-            "        calibrated_turn += DRIFT_COMPENSATION",
-            "    ",
-            "    return calibrated_speed, calibrated_turn",
-            "",
-            "def move_forward(speed, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(speed, 0)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def move_backward(speed, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(-speed, 0)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def turn_left(angle, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(0, -angle)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
-            "def turn_right(angle, duration_ms):",
-            "    cal_speed, cal_turn = apply_calibration(0, angle)",
-            "    drive_base.drive(cal_speed, cal_turn)",
-            "    wait(duration_ms)",
-            "    drive_base.stop()",
-            "",
             "def arm1_up(speed, duration_ms):",
             "    arm1_motor.run(speed)",
             "    wait(duration_ms)",
@@ -3400,12 +3345,31 @@ while True:
             const funcLines = [`def ${funcName}():`];
             funcLines.push(`    # ${run.name}`);
             
-            if (Array.isArray(run.path) && run.path.length > 1) {
-                funcLines.push("    # Follow recorded coordinate path using dead-reckoning");
+            if (run.commands && run.commands.length > 0) {
+                funcLines.push("    # Replay recorded segments as move/turn/arc");
+                funcLines.push("    from pybricks.parameters import Stop");
+                run.commands.forEach(cmd => {
+                    const cmdType = cmd.command_type || cmd.type;
+                    const p = cmd.parameters || cmd;
+                    if (cmdType === 'move') {
+                        const dist = Math.round(p.distance || 0);
+                        funcLines.push(`    if ${dist} != 0: drive_base.straight(${dist})`);
+                    } else if (cmdType === 'turn') {
+                        const ang = Math.round(p.angle || 0);
+                        funcLines.push(`    if ${ang} != 0: drive_base.turn(${ang})`);
+                    } else if (cmdType === 'arc') {
+                        const radius = Math.round(p.radius || 0);
+                        const ang = Math.round(p.angle || 0);
+                        // Use arc with angle; rely on Pybricks to handle continuity
+                        funcLines.push(`    if ${radius} != 0 and ${ang} != 0: drive_base.arc(${radius}, angle=${ang}, then=Stop.HOLD)`);
+                    }
+                });
+            } else if (Array.isArray(run.path) && run.path.length > 1) {
+                funcLines.push("    # Fallback: coordinate path replay (legacy)");
                 const waypoints = run.path.map(p => `(${Math.round(p.x)}, ${Math.round(p.y)})`).join(', ');
                 funcLines.push(`    waypoints = [${waypoints}]`);
-                funcLines.push("    mm_per_unit = 1.0  # scale recorded units to mm");
-                funcLines.push("    cur_x, cur_y, cur_heading = 0.0, 0.0, 0.0  # deg");
+                funcLines.push("    mm_per_unit = 1.0");
+                funcLines.push("    cur_x, cur_y, cur_heading = 0.0, 0.0, 0.0");
                 funcLines.push("    def normalize_deg(a):\n        while a > 180: a -= 360\n        while a < -180: a += 360\n        return a");
                 funcLines.push("    for tx, ty in waypoints:");
                 funcLines.push("        dx = (tx - cur_x) * mm_per_unit");
@@ -3417,41 +3381,6 @@ while True:
                 funcLines.push("        if abs(turn) > 1: drive_base.turn(turn)");
                 funcLines.push("        if dist != 0: drive_base.straight(dist)");
                 funcLines.push("        cur_heading = target\n        cur_x, cur_y = tx, ty");
-            } else if (run.commands && run.commands.length > 0) {
-                run.commands.forEach(cmd => {
-                    const cmdType = cmd.command_type || cmd.type;
-                    const params = cmd.parameters || cmd;
-                    const duration = params.duration ? Math.round(params.duration * 1000) : 0;
-                    if (cmdType === "drive") {
-                        const speed = params.speed || 0;
-                        const turnRate = params.turn_rate || 0;
-                        if (speed !== 0 || turnRate !== 0) {
-                            funcLines.push(`    drive_base.drive(${speed}, ${turnRate})`);
-                            if (duration > 0) funcLines.push(`    wait(${duration})`);
-                            funcLines.push("    drive_base.stop()");
-                        } else {
-                            funcLines.push("    drive_base.stop()");
-                        }
-                    } else if (cmdType === "arm1") {
-                        const speed = params.speed || 0;
-                        if (speed !== 0) {
-                            funcLines.push(`    arm1_motor.run(${speed})`);
-                            if (duration > 0) funcLines.push(`    wait(${duration})`);
-                            funcLines.push("    arm1_motor.stop()");
-                        } else {
-                            funcLines.push("    arm1_motor.stop()");
-                        }
-                    } else if (cmdType === "arm2") {
-                        const speed = params.speed || 0;
-                        if (speed !== 0) {
-                            funcLines.push(`    arm2_motor.run(${speed})`);
-                            if (duration > 0) funcLines.push(`    wait(${duration})`);
-                            funcLines.push("    arm2_motor.stop()");
-                        } else {
-                            funcLines.push("    arm2_motor.stop()");
-                        }
-                    }
-                });
             } else {
                 funcLines.push("    # No commands recorded for this run");
                 funcLines.push("    pass");
@@ -3854,18 +3783,8 @@ while True:
             // Initialize pose
             this.initializePlaybackPose(selectedRun);
             // Decide mode
-            if (Array.isArray(selectedRun.path) && selectedRun.path.length > 1) {
-                this.playbackMode = 'path';
-                this.playbackIndex = 0;
-                this.isPlaying = true;
-                this.isPaused = false;
-                this.playbackElapsedBeforePause = 0;
-                this.playbackStartEpoch = Date.now();
-                this.toastManager.show(`Playing run "${selectedRun.name}" (path)`, 'info');
-                this.logger.log(`Playing run (path): ${selectedRun.name}`, 'info');
-                this.startPathInterval();
-            } else {
-                const commands = Array.isArray(selectedRun.commands) ? selectedRun.commands : [];
+            if (Array.isArray(selectedRun.commands) && selectedRun.commands.length > 0) {
+                const commands = selectedRun.commands;
                 this.playbackMode = 'commands';
                 this.playbackCommands = commands;
                 this.playbackIndex = 0;
@@ -3876,6 +3795,16 @@ while True:
                 this.toastManager.show(`Playing run "${selectedRun.name}"`, 'info');
                 this.logger.log(`Playing run: ${selectedRun.name} (${commands.length} commands)`, 'info');
                 this.scheduleNextCommand();
+            } else if (Array.isArray(selectedRun.path) && selectedRun.path.length > 1) {
+                this.playbackMode = 'path';
+                this.playbackIndex = 0;
+                this.isPlaying = true;
+                this.isPaused = false;
+                this.playbackElapsedBeforePause = 0;
+                this.playbackStartEpoch = Date.now();
+                this.toastManager.show(`Playing run "${selectedRun.name}" (path)`, 'info');
+                this.logger.log(`Playing run (path): ${selectedRun.name}`, 'info');
+                this.startPathInterval();
             }
             this.updatePlayButtonUI();
         } catch (e) {
@@ -3887,56 +3816,13 @@ while True:
         if (!this.robotSimulator || !run) return;
         const rect = this.robotSimulator.canvas.getBoundingClientRect();
         const margin = 30;
-        const corner = run.startCorner || this.startCorner || 'BL';
-        const startXCorner = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
-        const startYCorner = Math.max(margin, rect.height - margin);
-        this.robotSimulator.setPose(startXCorner, startYCorner, 0, { clearTrail: true, resetMotion: true });
-        if (Array.isArray(run.path) && run.path.length >= 1) {
-            const width = this.simCanvasSize.width || rect.width || 0;
-            const height = this.simCanvasSize.height || rect.height || 0;
-            const startWorld = run.path[0];
-            const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
-            const simY = Math.max(0, height - startWorld.y);
-            this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
-            this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
-        }
+        const startX = margin;
+        const startY = Math.max(margin, rect.height - margin);
+        this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
     }
 
     startPathInterval() {
-        if (!this.playbackRun || !Array.isArray(this.playbackRun.path)) return;
-        const path = this.playbackRun.path;
-        const prevCorner = this.startCorner;
-        this.startCorner = this.playbackRun.startCorner || 'BL';
-        // Ensure robot stopped before starting tick
-        this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-        const tickMs = 50;
-        if (this.playbackTimerId) clearInterval(this.playbackTimerId);
-        this.playbackTimerId = setInterval(() => {
-            if (!this.isPlaying || this.isPaused) return;
-            if (this.playbackIndex >= path.length) {
-                clearInterval(this.playbackTimerId);
-                this.playbackTimerId = null;
-                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-                this.startCorner = prevCorner;
-                this.onPlaybackComplete();
-                return;
-            }
-            const target = path[this.playbackIndex];
-            const current = this.odom;
-            const dx = (target.x) - current.x;
-            const dy = (target.y) - current.y;
-            const distance = Math.hypot(dx, dy);
-            const heading = Math.atan2(dy, dx) * 180 / Math.PI;
-            let errHeading = heading - current.thetaDeg;
-            while (errHeading > 180) errHeading -= 360;
-            while (errHeading < -180) errHeading += 360;
-            const maxSpeed = this.config.straightSpeed || 500;
-            const maxTurn = this.config.turnRate || 200;
-            const speed = Math.max(Math.min(distance * 3, maxSpeed), -maxSpeed);
-            const turn = Math.max(Math.min(errHeading * 3, maxTurn), -maxTurn);
-            this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
-            this.playbackIndex++;
-        }, tickMs);
+        // Path mode removed (coordinate system deprecated)
     }
 
     scheduleNextCommand() {
@@ -3945,29 +3831,27 @@ while True:
             this.onPlaybackComplete();
             return;
         }
-        // Execute any overdue commands immediately
-        while (this.playbackIndex < this.playbackCommands.length) {
+        // Commands are segments; execute sequentially without stop-start gaps
+        const executeNext = () => {
+            if (!this.isPlaying || this.isPaused) return;
+            if (this.playbackIndex >= this.playbackCommands.length) {
+                this.onPlaybackComplete();
+                return;
+            }
             const cmd = this.playbackCommands[this.playbackIndex];
-            const elapsed = (Date.now() - this.playbackStartEpoch) + this.playbackElapsedBeforePause;
-            const delay = Math.max(0, (cmd.timestamp || 0) - elapsed);
-            if (delay === 0) {
-                this.executeCommand(cmd);
-                this.playbackIndex++;
-                continue;
+            const duration = (cmd.parameters && (cmd.parameters.durationMs || cmd.parameters.duration)) ? (cmd.parameters.durationMs || cmd.parameters.duration) : 0;
+            this.executeCommand(cmd);
+            this.playbackIndex++;
+            if (this.playbackIndex >= this.playbackCommands.length) {
+                // Schedule a final small stop to settle after last command
+                if (this.playbackCurrentTimeout) clearTimeout(this.playbackCurrentTimeout);
+                this.playbackCurrentTimeout = setTimeout(() => this.onPlaybackComplete(), Math.max(50, duration || 100));
+                return;
             }
             if (this.playbackCurrentTimeout) clearTimeout(this.playbackCurrentTimeout);
-            this.playbackCurrentTimeout = setTimeout(() => {
-                if (!this.isPlaying || this.isPaused) return;
-                this.executeCommand(cmd);
-                this.playbackIndex++;
-                if (this.playbackIndex >= this.playbackCommands.length) {
-                    this.onPlaybackComplete();
-                } else {
-                    this.scheduleNextCommand();
-                }
-            }, delay);
-            break;
-        }
+            this.playbackCurrentTimeout = setTimeout(executeNext, Math.max(0, duration || 100));
+        };
+        executeNext();
         if (this.playbackIndex >= this.playbackCommands.length) {
             this.onPlaybackComplete();
         }
@@ -4036,64 +3920,7 @@ while True:
         }
     }
     
-    async followPath(run) {
-        // Move the robot by sending continuous drive commands to steer towards successive path points
-        const path = run.path;
-        const corner = run.startCorner || 'BL';
-        // Temporarily use the run's start corner for coordinate transforms
-        const prevCorner = this.startCorner;
-        this.startCorner = corner;
-        // Initialize simulator pose to the recorded starting point
-        if (this.robotSimulator && Array.isArray(path) && path.length > 0) {
-            // Path coordinates are in world space (bottom origin with corner transform)
-            const width = this.simCanvasSize.width || this.robotSimulator.canvas.getBoundingClientRect().width || 0;
-            const height = this.simCanvasSize.height || this.robotSimulator.canvas.getBoundingClientRect().height || 0;
-            const startWorld = path[0];
-            // Convert world coords back to simulator canvas coords
-            const simX = corner === 'BL' ? startWorld.x : Math.max(0, width - startWorld.x);
-            const simY = Math.max(0, height - startWorld.y);
-            this.robotSimulator.setPose(simX, simY, startWorld.theta || 0, { clearTrail: true, resetMotion: true });
-            // Also sync odom immediately
-            this.odom = { x: startWorld.x, y: startWorld.y, thetaDeg: startWorld.theta || 0 };
-        }
-        // Reset internal pressed keys and stop
-        this.pressedKeys.clear();
-        await this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-        let idx = 0;
-        const tickMs = 50;
-        return new Promise((resolve) => {
-            const timer = setInterval(() => {
-                if (idx >= path.length) {
-                    clearInterval(timer);
-                    // stop robot
-                    this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
-                    // Restore previous corner preference
-                    this.startCorner = prevCorner;
-                    resolve();
-                    return;
-                }
-                // Desired target point in world coords for this path tick
-                const target = path[idx];
-                // Compute current world odom (already kept up to date by onSimulatorUpdate)
-                const current = this.odom;
-                const dx = (target.x) - current.x;
-                const dy = (target.y) - current.y;
-                const distance = Math.hypot(dx, dy);
-                // Heading to target in degrees, convert to turn command
-                const heading = Math.atan2(dy, dx) * 180 / Math.PI;
-                let errHeading = heading - current.thetaDeg;
-                while (errHeading > 180) errHeading -= 360;
-                while (errHeading < -180) errHeading += 360;
-                // Simple P controller
-                const maxSpeed = this.config.straightSpeed || 500;
-                const maxTurn = this.config.turnRate || 200;
-                const speed = Math.max(Math.min(distance * 3, maxSpeed), -maxSpeed);
-                const turn = Math.max(Math.min(errHeading * 3, maxTurn), -maxTurn);
-                this.sendRobotCommand({ type: 'drive', speed, turn_rate: turn });
-                idx++;
-            }, tickMs);
-        });
-    }
+    async followPath(run) { /* removed */ }
     
     executeCommand(cmd) {
         if (cmd.eventType === 'keyboard') {
@@ -4121,6 +3948,29 @@ while True:
         } else if (cmd.eventType === 'robot') {
             // Handle direct robot commands
             this.sendRobotCommand(cmd.command);
+        } else if (cmd.eventType === 'segment') {
+            // Execute high-level segment immediately and seamlessly
+            const kind = cmd.command_type || cmd.kind;
+            const p = cmd.parameters || cmd.params || {};
+            if (kind === 'move') {
+                const distance = p.distance || 0;
+                const speed = Math.sign(distance) * (this.config.straightSpeed || 500);
+                this.sendRobotCommand({ type: 'drive', speed, turn_rate: 0 });
+            } else if (kind === 'turn') {
+                const angle = p.angle || 0;
+                const turnRate = Math.sign(angle) * (this.config.turnRate || 200);
+                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: turnRate });
+            } else if (kind === 'arc') {
+                // Approximate an arc by commanding speed and turn simultaneously
+                const radius = p.radius || 0; // mm
+                const angle = p.angle || 0; // deg
+                if (radius !== 0 && angle !== 0) {
+                    const speed = Math.sign(angle) * (this.config.straightSpeed || 500) * 0.8;
+                    const turnRate = (speed / Math.max(1, Math.abs(radius))) * (180 / Math.PI);
+                    const signedTurn = angle >= 0 ? Math.abs(turnRate) : -Math.abs(turnRate);
+                    this.sendRobotCommand({ type: 'drive', speed, turn_rate: signedTurn });
+                }
+            }
         }
     }
 
@@ -4163,6 +4013,20 @@ while True:
 
     resetSimulator() {}
 
+    resetSimulatorPosition() {
+        try {
+            if (!this.robotSimulator || !this.robotSimulator.canvas) return;
+            const rect = this.robotSimulator.canvas.getBoundingClientRect();
+            const margin = 30;
+            const startX = margin;
+            const startY = Math.max(margin, rect.height - margin);
+            this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
+            this.toastManager.show('Simulator reset to bottom-left', 'info');
+        } catch (e) {
+            console.warn('Failed to reset simulator position:', e);
+        }
+    }
+
 
 
     closeWindow() {
@@ -4198,49 +4062,179 @@ while True:
         this.logger.log('Application shutting down', 'info');
     }
 
-    setStartCorner(corner) {
-        this.startCorner = corner;
-        this.saveUserData();
-        this.toastManager.show(`Start corner set to ${corner}`, 'success');
-        const bl = document.getElementById('cornerBLBtn');
-        const br = document.getElementById('cornerBRBtn');
-        if (bl && br) {
-            if (corner === 'BL') {
-                bl.classList.add('btn-primary');
-                bl.classList.remove('btn-secondary');
-                br.classList.add('btn-secondary');
-                br.classList.remove('btn-primary');
-            } else {
-                br.classList.add('btn-primary');
-                br.classList.remove('btn-secondary');
-                bl.classList.add('btn-secondary');
-                bl.classList.remove('btn-primary');
-            }
-        }
-        // Move current simulator pose to the selected corner
-        if (this.robotSimulator && this.robotSimulator.canvas) {
-            const rect = this.robotSimulator.canvas.getBoundingClientRect();
-            const margin = 30;
-            const x = corner === 'BL' ? margin : Math.max(margin, rect.width - margin);
-            const y = Math.max(margin, rect.height - margin);
-            this.robotSimulator.setPose(x, y, 0, { clearTrail: true, resetMotion: true });
-        }
-    }
+    setStartCorner(corner) { /* removed */ }
 
     onSimulatorUpdate(data) {
         // Track coordinates with origin at bottom-left or bottom-right
         const { x: simX, y: simY, angle } = data;
-        const width = this.simCanvasSize.width || this.robotSimulator?.canvas?.getBoundingClientRect()?.width || 0;
-        const height = this.simCanvasSize.height || this.robotSimulator?.canvas?.getBoundingClientRect()?.height || 0;
-        // Convert simulator coordinates (origin top-left) to bottom origin with selected corner
-        const worldY = Math.max(0, height - simY);
-        const worldX = this.startCorner === 'BL' ? simX : Math.max(0, width - simX);
-        this.odom = { x: worldX, y: worldY, thetaDeg: angle };
+        // Directly use simulator coordinate space for odometry
+        this.odom = { x: simX, y: simY, thetaDeg: angle };
         const now = Date.now();
         this.lastOdomTimestamp = now;
         if (this.isRecording) {
-            this.recordedPath.push({ t: now - this.recordingStartTime, x: worldX, y: worldY, theta: angle });
+            // Path recording removed; only segment commands are stored
+            try {
+                this.updateSegmentation({ x: simX, y: simY, thetaDeg: angle }, now);
+            } catch (e) {
+                // fail-safe: ignore segmentation errors
+            }
         }
+    }
+
+    normalizeAngleDeg(a) {
+        let ang = a;
+        while (ang > 180) ang -= 360;
+        while (ang < -180) ang += 360;
+        return ang;
+    }
+
+    flushActiveSegment(force = false) {
+        const seg = this.segmentation;
+        if (!seg.active && !force) return;
+        if (!seg.type) {
+            // reset
+            this.segmentation.active = false;
+            this.segmentation.type = null;
+            return;
+        }
+        const durationMs = Math.max(0, (seg.lastTimestamp - seg.startTimestamp));
+        const startOffsetMs = Math.max(0, seg.startTimestamp - this.recordingStartTime);
+        const endOffsetMs = startOffsetMs + durationMs;
+        let params = {};
+        if (seg.type === 'move') {
+            params = { distance: seg.accumDistance };
+        } else if (seg.type === 'turn') {
+            params = { angle: seg.accumAngle };
+        } else if (seg.type === 'arc') {
+            const angleTotal = seg.accumAngle;
+            // Respect Pybricks convention: positive radius => arc to the right; negative => left
+            // If turning left (positive angle), radius should be negative
+            const signedRadius = angleTotal >= 0 ? Math.abs(seg.arcRadius || 0) * -1 : Math.abs(seg.arcRadius || 0);
+            params = { radius: signedRadius, angle: angleTotal };
+        }
+        if (!Array.isArray(this.segmentedCommands)) this.segmentedCommands = [];
+        if (seg.type && durationMs > 0) {
+            this.segmentedCommands.push({
+                type: 'segment',
+                startOffsetMs,
+                endOffsetMs,
+                durationMs,
+                kind: seg.type,
+                params
+            });
+        }
+        // reset
+        this.segmentation = {
+            active: false,
+            type: null,
+            startTimestamp: this.lastOdomTimestamp,
+            lastTimestamp: this.lastOdomTimestamp,
+            lastPose: this.odom ? { ...this.odom } : null,
+            accumDistance: 0,
+            accumAngle: 0,
+            accumArcLength: 0,
+            arcRadius: null
+        };
+    }
+
+    updateSegmentation(currentPose, nowTs) {
+        const seg = this.segmentation;
+        const lastPose = seg.lastPose || currentPose;
+        // Update lastPose at first call
+        if (!seg.lastPose) {
+            this.segmentation.lastPose = { ...currentPose };
+            this.segmentation.lastTimestamp = nowTs;
+            return;
+        }
+        const dt = Math.max(1, nowTs - seg.lastTimestamp) / 1000;
+        const dx = currentPose.x - lastPose.x;
+        const dy = currentPose.y - lastPose.y;
+        const stepDist = Math.hypot(dx, dy);
+        let dTheta = this.normalizeAngleDeg(currentPose.thetaDeg - lastPose.thetaDeg);
+        const moveEnough = stepDist >= this.recordingThresholds.minDistanceStep;
+        const turnEnough = Math.abs(dTheta) >= this.recordingThresholds.minAngleStep;
+        if (!moveEnough && !turnEnough) {
+            // idle; do not update timestamps aggressively to avoid zero durations
+            this.segmentation.lastPose = { ...currentPose };
+            this.segmentation.lastTimestamp = nowTs;
+            return;
+        }
+        // Classify
+        let newType = null;
+        if (moveEnough && !turnEnough) newType = 'move';
+        else if (!moveEnough && turnEnough) newType = 'turn';
+        else newType = 'arc';
+
+        const headingRad = (lastPose.thetaDeg * Math.PI) / 180;
+        const forwardComponent = dx * Math.cos(headingRad) + dy * Math.sin(headingRad);
+        const signedStep = Math.sign(forwardComponent || 0) * stepDist;
+
+        // For arcs, estimate instantaneous radius R = stepDist / radians(dTheta)
+        let stepRadius = null;
+        if (newType === 'arc') {
+            const dThetaRad = (dTheta * Math.PI) / 180;
+            if (Math.abs(dThetaRad) > 1e-6) {
+                stepRadius = stepDist / dThetaRad;
+            } else {
+                stepRadius = Infinity;
+            }
+        }
+
+        // Start or continue segment
+        const curvatureTolerance = this.recordingThresholds.curvatureTolerance;
+        if (!seg.active) {
+            // Begin new segment
+            this.segmentation.active = true;
+            this.segmentation.type = newType;
+            this.segmentation.startTimestamp = nowTs;
+            this.segmentation.accumDistance = newType === 'move' ? signedStep : 0;
+            this.segmentation.accumAngle = newType === 'turn' || newType === 'arc' ? dTheta : 0;
+            this.segmentation.accumArcLength = newType === 'arc' ? stepDist : 0;
+            this.segmentation.arcRadius = newType === 'arc' ? stepRadius : null;
+        } else if (seg.type === newType) {
+            // Continue; for arcs ensure radius stability
+            if (newType === 'arc') {
+                // If radius drifts too much, flush and start new
+                const prevR = seg.arcRadius || stepRadius;
+                const denom = Math.max(1, Math.abs(prevR));
+                const drift = Math.abs((stepRadius - prevR) / denom);
+                if (drift > curvatureTolerance) {
+                    this.flushActiveSegment();
+                    // start new arc
+                    this.segmentation.active = true;
+                    this.segmentation.type = 'arc';
+                    this.segmentation.startTimestamp = nowTs;
+                    this.segmentation.accumDistance = 0;
+                    this.segmentation.accumAngle = dTheta;
+                    this.segmentation.accumArcLength = stepDist;
+                    this.segmentation.arcRadius = stepRadius;
+                } else {
+                    this.segmentation.accumAngle += dTheta;
+                    this.segmentation.accumArcLength += stepDist;
+                    // smooth radius
+                    this.segmentation.arcRadius = (prevR * 0.7) + (stepRadius * 0.3);
+                }
+            } else if (newType === 'move') {
+                this.segmentation.accumDistance += signedStep;
+            } else if (newType === 'turn') {
+                this.segmentation.accumAngle += dTheta;
+            }
+        } else {
+            // Type changed: per spec, first record a straight move before arc, etc.
+            this.flushActiveSegment();
+            // Start the new type immediately using this step
+            this.segmentation.active = true;
+            this.segmentation.type = newType;
+            this.segmentation.startTimestamp = nowTs;
+            this.segmentation.accumDistance = newType === 'move' ? signedStep : 0;
+            this.segmentation.accumAngle = (newType === 'turn' || newType === 'arc') ? dTheta : 0;
+            this.segmentation.accumArcLength = newType === 'arc' ? stepDist : 0;
+            this.segmentation.arcRadius = newType === 'arc' ? stepRadius : null;
+        }
+
+        // Update last pose/timestamp
+        this.segmentation.lastPose = { ...currentPose };
+        this.segmentation.lastTimestamp = nowTs;
     }
 
     startOdomIntegration() {
@@ -4257,6 +4251,11 @@ while True:
             this.odom.x += Math.cos(angleRad) * speed * dt;
             this.odom.y += Math.sin(angleRad) * speed * dt;
             this.odom.thetaDeg += turn * dt;
+            if (this.isRecording) {
+                try {
+                    this.updateSegmentation({ ...this.odom }, now);
+                } catch (e) {}
+            }
         }, 50);
     }
 }
