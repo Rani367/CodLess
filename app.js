@@ -799,6 +799,18 @@ class RobotSimulator extends EventEmitter {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         
+        // Enhanced graphics toggles and settings
+        this.useEnhancedGraphics = true;
+        this.bloomEnabled = true;
+        this.qualityLevel = 2; // 1=low, 2=medium, 3=high
+        this.bloomScale = 0.5; // downscale factor for glow buffer
+        this.bloomRadius = 6; // px
+        this.bloomIterations = 2;
+        this.frameTimes = [];
+        this.maxFrameTimes = 45;
+        this.lightDirection = { x: -0.6, y: -0.8 }; // pseudo light from top-left
+        this._normalizeLightDirection();
+        
         // Robot state
         const rect = this.canvas.getBoundingClientRect();
         this.robotX = rect.width / 2;
@@ -846,7 +858,14 @@ class RobotSimulator extends EventEmitter {
         this.setupControls();
         this.setupResizeHandler();
         this.updateCanvasSize();
+        this.setupOffscreenBuffers();
         this.start();
+    }
+
+    _normalizeLightDirection() {
+        const len = Math.hypot(this.lightDirection.x, this.lightDirection.y) || 1;
+        this.lightDirection.x /= len;
+        this.lightDirection.y /= len;
     }
 
     setupControls() {
@@ -926,7 +945,124 @@ class RobotSimulator extends EventEmitter {
             this.ctx.textRenderingOptimization = 'optimizeQuality';
             
             this.pixelRatio = devicePixelRatio;
+
+            // Keep offscreen buffers in sync
+            if (this.mainBufferCanvas) {
+                this.updateOffscreenSizes();
+            }
         }
+    }
+
+    setupOffscreenBuffers() {
+        this.mainBufferCanvas = document.createElement('canvas');
+        this.mainBufferCtx = this.mainBufferCanvas.getContext('2d', { alpha: false });
+
+        this.glowBufferCanvas = document.createElement('canvas');
+        this.glowBufferCtx = this.glowBufferCanvas.getContext('2d');
+
+        this.blurBufferCanvas = document.createElement('canvas');
+        this.blurBufferCtx = this.blurBufferCanvas.getContext('2d');
+
+        this.updateOffscreenSizes();
+    }
+
+    updateOffscreenSizes() {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = this.pixelRatio || 1;
+        const bloomScale = this.bloomScale;
+
+        // Main (full-res)
+        const mainW = Math.max(1, Math.floor(rect.width * dpr));
+        const mainH = Math.max(1, Math.floor(rect.height * dpr));
+        if (this.mainBufferCanvas.width !== mainW || this.mainBufferCanvas.height !== mainH) {
+            this.mainBufferCanvas.width = mainW;
+            this.mainBufferCanvas.height = mainH;
+            this.mainBufferCtx.setTransform(1, 0, 0, 1, 0, 0);
+            this.mainBufferCtx.scale(dpr, dpr);
+            this.mainBufferCtx.imageSmoothingEnabled = true;
+            this.mainBufferCtx.imageSmoothingQuality = 'high';
+        }
+
+        // Glow (downscaled)
+        const glowW = Math.max(1, Math.floor(rect.width * bloomScale * dpr));
+        const glowH = Math.max(1, Math.floor(rect.height * bloomScale * dpr));
+        if (this.glowBufferCanvas.width !== glowW || this.glowBufferCanvas.height !== glowH) {
+            this.glowBufferCanvas.width = glowW;
+            this.glowBufferCanvas.height = glowH;
+            this.glowBufferCtx.setTransform(1, 0, 0, 1, 0, 0);
+            this.glowBufferCtx.scale(dpr * bloomScale, dpr * bloomScale);
+            this.glowBufferCtx.imageSmoothingEnabled = true;
+            this.glowBufferCtx.imageSmoothingQuality = 'medium';
+        }
+
+        // Blur (matches glow)
+        if (this.blurBufferCanvas.width !== glowW || this.blurBufferCanvas.height !== glowH) {
+            this.blurBufferCanvas.width = glowW;
+            this.blurBufferCanvas.height = glowH;
+            this.blurBufferCtx.setTransform(1, 0, 0, 1, 0, 0);
+            this.blurBufferCtx.imageSmoothingEnabled = true;
+            this.blurBufferCtx.imageSmoothingQuality = 'medium';
+        }
+    }
+
+    _clearOffscreen(ctx, canvas) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (ctx === this.mainBufferCtx) {
+            const dpr = this.pixelRatio || 1;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        } else if (ctx === this.glowBufferCtx) {
+            const dpr = (this.pixelRatio || 1) * this.bloomScale;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+    }
+
+    setQuality(level) {
+        level = Math.max(1, Math.min(3, level | 0));
+        if (this.qualityLevel === level) return;
+        this.qualityLevel = level;
+        if (level === 1) {
+            this.bloomScale = 0.25;
+            this.bloomRadius = 4;
+            this.bloomIterations = 1;
+        } else if (level === 2) {
+            this.bloomScale = 0.5;
+            this.bloomRadius = 6;
+            this.bloomIterations = 2;
+        } else {
+            this.bloomScale = 0.75;
+            this.bloomRadius = 8;
+            this.bloomIterations = 2;
+        }
+        if (this.mainBufferCanvas) this.updateOffscreenSizes();
+    }
+
+    adjustQuality(frameMsAvg) {
+        if (!this.useEnhancedGraphics) return;
+        if (frameMsAvg > 28 && this.qualityLevel > 1) {
+            this.setQuality(1);
+        } else if (frameMsAvg > 20 && this.qualityLevel > 2) {
+            this.setQuality(2);
+        } else if (frameMsAvg < 17 && this.qualityLevel < 3) {
+            this.setQuality(3);
+        }
+    }
+
+    _drawTrailGlow(glowCtx) {
+        if (!glowCtx || this.trail.length < 2) return;
+        glowCtx.save();
+        glowCtx.globalCompositeOperation = 'lighter';
+        glowCtx.lineWidth = 2.5;
+        glowCtx.lineCap = 'round';
+        glowCtx.lineJoin = 'round';
+        glowCtx.strokeStyle = 'rgba(0, 196, 255, 0.95)';
+        glowCtx.beginPath();
+        for (let i = 0; i < this.trail.length; i++) {
+            const { x, y } = this.trail[i];
+            if (i === 0) glowCtx.moveTo(Math.round(x), Math.round(y)); else glowCtx.lineTo(Math.round(x), Math.round(y));
+        }
+        glowCtx.stroke();
+        glowCtx.restore();
     }
 
     start() {
@@ -1001,6 +1137,14 @@ class RobotSimulator extends EventEmitter {
 
         this.updatePhysics(deltaTime);
         this.render();
+
+        // Adaptive quality based on frame time average
+        if (this.useEnhancedGraphics) {
+            this.frameTimes.push(deltaTime * 1000);
+            if (this.frameTimes.length > this.maxFrameTimes) this.frameTimes.shift();
+            const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+            this.adjustQuality(avg);
+        }
 
         this.animationFrame = requestAnimationFrame(() => this.animate());
     }
@@ -1077,16 +1221,57 @@ class RobotSimulator extends EventEmitter {
         
         const rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
-        
-        // Clear with a slight performance optimization
-        this.ctx.fillStyle = '#0f0f0f';
-        this.ctx.fillRect(0, 0, rect.width, rect.height);
-        
-        this.ctx.save();
 
-        // Draw background map with preserved aspect ratio (letterbox/pillarbox)
+        if (!this.useEnhancedGraphics) {
+            // Fallback to original path
+            this.ctx.fillStyle = '#0f0f0f';
+            this.ctx.fillRect(0, 0, rect.width, rect.height);
+            this.ctx.save();
+            if (this.backgroundMap) {
+                this.ctx.globalAlpha = 1.0;
+                const img = this.backgroundMap;
+                const canvasW = rect.width;
+                const canvasH = rect.height;
+                const imgW = img.naturalWidth || img.width;
+                const imgH = img.naturalHeight || img.height;
+                if (imgW > 0 && imgH > 0) {
+                    const scale = Math.min(canvasW / imgW, canvasH / imgH);
+                    const drawW = Math.floor(imgW * scale);
+                    const drawH = Math.floor(imgH * scale);
+                    const offsetX = Math.floor((canvasW - drawW) / 2);
+                    const offsetY = Math.floor((canvasH - drawH) / 2);
+                    this.ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+                } else {
+                    this.ctx.drawImage(img, 0, 0, canvasW, canvasH);
+                }
+                this.ctx.globalAlpha = 1.0;
+            }
+            this.drawGrid(this.ctx);
+            if (this.showTrail && this.trail.length > 1) this.drawTrail(this.ctx);
+            if (this.obstacles.length > 0) this.drawObstacles(this.ctx);
+            this.drawRobot(this.ctx);
+            this.ctx.restore();
+            return;
+        }
+
+        const mainCtx = this.mainBufferCtx || this.ctx;
+        const glowCtx = this.glowBufferCtx;
+        const blurCtx = this.blurBufferCtx;
+
+        // Clear offscreen
+        if (this.mainBufferCtx) {
+            this._clearOffscreen(this.mainBufferCtx, this.mainBufferCanvas);
+        }
+        if (this.glowBufferCtx) {
+            this._clearOffscreen(this.glowBufferCtx, this.glowBufferCanvas);
+        }
+
+        // Background
+        mainCtx.fillStyle = '#0f0f0f';
+        mainCtx.fillRect(0, 0, rect.width, rect.height);
+        mainCtx.save();
         if (this.backgroundMap) {
-            this.ctx.globalAlpha = 1.0;
+            mainCtx.globalAlpha = 1.0;
             const img = this.backgroundMap;
             const canvasW = rect.width;
             const canvasH = rect.height;
@@ -1098,75 +1283,100 @@ class RobotSimulator extends EventEmitter {
                 const drawH = Math.floor(imgH * scale);
                 const offsetX = Math.floor((canvasW - drawW) / 2);
                 const offsetY = Math.floor((canvasH - drawH) / 2);
-                this.ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+                mainCtx.drawImage(img, offsetX, offsetY, drawW, drawH);
             } else {
-                this.ctx.drawImage(img, 0, 0, canvasW, canvasH);
+                mainCtx.drawImage(img, 0, 0, canvasW, canvasH);
             }
-            this.ctx.globalAlpha = 1.0;
+            mainCtx.globalAlpha = 1.0;
+        }
+        this.drawGrid(mainCtx);
+        if (this.showTrail && this.trail.length > 1) {
+            this.drawTrail(mainCtx);
+            if (this.bloomEnabled && glowCtx) this._drawTrailGlow(glowCtx);
+        }
+        if (this.obstacles.length > 0) this.drawObstacles(mainCtx);
+        this.drawRobot(mainCtx, glowCtx);
+        mainCtx.restore();
+
+        // Composite onto visible canvas
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.scale(this.pixelRatio || 1, this.pixelRatio || 1);
+        this.ctx.fillStyle = '#0f0f0f';
+        this.ctx.fillRect(0, 0, rect.width, rect.height);
+        if (this.mainBufferCanvas) {
+            this.ctx.drawImage(this.mainBufferCanvas, 0, 0, this.mainBufferCanvas.width, this.mainBufferCanvas.height, 0, 0, rect.width, rect.height);
         }
 
-        // Draw grid
-        this.drawGrid();
-        
-        // Draw trail
-        if (this.showTrail && this.trail.length > 1) {
-            this.drawTrail();
+        if (this.bloomEnabled && glowCtx && blurCtx) {
+            // Blur glow buffer using CSS filter for speed
+            this.blurBufferCtx.setTransform(1, 0, 0, 1, 0, 0);
+            this.blurBufferCtx.clearRect(0, 0, this.blurBufferCanvas.width, this.blurBufferCanvas.height);
+            this.blurBufferCtx.filter = `blur(${this.bloomRadius}px)`;
+            for (let i = 0; i < this.bloomIterations; i++) {
+                this.blurBufferCtx.drawImage(this.glowBufferCanvas, 0, 0);
+            }
+            this.blurBufferCtx.filter = 'none';
+
+            // Additive composite
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'lighter';
+            this.ctx.globalAlpha = 0.8;
+            this.ctx.drawImage(
+                this.blurBufferCanvas,
+                0,
+                0,
+                this.blurBufferCanvas.width,
+                this.blurBufferCanvas.height,
+                0,
+                0,
+                rect.width,
+                rect.height
+            );
+            this.ctx.restore();
         }
-        
-        // Draw obstacles
-        if (this.obstacles.length > 0) {
-            this.drawObstacles();
-        }
-        
-        // Draw robot
-        this.drawRobot();
-        
-        this.ctx.restore();
-        
-        // Info overlay removed per request
     }
 
-    drawGrid() {
+    drawGrid(ctx = this.ctx) {
         const rect = this.canvas.getBoundingClientRect();
         const gridSize = 50;
         const pixelRatio = this.pixelRatio || 1;
         
-        this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(0, 168, 255, 0.08)';
-        this.ctx.lineWidth = 0.5;
-        this.ctx.globalCompositeOperation = 'multiply';
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 168, 255, 0.08)';
+        ctx.lineWidth = 0.5;
+        ctx.globalCompositeOperation = 'multiply';
 
-        this.ctx.beginPath();
+        ctx.beginPath();
         
         for (let x = 0.5; x <= rect.width; x += gridSize) {
-            this.ctx.moveTo(Math.floor(x) + 0.5, 0);
-            this.ctx.lineTo(Math.floor(x) + 0.5, rect.height);
+            ctx.moveTo(Math.floor(x) + 0.5, 0);
+            ctx.lineTo(Math.floor(x) + 0.5, rect.height);
         }
 
         for (let y = 0.5; y <= rect.height; y += gridSize) {
-            this.ctx.moveTo(0, Math.floor(y) + 0.5);
-            this.ctx.lineTo(rect.width, Math.floor(y) + 0.5);
+            ctx.moveTo(0, Math.floor(y) + 0.5);
+            ctx.lineTo(rect.width, Math.floor(y) + 0.5);
         }
         
-        this.ctx.stroke();
-        this.ctx.restore();
+        ctx.stroke();
+        ctx.restore();
     }
 
-    drawTrail() {
+    drawTrail(ctx = this.ctx) {
         if (this.trail.length < 2) return;
 
-        this.ctx.save();
-        this.ctx.globalCompositeOperation = 'screen';
-        this.ctx.lineWidth = 1.5;
-        this.ctx.lineCap = 'round';
-        this.ctx.lineJoin = 'round';
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         
-        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const gradient = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
         gradient.addColorStop(0, 'rgba(0, 196, 255, 0.6)');
         gradient.addColorStop(1, 'rgba(0, 196, 255, 0.2)');
-        this.ctx.strokeStyle = gradient;
+        ctx.strokeStyle = gradient;
         
-        this.ctx.beginPath();
+        ctx.beginPath();
         
         for (let i = 0; i < this.trail.length; i++) {
             const point = this.trail[i];
@@ -1174,148 +1384,183 @@ class RobotSimulator extends EventEmitter {
             const y = Math.round(point.y);
             
             if (i === 0) {
-                this.ctx.moveTo(x, y);
+                ctx.moveTo(x, y);
             } else {
-                this.ctx.lineTo(x, y);
+                ctx.lineTo(x, y);
             }
         }
         
-        this.ctx.stroke();
-        this.ctx.restore();
+        ctx.stroke();
+        ctx.restore();
     }
 
-    drawObstacles() {
-        this.ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-        this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-        this.ctx.lineWidth = 2;
+    drawObstacles(ctx = this.ctx) {
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
 
         this.obstacles.forEach(obstacle => {
-            this.ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
-            this.ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
         });
     }
 
-    drawRobot() {
-        this.ctx.save();
-        this.ctx.translate(Math.round(this.robotX), Math.round(this.robotY));
-        this.ctx.rotate((this.robotAngle * Math.PI) / 180);
+    drawRobot(ctx = this.ctx, glowCtx = null) {
+        ctx.save();
+        ctx.translate(Math.round(this.robotX), Math.round(this.robotY));
+        ctx.rotate((this.robotAngle * Math.PI) / 180);
 
-        // Robot body shadow
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.beginPath();
-        if (this.ctx.roundRect) {
-            this.ctx.roundRect(-19, -14, 38, 28, 5);
+        // Soft shadow blob cast opposite light direction
+        const shadowOffsetX = -this.lightDirection.x * 8;
+        const shadowOffsetY = -this.lightDirection.y * 8;
+        ctx.save();
+        ctx.translate(shadowOffsetX, shadowOffsetY);
+        const shadowGrad = ctx.createRadialGradient(0, 0, 6, 0, 0, 24);
+        shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+        shadowGrad.addColorStop(1, 'rgba(0,0,0,0.0)');
+        ctx.fillStyle = shadowGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 24, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Body with vertical gradient and subtle rim lighting
+        const bodyGradient = ctx.createLinearGradient(-20, -15, -20, 15);
+        bodyGradient.addColorStop(0, '#12ccff');
+        bodyGradient.addColorStop(0.5, '#0aa0d9');
+        bodyGradient.addColorStop(1, '#0a6ea6');
+        ctx.fillStyle = bodyGradient;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(-20, -15, 40, 30, 6);
         } else {
-            this.ctx.rect(-19, -14, 38, 28);
+            ctx.rect(-20, -15, 40, 30);
         }
-        this.ctx.fill();
+        ctx.fill();
+        ctx.stroke();
 
-        // Robot body gradient
-        const gradient = this.ctx.createLinearGradient(-20, -15, -20, 15);
-        gradient.addColorStop(0, '#00c4ff');
-        gradient.addColorStop(0.5, '#0099cc');
-        gradient.addColorStop(1, '#006ba3');
-        
-        this.ctx.fillStyle = gradient;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        if (this.ctx.roundRect) {
-            this.ctx.roundRect(-20, -15, 40, 30, 6);
+        // Specular highlight ellipse
+        ctx.save();
+        const highlightX = 8 * this.lightDirection.x;
+        const highlightY = 8 * this.lightDirection.y;
+        ctx.translate(highlightX, highlightY);
+        const specGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 14);
+        specGrad.addColorStop(0, 'rgba(255,255,255,0.35)');
+        specGrad.addColorStop(1, 'rgba(255,255,255,0.0)');
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = specGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Direction indicator (slightly emissive)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(16, -2.5, 6, 5, 1.5);
         } else {
-            this.ctx.rect(-20, -15, 40, 30);
+            ctx.rect(16, -2.5, 6, 5);
         }
-        this.ctx.fill();
-        this.ctx.stroke();
+        ctx.fill();
+        ctx.stroke();
 
-        // Direction indicator
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-        this.ctx.lineWidth = 0.5;
-        this.ctx.beginPath();
-        if (this.ctx.roundRect) {
-            this.ctx.roundRect(16, -2.5, 6, 5, 1.5);
-        } else {
-            this.ctx.rect(16, -2.5, 6, 5);
-        }
-        this.ctx.fill();
-        this.ctx.stroke();
+        // Arms
+        this.drawArm(ctx, -15, -10, this.arm1Angle, '#00e676');
+        this.drawArm(ctx, -15, 10, this.arm2Angle, '#ff5252');
 
-        // Draw arms
-        this.drawArm(-15, -10, this.arm1Angle, '#00e676');
-        this.drawArm(-15, 10, this.arm2Angle, '#ff5252');
+        // Center indicator
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 3, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
 
-        // Robot center indicator
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-        this.ctx.lineWidth = 0.5;
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, 3, 0, 2 * Math.PI);
-        this.ctx.fill();
-        this.ctx.stroke();
-
-        // Draw acceleration indicator
+        // Acceleration vector
         if (Math.abs(this.acceleration.x) > 10 || Math.abs(this.acceleration.angular) > 10) {
-            this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-            this.ctx.lineWidth = 2;
-            this.ctx.setLineDash([2, 2]);
-            
-            // Draw acceleration vector
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([2, 2]);
             const accelLength = Math.min(Math.abs(this.acceleration.x) * 0.05, 20);
             if (accelLength > 0) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(-25, 0);
-                this.ctx.lineTo(-25 - accelLength * Math.sign(this.acceleration.x), 0);
-                this.ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-25, 0);
+                ctx.lineTo(-25 - accelLength * Math.sign(this.acceleration.x), 0);
+                ctx.stroke();
             }
-            
-            this.ctx.setLineDash([]);
+            ctx.setLineDash([]);
         }
 
-        this.ctx.restore();
+        // Emit glow shapes for bloom
+        if (glowCtx) {
+            glowCtx.save();
+            glowCtx.translate(Math.round(this.robotX), Math.round(this.robotY));
+            glowCtx.rotate((this.robotAngle * Math.PI) / 180);
+            glowCtx.globalCompositeOperation = 'lighter';
+            glowCtx.fillStyle = 'rgba(0, 196, 255, 0.9)';
+            glowCtx.beginPath();
+            if (glowCtx.roundRect) {
+                glowCtx.roundRect(-22, -17, 44, 34, 8);
+            } else {
+                glowCtx.rect(-22, -17, 44, 34);
+            }
+            glowCtx.fill();
+            glowCtx.beginPath();
+            glowCtx.rect(16, -2.5, 6, 5);
+            glowCtx.fill();
+            glowCtx.restore();
+        }
+
+        ctx.restore();
     }
 
-    drawArm(x, y, angle, color) {
-        this.ctx.save();
-        this.ctx.translate(x, y);
-        this.ctx.rotate((angle * Math.PI) / 180);
+    drawArm(ctx, x, y, angle, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((angle * Math.PI) / 180);
 
         // Arm base
-        this.ctx.fillStyle = color;
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, 5, 0, 2 * Math.PI);
-        this.ctx.fill();
-        this.ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
 
         // Arm shaft with gradient
-        const armGradient = this.ctx.createLinearGradient(0, -2, 0, 2);
+        const armGradient = ctx.createLinearGradient(0, -2, 0, 2);
         armGradient.addColorStop(0, color);
         armGradient.addColorStop(1, this.darkenColor(color, 0.7));
         
-        this.ctx.strokeStyle = armGradient;
-        this.ctx.lineWidth = 4;
-        this.ctx.lineCap = 'round';
-        this.ctx.beginPath();
-        this.ctx.moveTo(3, 0);
-        this.ctx.lineTo(18, 0);
-        this.ctx.stroke();
+        ctx.strokeStyle = armGradient;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(3, 0);
+        ctx.lineTo(18, 0);
+        ctx.stroke();
 
         // Arm end effector
-        this.ctx.fillStyle = color;
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        if (this.ctx.roundRect) {
-            this.ctx.roundRect(17, -3, 7, 6, 2);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(17, -3, 7, 6, 2);
         } else {
-            this.ctx.rect(17, -3, 7, 6);
+            ctx.rect(17, -3, 7, 6);
         }
-        this.ctx.fill();
-        this.ctx.stroke();
+        ctx.fill();
+        ctx.stroke();
 
-        this.ctx.restore();
+        ctx.restore();
     }
 
     darkenColor(color, factor) {
@@ -1476,6 +1721,26 @@ class RobotSimulator extends EventEmitter {
         // Clean up resize observer
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
+        }
+
+        // Release offscreen resources
+        if (this.mainBufferCanvas) {
+            this.mainBufferCtx = null;
+            this.mainBufferCanvas.width = 0;
+            this.mainBufferCanvas.height = 0;
+            this.mainBufferCanvas = null;
+        }
+        if (this.glowBufferCanvas) {
+            this.glowBufferCtx = null;
+            this.glowBufferCanvas.width = 0;
+            this.glowBufferCanvas.height = 0;
+            this.glowBufferCanvas = null;
+        }
+        if (this.blurBufferCanvas) {
+            this.blurBufferCtx = null;
+            this.blurBufferCanvas.width = 0;
+            this.blurBufferCanvas.height = 0;
+            this.blurBufferCanvas = null;
         }
     }
 }
