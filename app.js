@@ -2736,9 +2736,9 @@ class FLLRoboticsApp extends EventEmitter {
             // Send to appropriate controller
             if (this.bleController.connected && !this.bleController.isSimulatingConnection) {
                 await this.bleController.sendCommand(compensatedCommand);
-            } else if (this.bleController.isSimulatingConnection) {
-                // Send to visual simulator if available
-                this.robotSimulator?.updateCommand(compensatedCommand);
+            } else if (this.robotSimulator) {
+                // Route to simulator whenever available and not driving a real robot
+                this.robotSimulator.updateCommand(compensatedCommand);
                 this.logger.log(`SIMULATED: ${this.formatCommandForLog(compensatedCommand)}`, 'info');
             }
             
@@ -4024,6 +4024,8 @@ while True:
     playSelectedRun() {
         const runsList = document.getElementById('savedRunsList');
         if (!this.isPlaying) {
+            // Ensure simulator is active if we're not connected to a real robot
+            this.ensureSimulatorForPlayback();
             if (!runsList || !runsList.value) {
                 this.toastManager.show('Please select a run to play', 'warning');
                 return;
@@ -4074,6 +4076,26 @@ while True:
             this.updatePlayButtonUI();
         } catch (e) {
             this.toastManager.show('Failed to start playback', 'error');
+        }
+    }
+
+    ensureSimulatorForPlayback() {
+        try {
+            // If not driving a real robot, ensure the simulator is active and visible
+            if (!this.bleController.connected && !this.bleController.isSimulatingConnection) {
+                this.config.simulateConnected = true;
+                try { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config)); } catch (e) {}
+                if (typeof this.applySimulationState === 'function') {
+                    this.applySimulationState();
+                }
+                if (!this.robotSimulator) {
+                    this.setupRobotSimulator();
+                }
+            } else if (this.bleController.isSimulatingConnection && !this.robotSimulator) {
+                this.setupRobotSimulator();
+            }
+        } catch (e) {
+            console.warn('Failed to ensure simulator for playback:', e);
         }
     }
 
