@@ -24,7 +24,7 @@
     <meta property="twitter:image" content="https://rani367.github.io/CodLess/assets/screenshots/screenshot1.png">
 
 
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/CodLess/manifest.json">
     
 
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
@@ -586,13 +586,22 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then((registration) => {
-                        console.log('SW registered: ', registration);
-                    })
-                    .catch((registrationError) => {
-                        console.log('SW registration failed: ', registrationError);
-                    });
+                try {
+                    // Ensure correct scope on GitHub Pages (repo subpath)
+                    const basePath = (window.location.pathname.includes('/CodLess/') || window.location.hostname.endsWith('github.io'))
+                        ? '/CodLess'
+                        : '';
+                    const swUrl = `${basePath}/sw.js`;
+                    navigator.serviceWorker.register(swUrl)
+                        .then((registration) => {
+                            console.log('SW registered: ', registration);
+                        })
+                        .catch((registrationError) => {
+                            console.log('SW registration failed: ', registrationError);
+                        });
+                } catch (e) {
+                    console.log('SW registration exception: ', e);
+                }
             });
         }
     </script>
@@ -667,6 +676,6 @@
         })();
     </script>
 
-    <script src="app.js?v=1.0.0"></script>
+    <script src="/CodLess/app.js?v=1.0.0"></script>
 </body>
 </html>

@@ -3772,6 +3772,12 @@ while True:
     playSelectedRun() {
         const runsList = document.getElementById('savedRunsList');
         if (!this.isPlaying) {
+            // If not connected to a real robot and not already simulating, enable simulator automatically
+            if (!this.isRobotConnected()) {
+                this.config.simulateConnected = true;
+                try { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config)); } catch (e) {}
+                this.applySimulationState();
+            }
             if (!runsList || !runsList.value) {
                 this.toastManager.show('Please select a run to play', 'warning');
                 return;

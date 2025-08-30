@@ -1,17 +1,19 @@
 const CACHE_NAME = 'codless-robotics-v1.0.0';
-const OFFLINE_URL = '/offline.html';
+// Support GitHub Pages subpath (e.g., /CodLess)
+const BASE_PATH = (self.location && self.location.pathname && self.location.pathname.startsWith('/CodLess')) ? '/CodLess' : '';
+const OFFLINE_URL = `${BASE_PATH}/offline.html`;
 
 // Files to cache for offline functionality
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/styles.css',
-  '/animations.css',
-  '/app.js',
-  '/app.js?v=1.0.0',
-  '/manifest.json',
-  '/favicon.png',
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/index.html`,
+  `${BASE_PATH}/offline.html`,
+  `${BASE_PATH}/styles.css`,
+  `${BASE_PATH}/animations.css`,
+  `${BASE_PATH}/app.js`,
+  `${BASE_PATH}/app.js?v=1.0.0`,
+  `${BASE_PATH}/manifest.json`,
+  `${BASE_PATH}/favicon.png`,
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
@@ -208,20 +210,20 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: event.data ? event.data.text() : 'New notification from CodLess™',
-    icon: '/favicon.png',
-    badge: '/favicon.png',
+    icon: `${BASE_PATH}/favicon.png`,
+    badge: `${BASE_PATH}/favicon.png`,
     tag: 'codless-notification',
     requireInteraction: false,
     actions: [
       {
         action: 'open',
         title: 'Open App',
-        icon: '/favicon.png'
+        icon: `${BASE_PATH}/favicon.png`
       },
       {
         action: 'dismiss',
         title: 'Dismiss',
-        icon: '/favicon.png'
+        icon: `${BASE_PATH}/favicon.png`
       }
     ]
   };
@@ -239,7 +241,7 @@ self.addEventListener('notificationclick', (event) => {
   
   if (event.action === 'open') {
     event.waitUntil(
-      clients.openWindow('/')
+      clients.openWindow(`${BASE_PATH}/`)
     );
   }
 });
