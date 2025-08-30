@@ -1424,6 +1424,10 @@ class RobotSimulator extends EventEmitter {
         });
     }
 
+    getPose() {
+        return { x: this.robotX, y: this.robotY, angle: this.robotAngle };
+    }
+
     toggleTrail() {
         this.showTrail = !this.showTrail;
         if (!this.showTrail) {
@@ -1500,6 +1504,7 @@ class FLLRoboticsApp extends EventEmitter {
         this.isRecording = false;
         this.recordedCommands = [];
         this.recordingStartTime = 0;
+        this.recordingStartPose = null;
         this.recordingTimer = null;
         this.savedRuns = new Map();
         
@@ -2958,6 +2963,13 @@ class FLLRoboticsApp extends EventEmitter {
             accumArcLength: 0,
             arcRadius: null
         };
+        // Capture simulator pose at recording start
+        if (this.robotSimulator && typeof this.robotSimulator.getPose === 'function') {
+            const pose = this.robotSimulator.getPose();
+            this.recordingStartPose = { x: pose.x, y: pose.y, angle: pose.angle };
+        } else {
+            this.recordingStartPose = null;
+        }
         
         // Update UI
         const recordBtn = document.getElementById('recordBtn');
@@ -3040,10 +3052,11 @@ class FLLRoboticsApp extends EventEmitter {
         const run = {
             id: Date.now().toString(),
             name: name,
+            startPose: this.recordingStartPose ? { ...this.recordingStartPose } : null,
             commands: (this.segmentedCommands || []).map(seg => ({
                 eventType: 'segment',
                 timestamp: seg.startOffsetMs,
-                command_type: seg.type, // 'move' | 'turn' | 'arc'
+                command_type: seg.kind, // 'move' | 'turn' | 'arc'
                 parameters: { ...seg.params, durationMs: seg.durationMs }
             })),
             // path removed; no coordinate dependency
@@ -3814,11 +3827,10 @@ while True:
 
     initializePlaybackPose(run) {
         if (!this.robotSimulator || !run) return;
-        const rect = this.robotSimulator.canvas.getBoundingClientRect();
-        const margin = 30;
-        const startX = margin;
-        const startY = Math.max(margin, rect.height - margin);
-        this.robotSimulator.setPose(startX, startY, 0, { clearTrail: true, resetMotion: true });
+        if (run.startPose && typeof run.startPose.x === 'number' && typeof run.startPose.y === 'number') {
+            const angle = (typeof run.startPose.angle === 'number') ? run.startPose.angle : 0;
+            this.robotSimulator.setPose(run.startPose.x, run.startPose.y, angle, { clearTrail: true, resetMotion: true });
+        }
     }
 
     startPathInterval() {
