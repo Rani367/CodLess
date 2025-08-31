@@ -259,31 +259,37 @@
 
                 <div class="content-section">
                     <div class="section-header">
-                        <i class="fas fa-microphone" aria-hidden="true"></i>
-                        <h3>Recording Controls</h3>
-                        <div class="section-actions">
-                            <span id="recordingTimer" class="recording-timer hidden">00:00</span>
-                        </div>
+                        <i class="fas fa-cubes" aria-hidden="true"></i>
+                        <h3>Program Blocks</h3>
+                        <div class="section-actions"></div>
                     </div>
-                    <div class="recording-controls">
+                    <div id="blockEditor" class="block-editor">
                         <div class="input-group">
-                            <label for="runNameInput">Run Name:</label>
+                            <label for="runNameInput">Program Name:</label>
                             <input type="text" id="runNameInput" value="Run 1" class="input-field" maxlength="50" aria-describedby="runNameHelp">
                             <small id="runNameHelp" class="help-text">Maximum 50 characters</small>
                         </div>
-                        
-                        <div class="button-group">
-                            <button id="recordBtn" class="btn btn-danger" disabled>
-                                <i class="fas fa-circle" aria-hidden="true"></i>
-                                Record Run
-                            </button>
+                        <div class="block-palette" aria-label="Blocks palette">
+                            <div class="block-palette-title">Blocks</div>
+                            <div class="block-palette-items">
+                                <button class="block-btn" data-block-type="move" title="Move(distance)">Move</button>
+                                <button class="block-btn" data-block-type="turn" title="Turn(angle)">Turn</button>
+                                <button class="block-btn" data-block-type="arc" title="Arc(radius, angle OR distance, then, wait)">Arc</button>
+                                <button class="block-btn" data-block-type="wait" title="Wait(time)">Wait</button>
+                                <button class="block-btn" data-block-type="arm" title="MoveArm(arm, amount)">MoveArm</button>
+                            </div>
+                        </div>
+                        <div class="block-program" aria-label="Program editor">
+                            <div id="blockSlots" class="block-slots"></div>
+                        </div>
+                        <div class="button-group" style="margin-top: 10px;">
                             <button id="saveBtn" class="btn btn-success" disabled>
                                 <i class="fas fa-save" aria-hidden="true"></i>
-                                Save Run
+                                Save Program
                             </button>
-                            <button id="pauseBtn" class="btn btn-warning hidden" disabled>
-                                <i class="fas fa-pause" aria-hidden="true"></i>
-                                Pause
+                            <button id="runCurrentBtn" class="btn btn-primary">
+                                <i class="fas fa-play" aria-hidden="true"></i>
+                                Run Current
                             </button>
                         </div>
                     </div>

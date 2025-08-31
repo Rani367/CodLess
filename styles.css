@@ -2485,3 +2485,25 @@ body::-webkit-scrollbar-track {
 .text-accent { color: var(--accent-0) !important; }
 .text-muted { color: var(--text-muted) !important; }
 .stat-value { font-size: 12px; color: rgba(0,168,255,0.9); font-weight: 500; }
+
+/* --- Block Editor --- */
+.block-editor{border:1px solid #2c3e50;border-radius:8px;padding:12px;background:#0e1320}
+.block-palette{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.block-palette-title{color:#9aa4b2;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-right:8px}
+.block-btn{background:#1b2336;border:1px solid #2b3650;color:#dfe6f3;border-radius:6px;padding:6px 10px;font-size:13px;cursor:grab;user-select:none;transition:transform .1s ease,background .2s ease}
+.block-btn:active{transform:scale(.98)}
+.block-btn:hover{background:#223052}
+.block-program{background:#0b1020;border:1px dashed #2b3650;border-radius:8px;padding:8px}
+.block-slots{display:flex;flex-direction:column;gap:8px}
+.block-slot{display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #223052;border-radius:8px;padding:8px;min-height:44px;transition:background var(--anim-duration-normal, .3s) var(--anim-easing-smooth, ease)}
+.block-slot.is-empty{opacity:.7;border-style:dashed}
+.block-index{width:32px;height:32px;border-radius:6px;background:#1e293b;color:#93c5fd;display:flex;align-items:center;justify-content:center;font-weight:600}
+.cmd-block{display:flex;align-items:center;gap:8px;background:#14203a;border:1px solid #25406b;color:#e2e8f0;border-radius:8px;padding:6px 8px}
+.cmd-title{font-weight:600;color:#93c5fd}
+.cmd-fields{display:flex;gap:6px;flex-wrap:wrap}
+.cmd-fields input,.cmd-fields select{background:#0e162b;border:1px solid #24406a;border-radius:6px;color:#dbeafe;padding:4px 6px;width:90px}
+.cmd-remove{margin-left:auto;background:transparent;border:none;color:#94a3b8;cursor:pointer}
+.cmd-remove:hover{color:#f87171}
+.cmd-stop{background:#1f2937;border:1px solid #374151;color:#fca5a5}
+.drop-hover{outline:2px dashed #60a5fa;outline-offset:2px}
+.slot-appear{animation:fadeInUp var(--anim-duration-normal, .3s) var(--anim-easing-smooth, ease)}

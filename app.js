@@ -1566,6 +1566,338 @@ class FLLRoboticsApp extends EventEmitter {
         // Note: init() will be called explicitly after construction
     }
 
+    // --- Block Editor: UI and Data Model ---
+    initBlockEditor() {
+        try {
+            this.blockProgram = { blocks: [], version: 1 };
+            this.blockSlotsEl = document.getElementById('blockSlots');
+            this.saveBtnEl = document.getElementById('saveBtn');
+            this.runCurrentBtnEl = document.getElementById('runCurrentBtn');
+
+            if (this.saveBtnEl) {
+                this.saveBtnEl.disabled = false;
+                this.saveBtnEl.addEventListener('click', () => this.saveBlockRun());
+            }
+            if (this.runCurrentBtnEl) {
+                this.runCurrentBtnEl.addEventListener('click', () => this.runCurrentBlocks());
+            }
+
+            // Palette buttons: click to insert next
+            document.querySelectorAll('.block-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const type = btn.getAttribute('data-block-type');
+                    this.insertBlockAtNextEmpty(type);
+                });
+            });
+
+            this.renderBlockSlots();
+        } catch (e) {
+            console.warn('Block editor init failed:', e);
+        }
+    }
+
+    getBlockDefault(type) {
+        switch (type) {
+            case 'move': return { type: 'move', distance: 100 };
+            case 'turn': return { type: 'turn', angle: 90 };
+            case 'arc': return { type: 'arc', radius: 150, angle: 90, wait: 0 };
+            case 'wait': return { type: 'wait', time: 500 };
+            case 'arm': return { type: 'arm', arm: 'LEFT', amount: 180 };
+            case 'stop': return { type: 'stop' };
+        }
+        return { type };
+    }
+
+    renderBlockSlots() {
+        if (!this.blockSlotsEl) return;
+        const slots = this.blockProgram.blocks.slice();
+        // Ensure Stop at the end (locked)
+        if (slots.length === 0 || slots[slots.length - 1]?.type !== 'stop') {
+            slots.push({ type: 'stop' });
+        }
+        // Ensure there is at least one empty slot before Stop
+        if (slots.length === 1 || slots[slots.length - 2]?.type === 'stop') {
+            slots.splice(slots.length - 1, 0, { type: 'empty' });
+        }
+
+        this.blockSlotsEl.innerHTML = '';
+        slots.forEach((blk, idx) => {
+            const slot = document.createElement('div');
+            slot.className = 'block-slot slot-appear' + (blk.type === 'empty' ? ' is-empty' : '');
+            slot.setAttribute('data-index', String(idx + 1));
+
+            const indexBadge = document.createElement('div');
+            indexBadge.className = 'block-index';
+            indexBadge.textContent = String(idx + 1);
+            slot.appendChild(indexBadge);
+
+            if (blk.type === 'empty') {
+                const hint = document.createElement('div');
+                hint.style.color = '#94a3b8';
+                hint.textContent = 'Drop a block here';
+                slot.appendChild(hint);
+            } else if (blk.type === 'stop') {
+                slot.appendChild(this.createCommandBlock({ type: 'stop' }, true, idx));
+            } else {
+                slot.appendChild(this.createCommandBlock(blk, false, idx));
+            }
+
+            // Drag & drop support
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('drop-hover');
+            });
+            slot.addEventListener('dragleave', () => slot.classList.remove('drop-hover'));
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('drop-hover');
+                const data = e.dataTransfer?.getData('text/plain');
+                try {
+                    const parsed = JSON.parse(data || '{}');
+                    this.placeBlockAtIndex(parsed, idx);
+                } catch (_) {}
+            });
+
+            this.blockSlotsEl.appendChild(slot);
+        });
+
+        // Enable palette drag
+        ['move','turn','arc','wait','arm'].forEach(t => this.createPaletteDraggable(t));
+    }
+
+    createPaletteDraggable(type) {
+        const temp = this.getBlockDefault(type);
+        const payload = JSON.stringify(temp);
+        const btns = document.querySelectorAll(`.block-btn[data-block-type="${type}"]`);
+        btns.forEach(btn => {
+            btn.setAttribute('draggable', 'true');
+            btn.addEventListener('dragstart', (e) => {
+                e.dataTransfer?.setData('text/plain', payload);
+            });
+        });
+    }
+
+    createCommandBlock(blk, locked, slotIndex) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'cmd-block' + (blk.type === 'stop' ? ' cmd-stop' : '');
+        wrapper.setAttribute('draggable', blk.type !== 'stop' ? 'true' : 'false');
+        wrapper.addEventListener('dragstart', (e) => {
+            const payload = { move: true, sourceIndex: slotIndex, type: blk.type, data: blk };
+            e.dataTransfer?.setData('text/plain', JSON.stringify(payload));
+        });
+
+        const title = document.createElement('div');
+        title.className = 'cmd-title';
+        title.textContent = this.getBlockTitle(blk.type);
+        wrapper.appendChild(title);
+
+        const fields = document.createElement('div');
+        fields.className = 'cmd-fields';
+        this.attachFields(blk, fields);
+        wrapper.appendChild(fields);
+
+        if (!locked && blk.type !== 'stop') {
+            const remove = document.createElement('button');
+            remove.className = 'cmd-remove';
+            remove.innerHTML = '<i class="fas fa-trash"></i>';
+            remove.title = 'Delete block';
+            remove.addEventListener('click', () => this.deleteBlockAtSlot(slotIndex));
+            wrapper.appendChild(remove);
+        }
+        return wrapper;
+    }
+
+    getBlockTitle(type) {
+        switch (type) {
+            case 'move': return 'Move(distance)';
+            case 'turn': return 'Turn(angle)';
+            case 'arc': return 'Arc(radius, angle|distance, then, wait)';
+            case 'wait': return 'Wait(time)';
+            case 'arm': return 'MoveArm(arm, amount)';
+            case 'stop': return 'Stop';
+        }
+        return type;
+    }
+
+    attachFields(blk, container) {
+        const makeNum = (label, key, min=-10000, max=10000, step=1) => {
+            const inp = document.createElement('input');
+            inp.type = 'number';
+            inp.step = String(step);
+            inp.min = String(min);
+            inp.max = String(max);
+            inp.value = String(blk[key] ?? 0);
+            inp.placeholder = label;
+            inp.title = label;
+            inp.addEventListener('change', () => {
+                blk[key] = Number(inp.value);
+                this.onBlocksChanged();
+            });
+            container.appendChild(inp);
+        };
+        const makeSel = (label, key, options) => {
+            const sel = document.createElement('select');
+            options.forEach(o => {
+                const opt = document.createElement('option');
+                opt.value = o;
+                opt.textContent = o;
+                sel.appendChild(opt);
+            });
+            sel.value = String(blk[key] || options[0]);
+            sel.title = label;
+            sel.addEventListener('change', () => {
+                blk[key] = sel.value;
+                this.onBlocksChanged();
+            });
+            container.appendChild(sel);
+        };
+
+        if (blk.type === 'move') {
+            makeNum('distance (mm)', 'distance', -5000, 5000, 1);
+        } else if (blk.type === 'turn') {
+            makeNum('angle (deg)', 'angle', -360, 360, 1);
+        } else if (blk.type === 'arc') {
+            makeNum('radius (mm)', 'radius', -5000, 5000, 1);
+            // Choose either angle or distance; we store angle and distance optional
+            makeNum('angle (deg)', 'angle', -720, 720, 1);
+            makeNum('distance (mm)', 'distance', -5000, 5000, 1);
+            makeSel('then', 'then', ['HOLD', 'COAST', 'BRAKE']);
+            makeNum('wait (ms)', 'wait', 0, 10000, 10);
+        } else if (blk.type === 'wait') {
+            makeNum('time (ms)', 'time', 0, 60000, 50);
+        } else if (blk.type === 'arm') {
+            makeSel('arm', 'arm', ['LEFT', 'RIGHT']);
+            makeNum('amount', 'amount', -1440, 1440, 10);
+        }
+    }
+
+    onBlocksChanged() {
+        // Normalize: ensure trailing Stop and one empty slot before it
+        const b = this.blockProgram.blocks.filter(x => x.type !== 'stop' && x.type !== 'empty');
+        this.blockProgram.blocks = b;
+        this.renderBlockSlots();
+    }
+
+    insertBlockAtNextEmpty(type) {
+        // Insert before Stop
+        const blk = this.getBlockDefault(type);
+        const list = this.blockProgram.blocks;
+        // Append before the implicit Stop
+        list.push(blk);
+        this.onBlocksChanged();
+    }
+
+    placeBlockAtIndex(payload, targetSlotIdx) {
+        const slots = this.serializeSlotsWithStop();
+        // If payload is a move (reorder)
+        if (payload && payload.move && typeof payload.sourceIndex === 'number') {
+            const fromProgramIdx = this.slotIndexToProgramIndex(payload.sourceIndex, slots);
+            let toProgramIdx = this.slotIndexToProgramIndex(targetSlotIdx, slots);
+            if (fromProgramIdx === -1) return;
+            // Adjust destination if dropping after itself
+            if (toProgramIdx > fromProgramIdx) toProgramIdx -= 1;
+            this.arrayMoveInPlace(this.blockProgram.blocks, fromProgramIdx, toProgramIdx);
+            this.onBlocksChanged();
+            return;
+        }
+        // Otherwise insert new block (from palette)
+        const type = payload?.type;
+        if (!['move','turn','arc','wait','arm'].includes(type)) return;
+        const newBlk = { ...this.getBlockDefault(type), ...payload };
+        const programIdx = this.slotIndexToProgramIndex(targetSlotIdx, slots);
+        const insertAt = programIdx < 0 ? this.blockProgram.blocks.length : programIdx;
+        this.blockProgram.blocks.splice(insertAt, 0, newBlk);
+        this.onBlocksChanged();
+    }
+
+    deleteBlockAtSlot(slotIdx) {
+        const slots = this.serializeSlotsWithStop();
+        const programIdx = this.slotIndexToProgramIndex(slotIdx, slots);
+        if (programIdx >= 0) {
+            this.blockProgram.blocks.splice(programIdx, 1);
+            this.onBlocksChanged();
+        }
+    }
+
+    slotIndexToProgramIndex(slotIdx, slotsArr) {
+        // Map slot index to underlying program index by counting non-empty/non-stop up to slotIdx
+        const until = slotsArr.slice(0, Math.min(slotIdx + 1, slotsArr.length));
+        const count = until.filter(x => x.type !== 'empty' && x.type !== 'stop').length;
+        // program index is count-1 if current slot is a block; if current is empty, insertion point is count
+        if (slotsArr[slotIdx]?.type === 'empty') return count; // insertion after previous blocks
+        if (slotsArr[slotIdx]?.type === 'stop') return this.blockProgram.blocks.length; // insert at end
+        return count - 1;
+    }
+
+    arrayMoveInPlace(arr, fromIndex, toIndex) {
+        if (fromIndex === toIndex) return;
+        const item = arr.splice(fromIndex, 1)[0];
+        arr.splice(toIndex, 0, item);
+    }
+
+    serializeSlotsWithStop() {
+        const arr = this.blockProgram.blocks.slice();
+        arr.push({ type: 'stop' });
+        // Ensure empty prior
+        if (arr.length === 1 || arr[arr.length - 2]?.type === 'stop') {
+            arr.splice(arr.length - 1, 0, { type: 'empty' });
+        }
+        return arr;
+    }
+
+    serializeProgramBlocks() {
+        // Persist only command blocks (no Stop/empty)
+        return this.blockProgram.blocks.map(b => ({ ...b }));
+    }
+
+    deserializeProgramBlocks(blocks) {
+        const safe = Array.isArray(blocks) ? blocks.filter(b => b && ['move','turn','arc','wait','arm'].includes(b.type)) : [];
+        this.blockProgram.blocks = safe.map(b => ({ ...this.getBlockDefault(b.type), ...b }));
+        this.onBlocksChanged();
+    }
+
+    // --- Save/Load using existing Saved Runs UI ---
+    saveBlockRun() {
+        const nameInput = document.getElementById('runNameInput');
+        const name = (nameInput?.value || 'Run').trim();
+        const commands = this.serializeProgramBlocks();
+        if (commands.length === 0) {
+            this.toastManager.show('Add at least one block before saving', 'warning');
+            return;
+        }
+
+        const saved = this.getSavedRunsArray();
+        if (saved.some(r => r.name.toLowerCase() === name.toLowerCase())) {
+            this.toastManager.show('A run with this name already exists', 'warning');
+            return;
+        }
+        const run = {
+            id: 'run_' + Date.now(),
+            name,
+            commands,
+            createdAt: new Date().toISOString(),
+            duration: 0
+        };
+        saved.push(run);
+        localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(saved));
+        this.updateRunsList();
+        this.toastManager.show(`Program "${name}" saved`, 'success');
+    }
+
+    runCurrentBlocks() {
+        // Build a temporary run and play in commands mode
+        const run = {
+            id: 'current',
+            name: 'Current Program',
+            commands: this.serializeProgramBlocks(),
+        };
+        if (!run.commands.length) {
+            this.toastManager.show('Add blocks to run', 'warning');
+            return;
+        }
+        this.startRunPlayback(run);
+    }
+
     async init() {
         try {
             console.log('Starting application initialization...');
@@ -1586,6 +1918,9 @@ class FLLRoboticsApp extends EventEmitter {
             console.log('Setting up robot simulator...');
             // Setup robot simulator
             this.setupRobotSimulator();
+            
+            // Initialize block editor UI
+            this.initBlockEditor();
             
             console.log('Setting up BLE controller events...');
             // Setup BLE controller events
@@ -1918,10 +2253,11 @@ class FLLRoboticsApp extends EventEmitter {
         
         // Start corner selection removed (coordinate system deprecated)
         
-        // Recording controls
-        document.getElementById('recordBtn')?.addEventListener('click', () => this.toggleRecording());
-        document.getElementById('saveBtn')?.addEventListener('click', () => this.saveCurrentRun());
-        document.getElementById('pauseBtn')?.addEventListener('click', () => this.pauseRecording());
+        // Recording controls (deprecated by block editor)
+        const recordBtn = document.getElementById('recordBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (recordBtn) recordBtn.style.display = 'none';
+        if (pauseBtn) pauseBtn.style.display = 'none';
         
         // Run management
         document.getElementById('savedRunsList')?.addEventListener('change', (e) => this.selectRun(e.target.value));
@@ -3018,79 +3354,7 @@ class FLLRoboticsApp extends EventEmitter {
         }
     }
 
-    saveCurrentRun() {
-        if (!this.segmentedCommands || this.segmentedCommands.length === 0) {
-            this.toastManager.show('No recorded commands to save', 'warning');
-            return;
-        }
-
-        // Get name from input field instead of prompt
-        const runNameInput = document.getElementById('runNameInput');
-        if (!runNameInput) {
-            this.toastManager.show('Run name input not found', 'error');
-            return;
-        }
-
-        const name = runNameInput.value.trim();
-        if (!name) {
-            this.toastManager.show('Please enter a run name', 'warning');
-            runNameInput.focus();
-            return;
-        }
-
-        // Check for duplicate names
-        const savedRuns = this.getSavedRunsArray();
-        const isDuplicate = savedRuns.some(run => run.name.toLowerCase() === name.toLowerCase());
-        
-        if (isDuplicate) {
-            this.toastManager.show(`A run named "${name}" already exists. Please choose a different name.`, 'warning');
-            runNameInput.focus();
-            runNameInput.select();
-            return;
-        }
-
-        const run = {
-            id: Date.now().toString(),
-            name: name,
-            startPose: this.recordingStartPose ? { ...this.recordingStartPose } : null,
-            commands: (this.segmentedCommands || []).map(seg => ({
-                eventType: 'segment',
-                timestamp: seg.startOffsetMs,
-                command_type: seg.kind, // 'move' | 'turn' | 'arc'
-                parameters: { ...seg.params, durationMs: seg.durationMs }
-            })),
-            // path removed; no coordinate dependency
-            createdAt: new Date().toISOString(),
-            duration: (this.segmentedCommands && this.segmentedCommands.length > 0) ? 
-                (this.segmentedCommands[this.segmentedCommands.length - 1].endOffsetMs || 0) / 1000 : 0
-        };
-
-        // Save to localStorage
-        try {
-            savedRuns.push(run);
-            localStorage.setItem(STORAGE_KEYS.SAVED_RUNS, JSON.stringify(savedRuns));
-        } catch (error) {
-            console.error('Error saving to localStorage:', error);
-            this.toastManager.show('Failed to save run - storage error', 'error');
-            return;
-        }
-
-        // Update UI
-        this.updateRunsList();
-        this.recordedCommands = [];
-        this.segmentedCommands = [];
-        
-        // Disable save button until next recording
-        const saveBtn = document.getElementById('saveBtn');
-        if (saveBtn) saveBtn.disabled = true;
-
-        // Generate next run name
-        const nextRunNumber = savedRuns.length + 1;
-        runNameInput.value = `Run ${nextRunNumber}`;
-
-        this.toastManager.show(`✅ Run "${name}" saved successfully!`, 'success');
-        this.logger.log(`Run saved: ${name}`);
-    }
+    saveCurrentRun() { this.saveBlockRun(); }
 
     pauseRecording() {
         if (!this.isRecording) {
@@ -3294,21 +3558,27 @@ while True:
     wait(10)`;
         }
 
-        // Generate competition code with saved runs
-                 const codeLines = [
-             "from pybricks.hubs import PrimeHub",
-             "from pybricks.pupdevices import Motor",
-             "from pybricks.parameters import Port, Color, Button",
-             "from pybricks.robotics import DriveBase",
-             "from pybricks.tools import wait",
-             "",
-             "# --- ROBOT SETUP ---",
-             "hub = PrimeHub()",
+        // Generate competition code with saved runs (GyroDriveBase)
+        const codeLines = [
+            "from pybricks.hubs import PrimeHub",
+            "from pybricks.pupdevices import Motor",
+            "from pybricks.parameters import Port, Color, Button, Stop",
+            "from pybricks.robotics import DriveBase",
+            "from pybricks.tools import wait",
+            "",
+            "# --- ROBOT SETUP ---",
+            "hub = PrimeHub()",
             "",
             "# Initialize motors and drive base",
             `left_motor = Motor(Port.${this.config.leftMotorPort})`,
             `right_motor = Motor(Port.${this.config.rightMotorPort})`,
             `drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${this.config.wheelDiameter}, axle_track=${this.config.axleTrack})`,
+            "",
+            "# Enable gyro for accurate movement",
+            "try:",
+            "    drive_base.use_gyro(True)",
+            "except:",
+            "    pass",
             "",
             "# Configure drive base settings",
             "drive_base.settings(",
@@ -3323,26 +3593,44 @@ while True:
             `arm2_motor = Motor(Port.${this.config.arm2MotorPort})`,
             "",
             ...this.generateCalibrationCode(calibrationData),
-            "# --- HELPER FUNCTIONS ---",
-            "def arm1_up(speed, duration_ms):",
-            "    arm1_motor.run(speed)",
-            "    wait(duration_ms)",
-            "    arm1_motor.stop()",
+            "# --- BLOCK HELPERS ---",
+            "def do_move(distance):",
+            "    drive_base.straight(int(distance))",
             "",
-            "def arm1_down(speed, duration_ms):",
-            "    arm1_motor.run(-speed)",
-            "    wait(duration_ms)",
-            "    arm1_motor.stop()",
+            "def do_turn(angle):",
+            "    drive_base.turn(int(angle))",
             "",
-            "def arm2_up(speed, duration_ms):",
-            "    arm2_motor.run(speed)",
-            "    wait(duration_ms)",
-            "    arm2_motor.stop()",
+            "def do_arc(radius, angle=None, distance=None, then=Stop.HOLD, wait_ms=0):",
+            "    if angle is not None:",
+            "        drive_base.arc(int(radius), angle=int(angle), then=then)",
+            "    elif distance is not None:",
+            "        # Fallback: approximate via angle from distance/radius",
+            "        import math",
+            "        if radius != 0:",
+            "            ang = (distance / radius) * 180 / math.pi",
+            "            drive_base.arc(int(radius), angle=int(ang), then=then)",
+            "    if wait_ms > 0:",
+            "        wait(int(wait_ms))",
             "",
-            "def arm2_down(speed, duration_ms):",
-            "    arm2_motor.run(-speed)",
-            "    wait(duration_ms)",
-            "    arm2_motor.stop()",
+            "def do_wait(ms):",
+            "    wait(int(ms))",
+            "",
+            "def do_arm(which, amount):",
+            "    m = arm1_motor if which == 'LEFT' else arm2_motor",
+            "    if amount == 0: return",
+            "    spd = 300 if amount > 0 else -300",
+            "    m.run_angle(spd, int(abs(amount)))",
+            "",
+            "def do_stop():",
+            "    try:",
+            "        drive_base.stop()",
+            "    except:",
+            "        pass",
+            "    try:",
+            "        arm1_motor.stop()",
+            "        arm2_motor.stop()",
+            "    except:",
+            "        pass",
             "",
             "# --- RUN FUNCTIONS ---"
         ];
@@ -3359,24 +3647,39 @@ while True:
             funcLines.push(`    # ${run.name}`);
             
             if (run.commands && run.commands.length > 0) {
-                funcLines.push("    # Replay recorded segments as move/turn/arc");
-                funcLines.push("    from pybricks.parameters import Stop");
+                funcLines.push("    # Execute block-based program using GyroDriveBase");
                 run.commands.forEach(cmd => {
-                    const cmdType = cmd.command_type || cmd.type;
-                    const p = cmd.parameters || cmd;
-                    if (cmdType === 'move') {
-                        const dist = Math.round(p.distance || 0);
-                        funcLines.push(`    if ${dist} != 0: drive_base.straight(${dist})`);
-                    } else if (cmdType === 'turn') {
-                        const ang = Math.round(p.angle || 0);
-                        funcLines.push(`    if ${ang} != 0: drive_base.turn(${ang})`);
-                    } else if (cmdType === 'arc') {
-                        const radius = Math.round(p.radius || 0);
-                        const ang = Math.round(p.angle || 0);
-                        // Use arc with angle; rely on Pybricks to handle continuity
-                        funcLines.push(`    if ${radius} != 0 and ${ang} != 0: drive_base.arc(${radius}, angle=${ang}, then=Stop.HOLD)`);
+                    const t = cmd.type || cmd.command_type;
+                    const p = cmd;
+                    if (t === 'move') {
+                        const dist = Math.round((p.distance ?? (p.parameters?.distance || 0)) || 0);
+                        funcLines.push(`    do_move(${dist})`);
+                    } else if (t === 'turn') {
+                        const ang = Math.round((p.angle ?? (p.parameters?.angle || 0)) || 0);
+                        funcLines.push(`    do_turn(${ang})`);
+                    } else if (t === 'arc') {
+                        const radius = Math.round((p.radius ?? (p.parameters?.radius || 0)) || 0);
+                        const ang = p.angle ?? (p.parameters?.angle);
+                        const dist = p.distance ?? (p.parameters?.distance);
+                        const thenMode = String(p.then ?? (p.parameters?.then || 'HOLD'));
+                        const waitMs = Math.round((p.wait ?? (p.parameters?.wait || 0)) || 0);
+                        const th = thenMode === 'COAST' ? 'Stop.COAST' : (thenMode === 'BRAKE' ? 'Stop.BRAKE' : 'Stop.HOLD');
+                        if (ang !== undefined && ang !== null) {
+                            funcLines.push(`    do_arc(${radius}, angle=${Math.round(ang)}, then=${th}, wait_ms=${waitMs})`);
+                        } else if (dist !== undefined && dist !== null) {
+                            funcLines.push(`    do_arc(${radius}, distance=${Math.round(dist)}, then=${th}, wait_ms=${waitMs})`);
+                        }
+                    } else if (t === 'wait') {
+                        const ms = Math.round((p.time ?? (p.parameters?.time || 0)) || 0);
+                        funcLines.push(`    do_wait(${ms})`);
+                    } else if (t === 'arm') {
+                        const arm = (p.arm ?? (p.parameters?.arm || 'LEFT')).toString().toUpperCase();
+                        const amt = Math.round((p.amount ?? (p.parameters?.amount || 0)) || 0);
+                        funcLines.push(`    do_arm('${arm}', ${amt})`);
                     }
                 });
+                // Always end with Stop
+                funcLines.push("    do_stop()");
             } else if (Array.isArray(run.path) && run.path.length > 1) {
                 funcLines.push("    # Fallback: coordinate path replay (legacy)");
                 const waypoints = run.path.map(p => `(${Math.round(p.x)}, ${Math.round(p.y)})`).join(', ');
@@ -3762,6 +4065,16 @@ while True:
             playBtn.disabled = false;
             deleteBtn.disabled = false;
             exportBtn.disabled = false;
+            // Load selected program into editor for editing
+            try {
+                const savedRuns = this.getSavedRunsArray();
+                const run = savedRuns.find(r => r.id === runId);
+                if (run && Array.isArray(run.commands)) {
+                    this.deserializeProgramBlocks(run.commands);
+                    const nm = document.getElementById('runNameInput');
+                    if (nm) nm.value = run.name || nm.value;
+                }
+            } catch (e) { /* ignore */ }
         } else {
             playBtn.disabled = true;
             deleteBtn.disabled = true;
@@ -3803,7 +4116,18 @@ while True:
             this.initializePlaybackPose(selectedRun);
             // Decide mode
             if (Array.isArray(selectedRun.commands) && selectedRun.commands.length > 0) {
-                const commands = selectedRun.commands;
+                // Normalize possible legacy segment format to new block format
+                const commands = selectedRun.commands.map(c => {
+                    if (c && c.type) return c;
+                    if (c && c.eventType === 'segment') {
+                        const t = c.command_type || c.kind;
+                        const p = c.parameters || c.params || {};
+                        if (t === 'move') return { type: 'move', distance: p.distance };
+                        if (t === 'turn') return { type: 'turn', angle: p.angle };
+                        if (t === 'arc') return { type: 'arc', radius: p.radius, angle: p.angle, distance: p.distance, then: p.then, wait: p.wait };
+                    }
+                    return c;
+                });
                 this.playbackMode = 'commands';
                 this.playbackCommands = commands;
                 this.playbackIndex = 0;
@@ -3857,7 +4181,28 @@ while True:
                 return;
             }
             const cmd = this.playbackCommands[this.playbackIndex];
-            const duration = (cmd.parameters && (cmd.parameters.durationMs || cmd.parameters.duration)) ? (cmd.parameters.durationMs || cmd.parameters.duration) : 0;
+            // Determine duration semantics for block commands
+            let duration = 0;
+            if (cmd && cmd.type) {
+                const t = cmd.type;
+                if (t === 'move') {
+                    duration = Math.max(100, Math.abs(cmd.distance || 0) * 2);
+                } else if (t === 'turn') {
+                    duration = Math.max(100, Math.abs(cmd.angle || 0) * 4);
+                } else if (t === 'arc') {
+                    if (typeof cmd.wait === 'number' && cmd.wait > 0) duration = cmd.wait;
+                    else if (typeof cmd.angle === 'number' && cmd.radius) duration = Math.max(150, Math.abs(cmd.angle) * 4);
+                    else if (typeof cmd.distance === 'number' && cmd.radius) duration = Math.max(150, Math.abs(cmd.distance) * 2);
+                } else if (t === 'wait') {
+                    duration = Math.max(0, cmd.time || 0);
+                } else if (t === 'arm') {
+                    duration = Math.max(100, Math.abs(cmd.amount || 0) * 2);
+                } else if (t === 'stop') {
+                    duration = 50;
+                }
+            } else if (cmd && (cmd.eventType === 'segment')) {
+                duration = (cmd.parameters && (cmd.parameters.durationMs || cmd.parameters.duration)) ? (cmd.parameters.durationMs || cmd.parameters.duration) : 0;
+            }
             this.executeCommand(cmd);
             this.playbackIndex++;
             if (this.playbackIndex >= this.playbackCommands.length) {
@@ -3988,6 +4333,46 @@ while True:
                     const signedTurn = angle >= 0 ? Math.abs(turnRate) : -Math.abs(turnRate);
                     this.sendRobotCommand({ type: 'drive', speed, turn_rate: signedTurn });
                 }
+            }
+        } else if (cmd && cmd.type) {
+            // New block-based commands executed live in simulator/robot via streaming commands
+            if (cmd.type === 'move') {
+                const distance = Number(cmd.distance || 0);
+                const speed = Math.sign(distance) * (this.config.straightSpeed || 500);
+                this.sendRobotCommand({ type: 'drive', speed, turn_rate: 0 });
+            } else if (cmd.type === 'turn') {
+                const angle = Number(cmd.angle || 0);
+                const turnRate = Math.sign(angle) * (this.config.turnRate || 200);
+                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: turnRate });
+            } else if (cmd.type === 'arc') {
+                const radius = Number(cmd.radius || 0);
+                const angle = Number(cmd.angle || 0);
+                const distance = Number(cmd.distance || 0);
+                const thenMode = String(cmd.then || 'HOLD');
+                // Stream as curved drive approximation
+                if (radius) {
+                    let speed = (this.config.straightSpeed || 500) * 0.8;
+                    // Determine direction by sign of angle or distance
+                    if (angle) speed = Math.sign(angle) * Math.abs(speed);
+                    else if (distance) speed = Math.sign(distance) * Math.abs(speed);
+                    const turnRate = (Math.abs(speed) / Math.max(1, Math.abs(radius))) * (180 / Math.PI);
+                    const signedTurn = (angle >= 0 || distance >= 0) ? Math.abs(turnRate) : -Math.abs(turnRate);
+                    this.sendRobotCommand({ type: 'drive', speed, turn_rate: signedTurn });
+                }
+                if (typeof cmd.wait === 'number' && cmd.wait > 0) {
+                    // schedule handled by scheduler via returned duration
+                }
+            } else if (cmd.type === 'wait') {
+                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+            } else if (cmd.type === 'arm') {
+                const which = (cmd.arm || 'LEFT').toUpperCase();
+                const amount = Number(cmd.amount || 0);
+                const speed = Math.sign(amount) * 300;
+                this.sendRobotCommand({ type: which === 'LEFT' ? 'arm1' : 'arm2', speed });
+            } else if (cmd.type === 'stop') {
+                this.sendRobotCommand({ type: 'drive', speed: 0, turn_rate: 0 });
+                this.sendRobotCommand({ type: 'arm1', speed: 0 });
+                this.sendRobotCommand({ type: 'arm2', speed: 0 });
             }
         }
     }
