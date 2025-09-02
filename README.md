@@ -6,7 +6,7 @@
 
 **Visual programming for FLL teams**
 
-CodLess™ is a web-based tool that helps FIRST LEGO League teams program their robots without writing complex code. You can connect your LEGO hub, record movements, save them as reusable runs, and use them during competitions.
+CodLess™ is a web app for FIRST LEGO League teams that turns robot driving and simulation into repeatable programs. Pair a Pybricks-compatible LEGO hub over Web Bluetooth, record precise movements as named runs, and turn those runs into competition-ready Python you can run on the hub.
 
 ## [Live Demo – CodLess™](https://rani367.github.io/CodLess/)
 
@@ -14,25 +14,28 @@ CodLess™ is a web-based tool that helps FIRST LEGO League teams program their 
 
 ## Features
 
-- Connect to Pybricks-compatible LEGO hubs using Bluetooth
-- Record robot movements and save them as named runs
-- Upload and run Python code directly on the hub
-- Real-time 2D simulation of robot movements
-- Motor calibration for accurate control
-- Export and import saved runs
-- Works offline after the first load
+- Connect to Pybricks-compatible LEGO hubs over Web Bluetooth (Chromium desktop)
+- Optional Xbox controller drive for manual recording and teleop
+- Record robot motion and save it as named runs
+- Generate competition code that bundles your runs as functions
+- Upload and run Python on the hub from the browser
+- Real-time 2D simulator for testing without a robot
+- Robot configuration for ports, wheel size, track width, and basic calibration
+- Export and import runs for sharing or backup
+- Offline-first PWA after the first load; saved runs stay in your browser
 - Runs in the browser, no installation needed
 
 ---
 
 ## Quick Start
 
-1. Open [CodLess™](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera
-2. Click **Connect Robot** to pair with your Pybricks hub
-3. Configure motor ports in the settings
-4. Record movements using the control panel
-5. Save runs with custom names for later use
-6. Replay runs or export them as Python code
+1. Open [CodLess™](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera on desktop (HTTPS required for Bluetooth)
+2. Click **Connect to Pybricks Hub** to pair your hub
+3. Configure robot ports and dimensions under **Configure Robot**
+4. Optional: connect an Xbox controller for driving and recording
+5. Use the **Robot Simulator** or drive the robot to record a run
+6. Save the run with a name; it appears under **Saved Runs**
+7. Replay runs, export Python, or **Upload & Run on Hub**
 
 ---
 
