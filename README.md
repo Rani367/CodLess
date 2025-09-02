@@ -8,8 +8,6 @@
 
 CodLess™ is a web-based tool that helps FIRST LEGO League teams program their robots without writing complex code. You can connect your LEGO hub, record movements, save them as reusable runs, and use them during competitions.
 
-## [Live Demo – CodLess™](https://rani367.github.io/CodLess/)
-
 ---
 
 ## Features
