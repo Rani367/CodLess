@@ -4392,6 +4392,59 @@ function resetConfigToDefaults() {
     }
 }
 
+function resetAllData() {
+    // Confirm destructive action
+    const message = 'Are you sure? Your settings and runs WILL be deleted. This will reset the app to first-run state.';
+    if (!confirm(message)) return;
+
+    try {
+        // Prefer using existing helper to clear app data and reset in-memory state
+        if (window.app && typeof window.app.clearCorruptedData === 'function') {
+            window.app.clearCorruptedData();
+        } else {
+            // Fallback: remove known storage keys
+            try { localStorage.removeItem(STORAGE_KEYS.SAVED_RUNS); } catch (e) {}
+            try { localStorage.removeItem(STORAGE_KEYS.CONFIG); } catch (e) {}
+            try { localStorage.removeItem(STORAGE_KEYS.CALIBRATION_DATA); } catch (e) {}
+            try { localStorage.removeItem(STORAGE_KEYS.USER_PREFERENCES); } catch (e) {}
+        }
+    } catch (e) {
+        console.error('Error clearing app data:', e);
+    }
+
+    // Attempt to clear caches and unregister service workers for a truly fresh start
+    const clearCaches = (async () => {
+        if ('caches' in window) {
+            try {
+                const names = await caches.keys();
+                await Promise.all(names.map((name) => caches.delete(name)));
+            } catch (err) {
+                console.warn('Failed to clear caches:', err);
+            }
+        }
+    })();
+
+    const unregisterSW = (async () => {
+        if ('serviceWorker' in navigator) {
+            try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map((reg) => reg.unregister()));
+            } catch (err) {
+                console.warn('Failed to unregister service workers:', err);
+            }
+        }
+    })();
+
+    // Close the modal to avoid showing stale UI during reload
+    try { closeConfigModal(); } catch (e) {}
+
+    Promise.allSettled([clearCaches, unregisterSW]).finally(() => {
+        try { sessionStorage.clear(); } catch (e) {}
+        // Full reload to ensure fresh app state
+        location.reload();
+    });
+}
+
 function minimizeWindow() {
     window.app?.minimizeWindow();
 }
