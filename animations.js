@@ -206,3 +206,18 @@ if (document.readyState === 'loading') {
     animationController = new AnimationController();
     window.AnimationController = animationController;
 }
+
+(function(){
+    try {
+        const btn = document.getElementById('enterAppBtn');
+        if(!btn) return;
+        const glow = btn.querySelector('.cta-glow');
+        btn.addEventListener('pointermove', (e)=>{
+            const rect = btn.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            if(glow) glow.style.setProperty('--mx', x + '%');
+            if(glow) glow.style.setProperty('--my', y + '%');
+        }, {passive:true});
+    } catch(e) {}
+})();

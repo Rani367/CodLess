@@ -43,6 +43,7 @@
     <link rel="preload" href="app.js?v=1.0.0" as="script">
     <link rel="preload" href="styles.css" as="style">
     <link rel="preload" href="xbox-controller.glb" as="fetch" crossorigin>
+    <link rel="preload" href="gaming_keyboard.glb" as="fetch" crossorigin>
     
 
             <script>
@@ -131,7 +132,7 @@
     <div id="browserNotSupported" class="browser-not-supported" style="display: none;"></div>
 
 
-    <div class="app-container" id="appContainer">
+    <div class="app-container hidden" id="appContainer">
         <div class="title-bar">
             <div class="title-content">
                 <i class="fas fa-robot" aria-hidden="true"></i>
@@ -681,6 +682,99 @@
         })();
     </script>
 
+    <!-- Home Overlay -->
+    <div id="homeOverlay" class="home-overlay" aria-hidden="false">
+        <div class="home-overlay-content">
+            <div class="home-hero">
+                <div class="brand-badge">
+                    <i class="fas fa-robot" aria-hidden="true"></i>
+                    <span>CodLess™</span>
+                </div>
+                <h2 class="home-title">You can choose. controlling a robot has never been simpler.</h2>
+                <div class="models-row">
+                    <div class="model-card" id="keyboardCard">
+                        <model-viewer 
+                            id="keyboardModel"
+                            src="gaming_keyboard.glb"
+                            alt="Gaming Keyboard 3D Model"
+                            auto-rotate
+                            rotation-per-second="15deg"
+                            disable-zoom
+                            camera-controls
+                            min-camera-orbit="auto auto 110%"
+                            max-camera-orbit="auto auto 110%"
+                            camera-orbit="0deg 75deg 110%"
+                            shadow-intensity="0.6"
+                            exposure="1"
+                            style="width: 100%; height: 280px;">
+                        </model-viewer>
+                        <div class="model-label">Keyboard</div>
+                    </div>
+                    <div class="model-card" id="xboxCard">
+                        <model-viewer 
+                            id="xboxModel"
+                            src="xbox-controller.glb"
+                            alt="Xbox Controller 3D Model"
+                            auto-rotate
+                            rotation-per-second="15deg"
+                            disable-zoom
+                            camera-controls
+                            min-camera-orbit="auto auto 110%"
+                            max-camera-orbit="auto auto 110%"
+                            camera-orbit="0deg 75deg 110%"
+                            shadow-intensity="0.6"
+                            exposure="1"
+                            style="width: 100%; height: 280px;">
+                        </model-viewer>
+                        <div class="model-label">Xbox</div>
+                    </div>
+                </div>
+                <button id="enterAppBtn" class="cta-btn">
+                    Stop coding, start controlling.
+                    <span class="cta-glow"></span>
+                </button>
+            </div>
+        </div>
+        <div class="home-overlay-gradient"></div>
+    </div>
+
     <script src="app.js?v=1.0.0"></script>
+    <script>
+        (function(){
+            const overlay = document.getElementById('homeOverlay');
+            const appContainer = document.getElementById('appContainer');
+            const enterBtn = document.getElementById('enterAppBtn');
+            const xbox = document.getElementById('xboxModel');
+            const kbd = document.getElementById('keyboardModel');
+            const xboxCard = document.getElementById('xboxCard');
+            const kbdCard = document.getElementById('keyboardCard');
+
+            function setSpin(model, speedDeg){
+                if(!model) return;
+                model.setAttribute('rotation-per-second', speedDeg + 'deg');
+            }
+
+            function setupHover(card, model){
+                if(!card || !model) return;
+                card.addEventListener('mouseenter', ()=> setSpin(model, 6));
+                card.addEventListener('mouseleave', ()=> setSpin(model, 15));
+            }
+
+            setupHover(xboxCard, xbox);
+            setupHover(kbdCard, kbd);
+
+            function revealApp(){
+                if(appContainer){ appContainer.classList.remove('hidden'); }
+                if(overlay){ overlay.classList.add('hidden'); }
+                // Kick simulator init if it didn't run due to hidden canvas
+                try { window.app?.setupRobotSimulator?.(); } catch(e) {}
+            }
+
+            if(enterBtn){ enterBtn.addEventListener('click', revealApp); }
+
+            // Prevent scroll on overlay
+            document.body.style.overflow = 'hidden';
+        })();
+    </script>
 </body>
 </html>
