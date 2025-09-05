@@ -2485,3 +2485,125 @@ body::-webkit-scrollbar-track {
 .text-accent { color: var(--accent-0) !important; }
 .text-muted { color: var(--text-muted) !important; }
 .stat-value { font-size: 12px; color: rgba(0,168,255,0.9); font-weight: 500; }
+
+/* Home Overlay */
+.home-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(1200px 800px at 30% 20%, rgba(0,168,255,0.12), transparent 60%),
+                radial-gradient(1000px 700px at 70% 80%, rgba(255,99,132,0.10), transparent 55%),
+                linear-gradient(135deg, #0f0f10 0%, #17181a 100%);
+}
+.home-overlay.hidden { display: none !important; }
+.home-overlay-gradient {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(600px 400px at 50% 0%, rgba(255,255,255,0.06), transparent),
+                radial-gradient(1000px 1000px at -10% 110%, rgba(0,168,255,0.10), transparent),
+                radial-gradient(1000px 1000px at 110% -10%, rgba(255,99,132,0.10), transparent);
+    filter: blur(20px);
+}
+.home-overlay-content {
+    width: min(1200px, 92vw);
+    padding: 32px;
+    position: relative;
+}
+.home-hero {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter: blur(14px);
+}
+.brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(0,168,255,0.2), rgba(0,168,255,0.06));
+    border: 1px solid rgba(0,168,255,0.35);
+    color: #dff3ff;
+    box-shadow: 0 6px 20px rgba(0,168,255,0.18);
+    margin-bottom: 18px;
+}
+.brand-badge i { color: #00a8ff; }
+.brand-badge span { font-weight: 600; letter-spacing: 0.2px; }
+.home-title {
+    font-size: clamp(22px, 4vw, 34px);
+    line-height: 1.15;
+    font-weight: 700;
+    margin: 8px 0 22px 0;
+    background: linear-gradient(180deg, #ffffff, #b9dfff);
+    -webkit-background-clip: text background-clip: text; -webkit-text-fill-color: transparent;
+    text-shadow: 0 6px 30px rgba(0,168,255,0.12);
+}
+.models-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+}
+.model-card {
+    position: relative;
+    background: radial-gradient(500px 300px at 50% 0%, rgba(255,255,255,0.05), transparent), rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 14px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+    transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease, border-color 0.3s ease;
+}
+.model-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(0,168,255,0.35);
+    box-shadow: 0 30px 80px rgba(0,168,255,0.12);
+}
+.model-label {
+    position: absolute;
+    bottom: 12px;
+    left: 14px;
+    font-size: 12px;
+    opacity: 0.75;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 6px 10px;
+    border-radius: 999px;
+}
+.cta-btn {
+    margin: 26px auto 6px auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 22px;
+    border-radius: 14px;
+    border: 0;
+    color: #0a0a0a;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #00e1ff 0%, #00a8ff 40%, #7c4dff 100%);
+    box-shadow: 0 14px 40px rgba(0,168,255,0.45);
+    position: relative;
+    overflow: hidden;
+}
+.cta-btn:hover { box-shadow: 0 16px 48px rgba(0,168,255,0.6); transform: translateY(-1px); }
+.cta-btn:active { transform: translateY(0); }
+.cta-glow {
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.35), transparent 60%);
+    mix-blend-mode: overlay;
+    pointer-events: none;
+}
+.cta-btn:hover .cta-glow { filter: blur(6px); }
+
+@media (max-width: 860px) {
+    .models-row { grid-template-columns: 1fr; }
+}
