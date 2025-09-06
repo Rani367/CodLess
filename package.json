@@ -1,0 +1,26 @@
+{
+  "name": "codless",
+  "version": "1.0.0",
+  "description": "[![GitHub stars](https://img.shields.io/github/stars/rani367/CodLess?style=social)](https://github.com/rani367/CodLess) [![GitHub issues](https://img.shields.io/github/issues/rani367/CodLess)](https://github.com/rani367/CodLess/issues) [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-deployed-brightgreen)](https://rani367.github.io/CodLess/)",
+  "main": "animations.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rani367/CodLess.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rani367/CodLess/issues"
+  },
+  "homepage": "https://github.com/Rani367/CodLess#readme",
+  "type": "module",
+  "private": "true",
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

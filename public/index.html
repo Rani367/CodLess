@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="title" content="CodLess™ – Free Web App for FLL Teams">
+    <meta name="description" content="A free web-based coding tool for FLL teams to make robot programming easier. Record, save, and replay robot movements without writing code.">
+    <meta name="keywords" content="FLL, FIRST LEGO League, robotics, LEGO, Pybricks, robot programming, visual programming, STEM education, robotics competition">
+    <meta name="author" content="CodLess™">
+    <meta name="theme-color" content="#00a8ff">
+    
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://rani367.github.io/CodLess/">
+    <meta property="og:title" content="CodLess™ – Free Web App for FLL Teams">
+    <meta property="og:description" content="A free web-based coding tool for FLL teams to make robot programming easier. Record, save, and replay robot movements without writing code.">
+    <meta property="og:image" content="https://rani367.github.io/CodLess/assets/screenshots/screenshot1.png">
+
+
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://rani367.github.io/CodLess/">
+    <meta property="twitter:title" content="CodLess™ – Free Web App for FLL Teams">
+    <meta property="twitter:description" content="A free web-based coding tool for FLL teams to make robot programming easier. Record, save, and replay robot movements without writing code.">
+    <meta property="twitter:image" content="https://rani367.github.io/CodLess/assets/screenshots/screenshot1.png">
+
+
+    <link rel="manifest" href="manifest.json">
+    
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="shortcut icon" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    
+    <title>CodLess™ – Free Web App for FLL Teams</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+
+    <link rel="preload" href="app.js?v=1.0.0" as="script">
+    <link rel="preload" href="assets/css/styles.css" as="style">
+    <link rel="preload" href="assets/models/xbox-controller.glb" as="fetch" crossorigin>
+    <link rel="preload" href="assets/models/gaming_keyboard.glb" as="fetch" crossorigin>
+    
+
+            <script>
+            // Non-blocking check for Bluetooth API support (debug mode)
+            function immediateBluetoothCheck() {
+                if (!navigator.bluetooth || !window.isSecureContext) {
+                    window.BT_UNAVAILABLE = true; // Used to show a debug warning later
+                }
+                return true;
+            }
+            
+            // Run the check immediately (does not block app load)
+            immediateBluetoothCheck();
+        </script>
+
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+    <script src="animations.js" defer></script>
+</head>
+<body>
+
+    <style>
+        .page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+        }
+        
+        .page-loader.fade-out {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loader-content {
+            text-align: center;
+        }
+        
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #00a8ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .loader-text {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 500;
+            opacity: 0.8;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <div class="loader-text">Loading CodLess™...</div>
+        </div>
+    </div>
+    <script>
+        // Remove loader when page is fully loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('pageLoader');
+                if (loader) {
+                    loader.classList.add('fade-out');
+                    setTimeout(() => loader.remove(), 500);
+                }
+            }, 500);
+        });
+    </script>
+
+    <div id="browserNotSupported" class="browser-not-supported" style="display: none;"></div>
+
+
+    <div class="app-container hidden" id="appContainer">
+        <div class="title-bar">
+            <div class="title-content">
+                <i class="fas fa-robot" aria-hidden="true"></i>
+                <h1>CodLess™</h1>
+                <span class="version-badge">v1.0</span>
+            </div>
+            <div class="window-controls">
+                <button class="window-btn minimize-btn" onclick="minimizeWindow()" aria-label="Minimize window">
+                    <i class="fas fa-minus" aria-hidden="true"></i>
+                </button>
+                <button class="window-btn maximize-btn" onclick="toggleMaximize()" aria-label="Toggle fullscreen">
+                    <i class="fas fa-expand" aria-hidden="true"></i>
+                </button>
+                <button class="window-btn close-btn" onclick="closeWindow()" aria-label="Close application">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="main-container">
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-wifi" aria-hidden="true"></i>
+                        <h3>Hub Connection</h3>
+                    </div>
+                    <div class="section-content">
+                        <button id="connectBtn" class="btn btn-primary" aria-describedby="hubStatus">
+                            Connect to Pybricks Hub
+                        </button>
+                        <button id="connectXboxBtn" class="btn btn-secondary" style="margin-top: 10px;">
+                            <i class="fas fa-gamepad" aria-hidden="true"></i>
+                            Connect Xbox Controller
+                        </button>
+
+                        <div id="hubStatus" class="status-indicator disconnected" role="status" aria-live="polite">
+                            <div class="status-dot" aria-hidden="true"></div>
+                            <span>Hub Disconnected</span>
+                        </div>
+                        <div id="xboxStatus" class="status-indicator disconnected" role="status" aria-live="polite" style="margin-top: 10px;">
+                            <div class="status-dot" aria-hidden="true"></div>
+                            <span>Xbox Controller Disconnected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-cog" aria-hidden="true"></i>
+                        <h3>Robot Configuration</h3>
+                    </div>
+                    <div class="section-content">
+                        <button id="configBtn" class="btn btn-success">
+                            <i class="fas fa-tools" aria-hidden="true"></i>
+                            Configure Robot
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-download" aria-hidden="true"></i>
+                        <h3>Competition Code</h3>
+                    </div>
+                    <div class="section-content">
+                        <p class="info-text">
+                            Upload your competition code to your connected hub and run it immediately. The code includes all your saved runs as executable functions.
+                        </p>
+                        <button id="uploadToHubBtn" class="btn btn-success">
+                            <i class="fas fa-rocket" aria-hidden="true"></i>
+                            Upload & Run on Hub
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <i class="fas fa-play-circle" aria-hidden="true"></i>
+                        <h3>Saved Runs</h3>
+                    </div>
+                    <div class="section-content">
+                        <select id="savedRunsList" class="select-box" aria-label="Select saved run">
+                            <option value="">No saved runs</option>
+                        </select>
+                        <div class="button-group">
+                            <button id="playBtn" class="btn btn-success" disabled>
+                                <i class="fas fa-play" aria-hidden="true"></i>
+                                Play
+                            </button>
+                            <button id="deleteBtn" class="btn btn-danger" disabled>
+                                <i class="fas fa-trash" aria-hidden="true"></i>
+                                Delete
+                            </button>
+                        </div>
+                        <div class="button-group">
+                            <button id="exportBtn" class="btn btn-secondary" disabled>
+                                <i class="fas fa-download" aria-hidden="true"></i>
+                                Export
+                            </button>
+                            <button id="importBtn" class="btn btn-secondary">
+                                <i class="fas fa-upload" aria-hidden="true"></i>
+                                Import
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div id="simulatorSection" class="content-section hidden">
+                    <div class="section-header">
+                        <i class="fas fa-eye" aria-hidden="true"></i>
+                        <h3>Robot Simulator</h3>
+                    </div>
+                    <div class="simulator-container">
+                        <canvas id="robotSimulator" aria-label="Robot movement simulator"></canvas>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="section-header">
+                        <i class="fas fa-microphone" aria-hidden="true"></i>
+                        <h3>Recording Controls</h3>
+                        <div class="section-actions">
+                            <span id="recordingTimer" class="recording-timer hidden">00:00</span>
+                        </div>
+                    </div>
+                    <div class="recording-controls">
+                        <div class="input-group">
+                            <label for="runNameInput">Run Name:</label>
+                            <input type="text" id="runNameInput" value="Run 1" class="input-field" maxlength="50" aria-describedby="runNameHelp">
+                            <small id="runNameHelp" class="help-text">Maximum 50 characters</small>
+                        </div>
+                        <div class="input-group">
+                            <label>Start Corner:</label>
+                            <div class="button-group">
+                                <button id="cornerBLBtn" class="btn btn-secondary">
+                                    <i class="fas fa-location-arrow" aria-hidden="true"></i>
+                                    Bottom Left
+                                </button>
+                                <button id="cornerBRBtn" class="btn btn-secondary">
+                                    <i class="fas fa-location-arrow" aria-hidden="true"></i>
+                                    Bottom Right
+                                </button>
+                            </div>
+                            <small class="help-text">Sets the coordinate origin for recordings (under the hood only)</small>
+                        </div>
+                        <div class="button-group">
+                            <button id="recordBtn" class="btn btn-danger" disabled>
+                                <i class="fas fa-circle" aria-hidden="true"></i>
+                                Record Run
+                            </button>
+                            <button id="saveBtn" class="btn btn-success" disabled>
+                                <i class="fas fa-save" aria-hidden="true"></i>
+                                Save Run
+                            </button>
+                            <button id="pauseBtn" class="btn btn-warning hidden" disabled>
+                                <i class="fas fa-pause" aria-hidden="true"></i>
+                                Pause
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="section-header">
+                        <i class="fas fa-terminal" aria-hidden="true"></i>
+                        <h3>Status Display</h3>
+                        <div class="section-actions">
+                            <button id="clearLogBtn" class="btn-icon" aria-label="Clear log">
+                                <i class="fas fa-trash" aria-hidden="true"></i>
+                            </button>
+                            <button id="exportLogBtn" class="btn-icon" aria-label="Export log">
+                                <i class="fas fa-download" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="statusDisplay" class="status-display" role="log" aria-live="polite" aria-label="Application status log"></div>
+                </div>
+
+                <div class="content-section">
+                    <div class="section-header">
+                        <i class="fas fa-keyboard" aria-hidden="true"></i>
+                        <h3>Robot Controls</h3>
+                        <div class="section-actions">
+                            <button id="emergencyStopBtn" class="btn btn-danger btn-emergency">
+                                <i class="fas fa-stop" aria-hidden="true"></i>
+                                Emergency Stop
+                            </button>
+                        </div>
+                    </div>
+                    <div class="controls-grid">
+                        <div class="control-group">
+                            <h4>Movement Controls</h4>
+                            <div class="control-keys">
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd aria-label="W key">W</kbd>
+                                        <span>Forward</span>
+                                    </div>
+                                </div>
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd aria-label="A key">A</kbd>
+                                        <span>Turn Left</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd aria-label="S key">S</kbd>
+                                        <span>Backward</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd aria-label="D key">D</kbd>
+                                        <span>Turn Right</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <h4>Arm Controls</h4>
+                            <div class="control-keys">
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd aria-label="Q key">Q</kbd>
+                                        <span>Arm 1 Up</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd aria-label="E key">E</kbd>
+                                        <span>Arm 1 Down</span>
+                                    </div>
+                                </div>
+                                <div class="key-row">
+                                    <div class="key-item">
+                                        <kbd aria-label="R key">R</kbd>
+                                        <span>Arm 2 Up</span>
+                                    </div>
+                                    <div class="key-item">
+                                        <kbd aria-label="F key">F</kbd>
+                                        <span>Arm 2 Down</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                                        <div class="controls-help">
+                        <p class="help-text">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                            Hold multiple keys for combined movements. Press Space for emergency stop.
+                        </p>
+                        <div id="xboxControllerHelp" style="display: none; margin-top: 10px;">
+                            <p class="help-text">
+                                <i class="fas fa-gamepad" aria-hidden="true"></i>
+                                <strong>Xbox Controller:</strong> Right trigger = forward (proportional), Left trigger = reverse (proportional), Left stick = turn. Right stick or A/B for Arm 1, X/Y for Arm 2. Menu for emergency stop.
+                            </p>
+                            <div id="xboxTriggerDisplay" style="margin-top: 10px;">
+                                <div style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 11px; color: #aaa;">L Trigger (Reverse)</div>
+                                        <div class="meter">
+                                            <div id="leftTriggerBar" class="meter-fill is-reverse" style="width: 0%;"></div>
+                                        </div>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 11px; color: #aaa;">R Trigger (Forward)</div>
+                                        <div class="meter">
+                                            <div id="rightTriggerBar" class="meter-fill is-forward" style="width: 0%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="stat-value" style="text-align: center; margin-top: 5px;">
+                                    Speed: <span id="xboxSpeedDisplay">0</span> mm/s
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-content">
+                <span>Status:</span>
+                <span id="statusLabel">Ready</span>
+            </div>
+            <div class="status-content">
+                <span>Connection:</span>
+                <span id="connectionStatus">Disconnected</span>
+            </div>
+            <div class="status-content">
+                <span>Battery:</span>
+                <span id="batteryStatus">Unknown</span>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="configModal" class="modal" role="dialog" aria-labelledby="configModalTitle" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="configModalTitle">Robot Configuration</h2>
+                <button class="close-modal" onclick="closeConfigModal()" aria-label="Close configuration">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="config-tabs" role="tablist">
+                    <button class="tab-btn active" onclick="showTab('physical')" role="tab" aria-controls="physicalTab" aria-selected="true">Physical Parameters</button>
+                    <button class="tab-btn" onclick="showTab('movement')" role="tab" aria-controls="movementTab" aria-selected="false">Movement Settings</button>
+                    <button class="tab-btn" onclick="showTab('advanced')" role="tab" aria-controls="advancedTab" aria-selected="false">Advanced</button>
+                </div>
+
+                <div id="physicalTab" class="tab-content active" role="tabpanel" aria-labelledby="physicalTabBtn">
+                    <div class="config-group">
+                        <h3>Robot Dimensions</h3>
+                        <div class="config-row">
+                            <label for="axleTrack">Axle Track (mm):</label>
+                            <input type="number" id="axleTrack" value="112" step="0.1" min="50" max="300" class="config-input" aria-describedby="axleTrackHelp">
+                            <small id="axleTrackHelp" class="help-text">Distance between wheel centers</small>
+                        </div>
+                        <div class="config-row">
+                            <label for="wheelDiameter">Wheel Diameter (mm):</label>
+                            <input type="number" id="wheelDiameter" value="56" step="0.1" min="20" max="100" class="config-input" aria-describedby="wheelDiameterHelp">
+                            <small id="wheelDiameterHelp" class="help-text">Diameter of drive wheels</small>
+                        </div>
+                    </div>
+
+                    <div class="config-group">
+                        <h3>Motor Ports</h3>
+                        <div class="config-row">
+                            <label for="leftMotorPort">Left Motor Port:</label>
+                            <select id="leftMotorPort" class="config-select" aria-describedby="leftMotorHelp">
+                                <option value="A" selected>A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                            <small id="leftMotorHelp" class="help-text">Left drive motor port</small>
+                        </div>
+                        <div class="config-row">
+                            <label for="rightMotorPort">Right Motor Port:</label>
+                            <select id="rightMotorPort" class="config-select">
+                                <option value="A">A</option>
+                                <option value="B" selected>B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label for="arm1MotorPort">Arm 1 Motor Port:</label>
+                            <select id="arm1MotorPort" class="config-select">
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C" selected>C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label for="arm2MotorPort">Arm 2 Motor Port:</label>
+                            <select id="arm2MotorPort" class="config-select">
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D" selected>D</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="movementTab" class="tab-content" role="tabpanel">
+                    <div class="config-group">
+                        <h3>Speed Settings</h3>
+                        <div class="config-row">
+                            <label for="straightSpeed">Straight Speed (deg/s):</label>
+                            <input type="number" id="straightSpeed" value="500" min="100" max="1000" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label for="straightAccel">Straight Acceleration (deg/s²):</label>
+                            <input type="number" id="straightAccel" value="250" min="50" max="500" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label for="turnRate">Turn Rate (deg/s):</label>
+                            <input type="number" id="turnRate" value="200" min="50" max="400" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label for="turnAccel">Turn Acceleration (deg/s²):</label>
+                            <input type="number" id="turnAccel" value="300" min="100" max="600" class="config-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="advancedTab" class="tab-content" role="tabpanel">
+                    <div class="config-group">
+                        <h3>Advanced Settings</h3>
+                        <div class="config-row">
+                            <label for="commandTimeout">Command Timeout (ms):</label>
+                            <input type="number" id="commandTimeout" value="1000" min="100" max="5000" class="config-input">
+                        </div>
+                        <div class="config-row">
+                            <label for="batteryWarning">Battery Warning Level (%):</label>
+                            <input type="number" id="batteryWarning" value="20" min="5" max="50" class="config-input">
+                        </div>
+
+                        <div class="config-row">
+                            <label for="simulateConnected">Simulate Connected:</label>
+                            <input type="checkbox" id="simulateConnected" class="checkbox" aria-describedby="simulateConnectedHelp">
+                            <small id="simulateConnectedHelp" class="help-text">Make app behave as if robot is connected (for testing without physical robot)</small>
+                        </div>
+
+                        <div class="config-row">
+                            <button class="btn btn-danger" onclick="resetAllData()">
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i> Reset Data
+                            </button>
+                            <small class="help-text">Deletes all saved runs, settings, and calibration. Irreversible.</small>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="resetConfigToDefaults()">Reset to Defaults</button>
+                <button class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="xboxConnectModal" class="modal xbox-modal" role="dialog" aria-labelledby="xboxModalTitle" aria-hidden="true">
+        <div class="modal-content xbox-modal-content">
+            <div class="xbox-scene">
+                <model-viewer 
+                    id="xboxController3D"
+                    src="assets/models/xbox-controller.glb" 
+                    alt="Xbox Controller 3D Model"
+                    auto-rotate
+                    rotation-per-second="45deg"
+                    disable-zoom
+                    field-of-view="35deg"
+                    min-camera-orbit="auto auto 150%"
+                    max-camera-orbit="auto auto 150%"
+                    camera-orbit="0deg 90deg 150%"
+                    shadow-intensity="0.2"
+                    environment-image="neutral"
+                    exposure="1"
+                    loading="lazy"
+                    reveal="auto"
+                    style="width: 100%; height: 300px;">
+                </model-viewer>
+            </div>
+            <div class="xbox-modal-text">
+                <h2 id="xboxModalTitle">Searching for Xbox Controller</h2>
+                <p class="xbox-status-text">Press any button on your Xbox controller to connect...</p>
+                <div class="xbox-pulse-indicator">
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                </div>
+            </div>
+            <button class="btn btn-secondary xbox-cancel-btn" onclick="window.app?.cancelXboxConnection()">Cancel</button>
+        </div>
+    </div>
+
+
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch((registrationError) => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+
+
+    <script>
+        (function() {
+            // Detect Safari
+            function isSafari() {
+                return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            }
+            
+            // Detect other unsupported browsers
+            function isUnsupportedBrowser() {
+                // Check for Safari
+                if (isSafari()) return true;
+                
+                // Check for Internet Explorer
+                if (navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > -1) {
+                    return true;
+                }
+                
+                // Check for very old versions of browsers
+                const userAgent = navigator.userAgent;
+                
+                // Chrome versions below 80
+                const chromeMatch = userAgent.match(/Chrome\/(\d+)/);
+                if (chromeMatch && parseInt(chromeMatch[1]) < 80) return true;
+                
+                // Firefox versions below 75
+                const firefoxMatch = userAgent.match(/Firefox\/(\d+)/);
+                if (firefoxMatch && parseInt(firefoxMatch[1]) < 75) return true;
+                
+                // Edge versions below 80
+                const edgeMatch = userAgent.match(/Edg\/(\d+)/);
+                if (edgeMatch && parseInt(edgeMatch[1]) < 80) return true;
+                
+                return false;
+            }
+            
+            // Check for required APIs
+            function hasRequiredAPIs() {
+                // Check for Web Bluetooth
+                if (!navigator.bluetooth) return false;
+                
+                // Check for Service Workers
+                if (!('serviceWorker' in navigator)) return false;
+                
+                // Check for Promise support
+                if (typeof Promise === 'undefined') return false;
+                
+                // Check for async/await support (ES2017)
+                try {
+                    eval('async function test() {}');
+                } catch (e) {
+                    return false;
+                }
+                
+                return true;
+            }
+            
+            // Disabled: no longer show blocking screen; allow app to load for debugging
+            function showBrowserNotSupported() {
+                console.warn('Browser reported as unsupported; continuing in debug mode. Bluetooth will be disabled.');
+            }
+            
+            // Main browser compatibility check disabled: allow app to load for debugging
+            if (isUnsupportedBrowser() || !hasRequiredAPIs()) {
+                showBrowserNotSupported();
+                // Do not stop execution
+            }
+        })();
+    </script>
+
+    <!-- Home Overlay -->
+    <div id="homeOverlay" class="home-overlay" aria-hidden="false">
+        <div class="home-overlay-content">
+            <div class="home-hero">
+                <div class="brand-badge">
+                    <i class="fas fa-robot" aria-hidden="true"></i>
+                    <span>CodLess™</span>
+                </div>
+                <div class="models-row">
+                    <div class="model-card" id="keyboardCard">
+                        <model-viewer 
+                            id="keyboardModel"
+                            src="assets/models/gaming_keyboard.glb"
+                            alt="Gaming Keyboard 3D Model"
+                            auto-rotate
+                            rotation-per-second="12deg"
+                            disable-zoom
+                            min-camera-orbit="auto auto 110%"
+                            max-camera-orbit="auto auto 110%"
+                            camera-orbit="0deg 75deg 110%"
+                            shadow-intensity="0.2"
+                            environment-image="neutral"
+                            exposure="1"
+                            poster="favicon.png"
+                            loading="eager"
+                            reveal="auto"
+                            style="width: 100%; height: 280px;">
+                        </model-viewer>
+                        <div class="model-label">Keyboard</div>
+                    </div>
+                    <div class="model-card" id="xboxCard">
+                        <model-viewer 
+                            id="xboxModel"
+                            src="assets/models/xbox-controller.glb"
+                            alt="Xbox Controller 3D Model"
+                            auto-rotate
+                            rotation-per-second="12deg"
+                            disable-zoom
+                            min-camera-orbit="auto auto 110%"
+                            max-camera-orbit="auto auto 110%"
+                            camera-orbit="0deg 75deg 110%"
+                            shadow-intensity="0.2"
+                            environment-image="neutral"
+                            exposure="1"
+                            loading="lazy"
+                            reveal="auto"
+                            style="width: 100%; height: 280px;">
+                        </model-viewer>
+                        <div class="model-label">Xbox</div>
+                    </div>
+                </div>
+                <button id="enterAppBtn" class="cta-btn">
+                    Stop coding, start controlling.
+                    <span class="cta-glow"></span>
+                </button>
+            </div>
+        </div>
+        <div class="home-overlay-gradient"></div>
+    </div>
+
+    <script src="app.js?v=1.0.0"></script>
+    <script>
+        (function(){
+            const overlay = document.getElementById('homeOverlay');
+            const appContainer = document.getElementById('appContainer');
+            const enterBtn = document.getElementById('enterAppBtn');
+            const xbox = document.getElementById('xboxModel');
+            const kbd = document.getElementById('keyboardModel');
+            const xboxCard = document.getElementById('xboxCard');
+            const kbdCard = document.getElementById('keyboardCard');
+
+            function setSpin(model, speedDeg){
+                if(!model) return;
+                model.setAttribute('rotation-per-second', speedDeg + 'deg');
+            }
+
+            function setupHover(card, model){
+                // Hover interactions disabled
+                return;
+            }
+
+            setupHover(xboxCard, xbox);
+            setupHover(kbdCard, kbd);
+
+            function revealApp(){
+                if(appContainer){ appContainer.classList.remove('hidden'); }
+                if(overlay){ overlay.classList.add('hidden'); }
+                // Kick simulator init if it didn't run due to hidden canvas
+                try { window.app?.setupRobotSimulator?.(); } catch(e) {}
+            }
+
+            if(enterBtn){ enterBtn.addEventListener('click', revealApp); }
+
+            // Prevent scroll on overlay
+            document.body.style.overflow = 'hidden';
+        })();
+    </script>
+    <script>
+        (function(){
+            const PERF = { minFps: 55, windowsToDegrade: 2 };
+            let frames = 0;
+            let lowCount = 0;
+            let last = performance.now();
+            let rafId;
+
+            function applyPerfLite(){
+                if (document.body.classList.contains('perf-lite')) return;
+                document.body.classList.add('perf-lite');
+                const models = [document.getElementById('xboxModel'), document.getElementById('keyboardModel')].filter(Boolean);
+                models.forEach(m => {
+                    try {
+                        m.removeAttribute('camera-controls');
+                        m.removeAttribute('auto-rotate');
+                        m.setAttribute('shadow-intensity', '0');
+                        m.setAttribute('environment-image', 'neutral');
+                        const h = parseInt((m.style.height || '280px').replace('px',''), 10);
+                        if (h > 220) m.style.height = '220px';
+                    } catch (e) {}
+                });
+            }
+
+            function loop(now){
+                frames++;
+                if (now - last >= 1000) {
+                    const fps = Math.round(frames * 1000 / (now - last));
+                    frames = 0;
+                    last = now;
+                    if (fps < PERF.minFps) {
+                        lowCount++;
+                        if (lowCount >= PERF.windowsToDegrade) {
+                            applyPerfLite();
+                            cancelAnimationFrame(rafId);
+                            return;
+                        }
+                    } else {
+                        lowCount = Math.max(0, lowCount - 1);
+                    }
+                }
+                rafId = requestAnimationFrame(loop);
+            }
+
+            rafId = requestAnimationFrame(loop);
+        })();
+    </script>
+    <script>
+        (function(){
+            const models = () => Array.from(document.querySelectorAll('model-viewer'));
+            document.addEventListener('visibilitychange', () => {
+                const hidden = document.hidden;
+                models().forEach(m => {
+                    try {
+                        if (hidden) {
+                            if (m.hasAttribute('auto-rotate')) m.dataset.hadAutoRotate = '1';
+                            m.removeAttribute('auto-rotate');
+                            m.setAttribute('shadow-intensity', '0');
+                        } else {
+                            if (m.dataset.hadAutoRotate === '1') m.setAttribute('auto-rotate', '');
+                            delete m.dataset.hadAutoRotate;
+                        }
+                    } catch (e) {}
+                });
+            });
+        })();
+    </script>
+</body>
+</html>
