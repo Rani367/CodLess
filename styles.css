@@ -2261,6 +2261,39 @@ body::after {
     z-index: 0;
 }
 
+/* Performance-lite mode: reduce GPU/repaint load for low-end devices */
+body.perf-lite::before,
+body.perf-lite::after {
+    animation: none !important;
+    opacity: 0.08 !important;
+    filter: none !important;
+}
+
+.perf-lite .home-hero,
+.perf-lite .model-card,
+.perf-lite .content-section,
+.perf-lite .sidebar-section,
+.perf-lite .simulator-container,
+.perf-lite .toast,
+.perf-lite .modal-content {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+.perf-lite .model-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.perf-lite .cta-btn { box-shadow: none !important; }
+.perf-lite .cta-btn:hover { transform: none !important; box-shadow: none !important; }
+
+.perf-lite #xboxController3D,
+.perf-lite #xboxModel,
+.perf-lite #keyboardModel {
+    --progress-bar-height: 2px;
+}
+
 @keyframes auroraShift {
     0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
     50% { transform: translate3d(0, -2%, 0) scale(1.02); }

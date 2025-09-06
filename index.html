@@ -567,16 +567,16 @@
                     src="xbox-controller.glb" 
                     alt="Xbox Controller 3D Model"
                     auto-rotate
-                    rotation-per-second="90deg"
-                    camera-controls
+                    rotation-per-second="45deg"
                     disable-zoom
                     field-of-view="35deg"
                     min-camera-orbit="auto auto 150%"
                     max-camera-orbit="auto auto 150%"
                     camera-orbit="0deg 90deg 150%"
-                    shadow-intensity="0.5"
+                    shadow-intensity="0.2"
+                    environment-image="neutral"
                     exposure="1"
-                    loading="eager"
+                    loading="lazy"
                     reveal="auto"
                     style="width: 100%; height: 300px;">
                 </model-viewer>
@@ -697,14 +697,16 @@
                             src="gaming_keyboard.glb"
                             alt="Gaming Keyboard 3D Model"
                             auto-rotate
-                            rotation-per-second="15deg"
+                            rotation-per-second="12deg"
                             disable-zoom
-                            camera-controls
                             min-camera-orbit="auto auto 110%"
                             max-camera-orbit="auto auto 110%"
                             camera-orbit="0deg 75deg 110%"
-                            shadow-intensity="0.6"
+                            shadow-intensity="0.2"
+                            environment-image="neutral"
                             exposure="1"
+                            loading="lazy"
+                            reveal="auto"
                             style="width: 100%; height: 280px;">
                         </model-viewer>
                         <div class="model-label">Keyboard</div>
@@ -715,14 +717,16 @@
                             src="xbox-controller.glb"
                             alt="Xbox Controller 3D Model"
                             auto-rotate
-                            rotation-per-second="15deg"
+                            rotation-per-second="12deg"
                             disable-zoom
-                            camera-controls
                             min-camera-orbit="auto auto 110%"
                             max-camera-orbit="auto auto 110%"
                             camera-orbit="0deg 75deg 110%"
-                            shadow-intensity="0.6"
+                            shadow-intensity="0.2"
+                            environment-image="neutral"
                             exposure="1"
+                            loading="lazy"
+                            reveal="auto"
                             style="width: 100%; height: 280px;">
                         </model-viewer>
                         <div class="model-label">Xbox</div>
@@ -773,6 +777,73 @@
 
             // Prevent scroll on overlay
             document.body.style.overflow = 'hidden';
+        })();
+    </script>
+    <script>
+        (function(){
+            const PERF = { minFps: 55, windowsToDegrade: 2 };
+            let frames = 0;
+            let lowCount = 0;
+            let last = performance.now();
+            let rafId;
+
+            function applyPerfLite(){
+                if (document.body.classList.contains('perf-lite')) return;
+                document.body.classList.add('perf-lite');
+                const models = [document.getElementById('xboxModel'), document.getElementById('keyboardModel')].filter(Boolean);
+                models.forEach(m => {
+                    try {
+                        m.removeAttribute('camera-controls');
+                        m.removeAttribute('auto-rotate');
+                        m.setAttribute('shadow-intensity', '0');
+                        m.setAttribute('environment-image', 'neutral');
+                        const h = parseInt((m.style.height || '280px').replace('px',''), 10);
+                        if (h > 220) m.style.height = '220px';
+                    } catch (e) {}
+                });
+            }
+
+            function loop(now){
+                frames++;
+                if (now - last >= 1000) {
+                    const fps = Math.round(frames * 1000 / (now - last));
+                    frames = 0;
+                    last = now;
+                    if (fps < PERF.minFps) {
+                        lowCount++;
+                        if (lowCount >= PERF.windowsToDegrade) {
+                            applyPerfLite();
+                            cancelAnimationFrame(rafId);
+                            return;
+                        }
+                    } else {
+                        lowCount = Math.max(0, lowCount - 1);
+                    }
+                }
+                rafId = requestAnimationFrame(loop);
+            }
+
+            rafId = requestAnimationFrame(loop);
+        })();
+    </script>
+    <script>
+        (function(){
+            const models = () => Array.from(document.querySelectorAll('model-viewer'));
+            document.addEventListener('visibilitychange', () => {
+                const hidden = document.hidden;
+                models().forEach(m => {
+                    try {
+                        if (hidden) {
+                            if (m.hasAttribute('auto-rotate')) m.dataset.hadAutoRotate = '1';
+                            m.removeAttribute('auto-rotate');
+                            m.setAttribute('shadow-intensity', '0');
+                        } else {
+                            if (m.dataset.hadAutoRotate === '1') m.setAttribute('auto-rotate', '');
+                            delete m.dataset.hadAutoRotate;
+                        }
+                    } catch (e) {}
+                });
+            });
         })();
     </script>
 </body>
