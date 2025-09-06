@@ -758,9 +758,8 @@
             }
 
             function setupHover(card, model){
-                if(!card || !model) return;
-                card.addEventListener('mouseenter', ()=> setSpin(model, 6));
-                card.addEventListener('mouseleave', ()=> setSpin(model, 15));
+                // Hover interactions disabled
+                return;
             }
 
             setupHover(xboxCard, xbox);
