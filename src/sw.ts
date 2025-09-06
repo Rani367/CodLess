@@ -1,24 +1,23 @@
 /// <reference lib="webworker" />
 // @ts-nocheck
-export {};
 declare const self: ServiceWorkerGlobalScope;
 
 const CACHE_NAME = 'codless-robotics-v1.0.0';
-const OFFLINE_URL = '/offline.html';
+const OFFLINE_URL = 'offline.html';
 
 // Files to cache for offline functionality
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/assets/css/styles.css',
-  '/assets/css/animations.css',
-  '/app.js',
-  '/app.js?v=1.0.0',
-  '/manifest.json',
-  '/favicon.png',
-  '/assets/models/gaming_keyboard.glb',
-  '/assets/models/xbox-controller.glb',
+  './',
+  'index.html',
+  'offline.html',
+  'assets/css/styles.css',
+  'assets/css/animations.css',
+  'app.js',
+  'app.js?v=1.0.0',
+  'manifest.json',
+  'favicon.png',
+  'assets/models/gaming_keyboard.glb',
+  'assets/models/xbox-controller.glb',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
@@ -215,20 +214,20 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: event.data ? event.data.text() : 'New notification from CodLess™',
-    icon: '/favicon.png',
-    badge: '/favicon.png',
+    icon: 'favicon.png',
+    badge: 'favicon.png',
     tag: 'codless-notification',
     requireInteraction: false,
     actions: [
       {
         action: 'open',
         title: 'Open App',
-        icon: '/favicon.png'
+        icon: 'favicon.png'
       },
       {
         action: 'dismiss',
         title: 'Dismiss',
-        icon: '/favicon.png'
+        icon: 'favicon.png'
       }
     ]
   };
@@ -246,7 +245,7 @@ self.addEventListener('notificationclick', (event) => {
   
   if (event.action === 'open') {
     event.waitUntil(
-      clients.openWindow('/')
+      clients.openWindow('./')
     );
   }
 });
