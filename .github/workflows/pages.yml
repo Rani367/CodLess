@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - main
-      - master
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - 'tsconfig.json'
+      - 'package.json'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
