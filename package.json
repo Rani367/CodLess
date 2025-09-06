@@ -19,7 +19,7 @@
   },
   "homepage": "https://rani367.github.io/CodLess/",
   "type": "module",
-  "private": "true",
+  "private": true,
   "devDependencies": {
     "typescript": "^5.5.4"
   }
