@@ -3,8 +3,8 @@
   "short_name": "CodLess™",
   "description": "Professional robotics platform with advanced robot control, recording, and simulation capabilities",
   "version": "1.0.0",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "landscape-primary",
   "theme_color": "#00a8ff",
@@ -65,7 +65,7 @@
       "name": "Quick Connect",
       "short_name": "Connect",
       "description": "Quickly connect to your robot",
-      "url": "/?action=connect",
+      "url": "./?action=connect",
       "icons": [
         {
           "src": "favicon.png",
@@ -77,7 +77,7 @@
       "name": "Simulator",
       "short_name": "Simulator",
       "description": "Open robot simulator",
-      "url": "/?action=simulator",
+      "url": "./?action=simulator",
       "icons": [
         {
           "src": "favicon.png",
