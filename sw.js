@@ -12,6 +12,8 @@ const urlsToCache = [
   '/app.js?v=1.0.0',
   '/manifest.json',
   '/favicon.png',
+  '/gaming_keyboard.glb',
+  '/xbox-controller.glb',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
