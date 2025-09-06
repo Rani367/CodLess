@@ -48,17 +48,6 @@ Please follow the existing style and add clear documentation for new features.
 
 ---
 
-## Development
-
-Install and build:
-
-```bash
-npm ci
-npm run build
-```
-
-The build emits to `docs/`, which is used for GitHub Pages deployment. Source files are in `src/`.
-
 ## License
 
 This project is licensed under the terms in the [LICENSE](LICENSE) file.
