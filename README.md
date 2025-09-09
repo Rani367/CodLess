@@ -1,53 +1,37 @@
 # CodLess™
 
-[![GitHub stars](https://img.shields.io/github/stars/rani367/CodLess?style=social)](https://github.com/rani367/CodLess)
-[![GitHub issues](https://img.shields.io/github/issues/rani367/CodLess)](https://github.com/rani367/CodLess/issues)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-deployed-brightgreen)](https://rani367.github.io/CodLess/)
+### A new way to program robotics
 
-**Visual programming for FLL teams**
+CodLess™ is not just another tool. It is a rethinking of how FIRST LEGO League teams approach robot programming.  
 
-CodLess™ is a web-based tool that helps FIRST LEGO League teams program their robots without writing complex code. You can connect your LEGO hub, record movements, save them as reusable runs, and use them during competitions.
+After months of iteration, refinement, and countless hours spent perfecting both the interface and the underlying architecture, CodLess™ has finally reached the point where it feels complete.  
 
----
+## Why CodLess™
 
-## Features
+CodLess™ is designed for teams that want power and simplicity at the same time.  
 
-- Connect to Pybricks-compatible LEGO hubs using Bluetooth
-- Record robot movements and save them as named runs
-- Upload and run Python code directly on the hub
-- Real-time 2D simulation of robot movements
-- Motor calibration for accurate control
-- Export and import saved runs
-- Works offline after the first load
-- Runs in the browser, no installation needed
+• A clean interface that makes complex robotics control feel natural  
+• Real-time Bluetooth connection to Pybricks-compatible LEGO hubs  
+• Movement recording that can be saved and replayed as digital runs  
 
----
+## Getting Started
 
-## Quick Start
-
-1. Open [CodLess™](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera
-2. Click **Connect Robot** to pair with your Pybricks hub
-3. Configure motor ports in the settings
-4. Record movements using the control panel
-5. Save runs with custom names for later use
-6. Replay runs or export them as Python code
-
----
-
+1. Open [CodLess™](https://rani367.github.io/CodLess/) in Chrome, Edge, or Opera  
+2. Connect your robot hub with a single click  
+3. Configure motor ports in the settings  
+4. Record movements using the control panel  
+5. Save your runs with custom names  
+6. Replay them or export to Python  
 
 ## Contributing
 
-We welcome contributions from the FLL community:
+CodLess™ is built together with the FLL community. If you would like to improve it:  
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Open a pull request
-
-Please follow the existing style and add clear documentation for new features.
-
----
+1. Fork this repository  
+2. Create a branch for your changes  
+3. Add clear documentation where needed  
+4. Open a pull request  
 
 ## License
 
-This project is licensed under the terms in the [LICENSE](LICENSE) file.
+This project is licensed under the terms in the [LICENSE](LICENSE) file.  
