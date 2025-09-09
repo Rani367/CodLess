@@ -142,6 +142,7 @@
                 <span class="version-badge">v1.0</span>
             </div>
             <div class="window-controls">
+                <button id="controlsTopBtn" class="btn btn-secondary title-controls-btn" onclick="openControlsModal()" aria-label="Open controls">Controls</button>
                 <button class="window-btn minimize-btn" onclick="minimizeWindow()" aria-label="Minimize window">
                     <i class="fas fa-minus" aria-hidden="true"></i>
                 </button>
@@ -314,102 +315,6 @@
                     </div>
                     <div id="statusDisplay" class="status-display" role="log" aria-live="polite" aria-label="Application status log"></div>
                 </div>
-
-                <div class="content-section">
-                    <div class="section-header">
-                        <i class="fas fa-keyboard" aria-hidden="true"></i>
-                        <h3>Robot Controls</h3>
-                        <div class="section-actions">
-                            <button id="emergencyStopBtn" class="btn btn-danger btn-emergency">
-                                <i class="fas fa-stop" aria-hidden="true"></i>
-                                Emergency Stop
-                            </button>
-                        </div>
-                    </div>
-                    <div class="controls-grid">
-                        <div class="control-group">
-                            <h4>Movement Controls</h4>
-                            <div class="control-keys">
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="W key">W</kbd>
-                                        <span>Forward</span>
-                                    </div>
-                                </div>
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="A key">A</kbd>
-                                        <span>Turn Left</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="S key">S</kbd>
-                                        <span>Backward</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="D key">D</kbd>
-                                        <span>Turn Right</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="control-group">
-                            <h4>Arm Controls</h4>
-                            <div class="control-keys">
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="Q key">Q</kbd>
-                                        <span>Arm 1 Up</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="E key">E</kbd>
-                                        <span>Arm 1 Down</span>
-                                    </div>
-                                </div>
-                                <div class="key-row">
-                                    <div class="key-item">
-                                        <kbd aria-label="R key">R</kbd>
-                                        <span>Arm 2 Up</span>
-                                    </div>
-                                    <div class="key-item">
-                                        <kbd aria-label="F key">F</kbd>
-                                        <span>Arm 2 Down</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                                        <div class="controls-help">
-                        <p class="help-text">
-                            <i class="fas fa-info-circle" aria-hidden="true"></i>
-                            Hold multiple keys for combined movements. Press Space for emergency stop.
-                        </p>
-                        <div id="xboxControllerHelp" style="display: none; margin-top: 10px;">
-                            <p class="help-text">
-                                <i class="fas fa-gamepad" aria-hidden="true"></i>
-                                <strong>Xbox Controller:</strong> Right trigger = forward (proportional), Left trigger = reverse (proportional), Left stick = turn. Right stick or A/B for Arm 1, X/Y for Arm 2. Menu for emergency stop.
-                            </p>
-                            <div id="xboxTriggerDisplay" style="margin-top: 10px;">
-                                <div style="display: flex; gap: 10px;">
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 11px; color: #aaa;">L Trigger (Reverse)</div>
-                                        <div class="meter">
-                                            <div id="leftTriggerBar" class="meter-fill is-reverse" style="width: 0%;"></div>
-                                        </div>
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 11px; color: #aaa;">R Trigger (Forward)</div>
-                                        <div class="meter">
-                                            <div id="rightTriggerBar" class="meter-fill is-forward" style="width: 0%;"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="stat-value" style="text-align: center; margin-top: 5px;">
-                                    Speed: <span id="xboxSpeedDisplay">0</span> mm/s
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -561,6 +466,108 @@
     </div>
 
 
+    <div id="controlsModal" class="modal" role="dialog" aria-labelledby="controlsModalTitle" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="controlsModalTitle">Controls</h2>
+                <button class="close-modal" onclick="closeControlsModal()" aria-label="Close controls">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <h4>Movement Controls</h4>
+                        <div class="control-keys">
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="W key">W</kbd>
+                                    <span>Forward</span>
+                                </div>
+                            </div>
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="A key">A</kbd>
+                                    <span>Turn Left</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="S key">S</kbd>
+                                    <span>Backward</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="D key">D</kbd>
+                                    <span>Turn Right</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <h4>Arm Controls</h4>
+                        <div class="control-keys">
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="Q key">Q</kbd>
+                                    <span>Arm 1 Up</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="E key">E</kbd>
+                                    <span>Arm 1 Down</span>
+                                </div>
+                            </div>
+                            <div class="key-row">
+                                <div class="key-item">
+                                    <kbd aria-label="R key">R</kbd>
+                                    <span>Arm 2 Up</span>
+                                </div>
+                                <div class="key-item">
+                                    <kbd aria-label="F key">F</kbd>
+                                    <span>Arm 2 Down</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="controls-help">
+                    <div class="section-actions" style="margin-bottom: 10px;">
+                        <button id="emergencyStopBtn" class="btn btn-danger btn-emergency">
+                            <i class="fas fa-stop" aria-hidden="true"></i>
+                            Emergency Stop
+                        </button>
+                    </div>
+                    <p class="help-text">
+                        <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        Hold multiple keys for combined movements. Press Space for emergency stop.
+                    </p>
+                    <div id="xboxControllerHelp" style="display: none; margin-top: 10px;">
+                        <p class="help-text">
+                            <i class="fas fa-gamepad" aria-hidden="true"></i>
+                            <strong>Xbox Controller:</strong> Right trigger = forward (proportional), Left trigger = reverse (proportional), Left stick = turn. Right stick or A/B for Arm 1, X/Y for Arm 2. Menu for emergency stop.
+                        </p>
+                        <div id="xboxTriggerDisplay" style="margin-top: 10px;">
+                            <div style="display: flex; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; color: #aaa;">L Trigger (Reverse)</div>
+                                    <div class="meter">
+                                        <div id="leftTriggerBar" class="meter-fill is-reverse" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; color: #aaa;">R Trigger (Forward)</div>
+                                    <div class="meter">
+                                        <div id="rightTriggerBar" class="meter-fill is-forward" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="stat-value" style="text-align: center; margin-top: 5px;">
+                                Speed: <span id="xboxSpeedDisplay">0</span> mm/s
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="xboxConnectModal" class="modal xbox-modal" role="dialog" aria-labelledby="xboxModalTitle" aria-hidden="true">
         <div class="modal-content xbox-modal-content">
             <div class="xbox-scene">
@@ -703,9 +710,9 @@
                             auto-rotate
                             rotation-per-second="12deg"
                             disable-zoom
-                            min-camera-orbit="auto auto 110%"
-                            max-camera-orbit="auto auto 110%"
-                            camera-orbit="0deg 75deg 110%"
+                            min-camera-orbit="auto auto 95%"
+                            max-camera-orbit="auto auto 95%"
+                            camera-orbit="0deg 75deg 95%"
                             shadow-intensity="0.2"
                             environment-image="neutral"
                             exposure="1"
@@ -759,6 +766,7 @@
             const kbd = document.getElementById('keyboardModel');
             const xboxCard = document.getElementById('xboxCard');
             const kbdCard = document.getElementById('keyboardCard');
+            const controlsBtn = document.getElementById('controlsTopBtn');
 
             function setSpin(model, speedDeg){
                 if(!model) return;
@@ -781,6 +789,7 @@
             }
 
             if(enterBtn){ enterBtn.addEventListener('click', revealApp); }
+            if(controlsBtn){ controlsBtn.addEventListener('click', () => window.openControlsModal && window.openControlsModal()); }
 
             // Prevent scroll on overlay
             document.body.style.overflow = 'hidden';
@@ -835,6 +844,14 @@
     </script>
     <script>
         (function(){
+            window.openControlsModal = function(){
+                const modal = document.getElementById('controlsModal');
+                if(modal){ modal.style.display = 'block'; }
+            };
+            window.closeControlsModal = function(){
+                const modal = document.getElementById('controlsModal');
+                if(modal){ modal.style.display = 'none'; }
+            };
             const models = () => Array.from(document.querySelectorAll('model-viewer'));
             document.addEventListener('visibilitychange', () => {
                 const hidden = document.hidden;
