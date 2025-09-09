@@ -141,6 +141,151 @@ class MicroInteractions {
         });
     }
 }
+// Liquid glass cursor spotlight and 3D tilt
+class Tilt3D {
+    constructor() {
+        this.tiltElements = new Set();
+        this.maxTiltDeg = 8;
+        this.isPerfLite = false;
+        this.rafId = 0;
+        this.pointer = { x: 0, y: 0 };
+        this.currentTarget = null;
+        this.init();
+    }
+    init() {
+        this.isPerfLite = document.body.classList.contains('perf-lite');
+        if (this.isPerfLite)
+            return; // Skip heavy interactions
+        // Observe DOM additions if needed later
+        this.addHandlersToExisting();
+        const observer = new MutationObserver(() => this.addHandlersToExisting());
+        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: false });
+    }
+    addHandlersToExisting() {
+        document.querySelectorAll('.tilt-3d').forEach((el) => {
+            if (this.tiltElements.has(el))
+                return;
+            this.tiltElements.add(el);
+            // Ensure a glow child exists
+            if (!el.querySelector('.tilt-glow')) {
+                const glow = document.createElement('span');
+                glow.className = 'tilt-glow';
+                el.appendChild(glow);
+            }
+            el.addEventListener('pointermove', (e) => this.onPointerMove(e, el), { passive: true });
+            el.addEventListener('pointerleave', () => this.reset(el), { passive: true });
+        });
+    }
+    onPointerMove(e, el) {
+        this.pointer.x = e.clientX;
+        this.pointer.y = e.clientY;
+        this.currentTarget = el;
+        if (!this.rafId) {
+            this.rafId = requestAnimationFrame(() => this.applyTilt());
+        }
+    }
+    applyTilt() {
+        this.rafId = 0;
+        const el = this.currentTarget;
+        if (!el)
+            return;
+        const rect = el.getBoundingClientRect();
+        const relX = (this.pointer.x - rect.left) / Math.max(1, rect.width);
+        const relY = (this.pointer.y - rect.top) / Math.max(1, rect.height);
+        const dx = (relX - 0.5);
+        const dy = (relY - 0.5);
+        const rotateY = -dx * this.maxTiltDeg;
+        const rotateX = dy * this.maxTiltDeg;
+        // Update CSS variables for glow positioning
+        el.style.setProperty('--mx', `${relX * 100}%`);
+        el.style.setProperty('--my', `${relY * 100}%`);
+        // Apply transform with perspective
+        el.style.transform = `perspective(800px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+    }
+    reset(el) {
+        el.style.transform = '';
+    }
+}
+class CursorSpotlight {
+    constructor() {
+        this.targets = new Set();
+        this.isPerfLite = document.body.classList.contains('perf-lite');
+        this.init();
+    }
+    init() {
+        this.addHandlersToExisting();
+        const observer = new MutationObserver(() => this.addHandlersToExisting());
+        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: false });
+    }
+    addHandlersToExisting() {
+        document.querySelectorAll('.liquid-glass').forEach((el) => {
+            if (this.targets.has(el))
+                return;
+            this.targets.add(el);
+            const onMove = (e) => {
+                const rect = el.getBoundingClientRect();
+                const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+                const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
+                el.style.setProperty('--mx', `${(relX * 100).toFixed(2)}%`);
+                el.style.setProperty('--my', `${(relY * 100).toFixed(2)}%`);
+                if (!this.isPerfLite)
+                    el.style.setProperty('--spotlight-alpha', '0.10');
+            };
+            const onLeave = () => {
+                el.style.removeProperty('--spotlight-alpha');
+            };
+            el.addEventListener('pointermove', onMove, { passive: true });
+            el.addEventListener('pointerleave', onLeave, { passive: true });
+        });
+    }
+}
+class DOMDecorator {
+    constructor() {
+        this.decorate();
+    }
+    decorate() {
+        try {
+            // Apply liquid glass to core surfaces
+            const glassSelectors = [
+                '.content-section',
+                '.sidebar-section',
+                '.simulator-container',
+                '.modal-content',
+                '.toast',
+                '.home-hero',
+                '.model-card',
+                '.status-display'
+            ];
+            glassSelectors.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => el.classList.add('liquid-glass'));
+            });
+            // Apply tilt to select cards/panels
+            const tiltSelectors = [
+                '.model-card',
+                '.content-section',
+                '.sidebar-section',
+                '.modal-content'
+            ];
+            tiltSelectors.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => el.classList.add('tilt-3d'));
+            });
+            // Ensure ripple on buttons
+            document.querySelectorAll('.btn, .window-btn, .tab-btn').forEach(el => {
+                el.setAttribute('data-ripple', '');
+            });
+            // Add scroll animation attributes if missing
+            document.querySelectorAll('.sidebar-section').forEach(el => {
+                if (!el.hasAttribute('data-scroll-animation'))
+                    el.setAttribute('data-scroll-animation', 'fade-right');
+            });
+            document.querySelectorAll('.content-section, .simulator-container, .control-group, .status-display').forEach(el => {
+                if (!el.hasAttribute('data-scroll-animation'))
+                    el.setAttribute('data-scroll-animation', '');
+            });
+        }
+        catch (_) { }
+    }
+}
 // Animation controller
 class AnimationController {
     constructor() {
@@ -148,9 +293,13 @@ class AnimationController {
         this.init();
     }
     init() {
+        // Decorate DOM first so observers/enhancers see classes/attrs
+        this.modules.domDecorator = new DOMDecorator();
         this.modules.scrollObserver = new ScrollAnimationObserver();
         this.modules.ripple = new RippleEffect();
         this.modules.microInteractions = new MicroInteractions();
+        this.modules.cursorSpotlight = new CursorSpotlight();
+        this.modules.tilt3d = new Tilt3D();
         this.playInitAnimation();
     }
     playInitAnimation() {
