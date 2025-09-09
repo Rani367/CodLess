@@ -39,11 +39,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
 
     <link rel="preload" href="app.js?v=1.0.0" as="script">
     <link rel="preload" href="assets/css/styles.css" as="style">
-    <link rel="preload" href="assets/models/xbox-controller.glb" as="fetch" crossorigin>
-    <link rel="preload" href="assets/models/gaming_keyboard.glb" as="fetch" crossorigin>
+    <link rel="preload" href="assets/models/xbox-controller.glb" as="fetch" crossorigin fetchpriority="high">
+    <link rel="preload" href="assets/models/gaming_keyboard.glb" as="fetch" crossorigin fetchpriority="high">
+    <link rel="modulepreload" href="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js" crossorigin fetchpriority="high">
     
 
             <script>
@@ -576,8 +578,10 @@
                     shadow-intensity="0.2"
                     environment-image="neutral"
                     exposure="1"
-                    loading="lazy"
+                    loading="eager"
                     reveal="auto"
+                    poster="favicon.png"
+                    preload
                     style="width: 100%; height: 300px;">
                 </model-viewer>
             </div>
@@ -708,6 +712,7 @@
                             poster="favicon.png"
                             loading="eager"
                             reveal="auto"
+                            preload
                             style="width: 100%; height: 280px;">
                         </model-viewer>
                         <div class="model-label">Keyboard</div>
@@ -726,8 +731,10 @@
                             shadow-intensity="0.2"
                             environment-image="neutral"
                             exposure="1"
-                            loading="lazy"
+                            poster="favicon.png"
+                            loading="eager"
                             reveal="auto"
+                            preload
                             style="width: 100%; height: 280px;">
                         </model-viewer>
                         <div class="model-label">Xbox</div>
