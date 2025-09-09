@@ -147,7 +147,6 @@ class Tilt3D {
         this.tiltElements = new Set();
         this.maxTiltDeg = 8;
         this.isPerfLite = false;
-        this.rafId = 0;
         this.pointer = { x: 0, y: 0 };
         this.currentTarget = null;
         this.init();
@@ -180,12 +179,9 @@ class Tilt3D {
         this.pointer.x = e.clientX;
         this.pointer.y = e.clientY;
         this.currentTarget = el;
-        if (!this.rafId) {
-            this.rafId = requestAnimationFrame(() => this.applyTilt());
-        }
+        this.applyTilt();
     }
     applyTilt() {
-        this.rafId = 0;
         const el = this.currentTarget;
         if (!el)
             return;
@@ -199,11 +195,13 @@ class Tilt3D {
         // Update CSS variables for glow positioning
         el.style.setProperty('--mx', `${relX * 100}%`);
         el.style.setProperty('--my', `${relY * 100}%`);
-        // Apply transform with perspective
-        el.style.transform = `perspective(800px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+        // Apply transform with perspective - more responsive with higher precision
+        el.style.transform = `perspective(800px) rotateX(${rotateX.toFixed(1)}deg) rotateY(${rotateY.toFixed(1)}deg)`;
     }
     reset(el) {
         el.style.transform = '';
+        el.style.setProperty('--mx', '');
+        el.style.setProperty('--my', '');
     }
 }
 class CursorSpotlight {
@@ -259,12 +257,11 @@ class DOMDecorator {
             glassSelectors.forEach(sel => {
                 document.querySelectorAll(sel).forEach(el => el.classList.add('liquid-glass'));
             });
-            // Apply tilt to select cards/panels
+            // Apply tilt to select cards/panels (excluding modals to prevent unwanted movement)
             const tiltSelectors = [
                 '.model-card',
                 '.content-section',
-                '.sidebar-section',
-                '.modal-content'
+                '.sidebar-section'
             ];
             tiltSelectors.forEach(sel => {
                 document.querySelectorAll(sel).forEach(el => el.classList.add('tilt-3d'));
