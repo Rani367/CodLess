@@ -6,7 +6,7 @@ CodLess™ is not just another tool. It is a rethinking of how FIRST LEGO League
 
 After months of iteration, refinement, and countless hours spent perfecting both the interface and the underlying architecture, CodLess™ has finally reached the point where it feels complete.  
 
-CodLess™ is the first, and only application that allows you to control your robot with you keybord, or even an Xbox controler in REAL TIME, and save those movements. without writing a single line of code.
+CodLess™ is the first, and only application that allows you to control your robot with your keybord, or even an Xbox controler in REAL TIME, and save those movements. without writing a single line of code.
 
 ## Why CodLess™
 
