@@ -165,12 +165,6 @@ class Tilt3D {
             if (this.tiltElements.has(el))
                 return;
             this.tiltElements.add(el);
-            // Ensure a glow child exists
-            if (!el.querySelector('.tilt-glow')) {
-                const glow = document.createElement('span');
-                glow.className = 'tilt-glow';
-                el.appendChild(glow);
-            }
             el.addEventListener('pointermove', (e) => this.onPointerMove(e, el), { passive: true });
             el.addEventListener('pointerleave', () => this.reset(el), { passive: true });
         });
@@ -295,7 +289,6 @@ class AnimationController {
         this.modules.scrollObserver = new ScrollAnimationObserver();
         this.modules.ripple = new RippleEffect();
         this.modules.microInteractions = new MicroInteractions();
-        this.modules.cursorSpotlight = new CursorSpotlight();
         this.modules.tilt3d = new Tilt3D();
         this.playInitAnimation();
     }
@@ -322,22 +315,5 @@ else {
     animationController = new AnimationController();
     window.AnimationController = animationController;
 }
-(function () {
-    try {
-        const btn = document.getElementById('enterAppBtn');
-        if (!btn)
-            return;
-        const glow = btn.querySelector('.cta-glow');
-        btn.addEventListener('pointermove', (e) => {
-            const rect = btn.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 100;
-            const y = ((e.clientY - rect.top) / rect.height) * 100;
-            if (glow)
-                glow.style.setProperty('--mx', x + '%');
-            if (glow)
-                glow.style.setProperty('--my', y + '%');
-        }, { passive: true });
-    }
-    catch (e) { }
-})();
+// CTA pointer-follow glow disabled
 //# sourceMappingURL=animations.js.map

@@ -2646,6 +2646,7 @@ body::-webkit-scrollbar-track {
 .cta-btn:active { transform: translateY(0); }
 .cta-glow {
     position: absolute;
+    display: none;
     inset: -1px;
     border-radius: inherit;
     background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.35), transparent 60%);
@@ -2694,10 +2695,10 @@ body::-webkit-scrollbar-track {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(220px 160px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255, var(--spotlight-alpha, 0)) 0%, rgba(255,255,255, 0.06) 22%, transparent 60%);
+    background: none;
     mix-blend-mode: soft-light;
     transition: opacity 0.25s ease, transform 0.25s ease;
-    opacity: 0.85;
+    opacity: 0;
 }
 
 .liquid-glass:is(:hover, :focus-within) {
@@ -2721,6 +2722,7 @@ body::-webkit-scrollbar-track {
 
 .tilt-3d .tilt-glow {
     position: absolute;
+    display: none;
     inset: 0;
     pointer-events: none;
     border-radius: inherit;
@@ -2730,7 +2732,7 @@ body::-webkit-scrollbar-track {
     transition: opacity 0.1s ease;
 }
 
-.tilt-3d:hover .tilt-glow { opacity: 1; }
+.tilt-3d:hover .tilt-glow { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
     .tilt-3d { transition: none; }
