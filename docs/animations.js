@@ -315,5 +315,4 @@ else {
     animationController = new AnimationController();
     window.AnimationController = animationController;
 }
-// CTA pointer-follow glow disabled
 //# sourceMappingURL=animations.js.map

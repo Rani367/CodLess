@@ -6,7 +6,8 @@
 const APP_CONFIG = {
     VERSION: '1.0.0',
     NAME: 'CodLess™',
-    BLUETOOTH_SERVICE_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
+    BLUETOOTH_SERVICE_UUID: 'c5f50001-8280-46da-89f4-6d8051e4aeef',
+    BLUETOOTH_CHARACTERISTIC_UUID: 'c5f50002-8280-46da-89f4-6d8051e4aeef',
     HUB_NAME_PREFIX: 'Pybricks',
     DEFAULT_COMMAND_TIMEOUT: 1000,
     MAX_LOG_ENTRIES: 1000,
@@ -506,11 +507,12 @@ class BLEController extends EventEmitter {
             this.emit('connecting');
             
             this.device = await navigator.bluetooth.requestDevice({
-                filters: [{ namePrefix: APP_CONFIG.HUB_NAME_PREFIX }],
+                // Use acceptAllDevices with optionalServices to allow hubs with different names
+                acceptAllDevices: true,
                 optionalServices: [
-                    APP_CONFIG.BLUETOOTH_SERVICE_UUID,
-                    'c5f50001-8280-46da-89f4-6d8051e4aeef',  // Pybricks service
-                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e'   // Nordic UART service
+                    APP_CONFIG.BLUETOOTH_SERVICE_UUID, // Pybricks service
+                    APP_CONFIG.BLUETOOTH_CHARACTERISTIC_UUID,
+                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e' // Nordic UART service (some hubs expose this during DFU)
                 ]
             });
 
@@ -520,7 +522,7 @@ class BLEController extends EventEmitter {
 
             this.server = await this.device.gatt.connect();
             this.service = await this.server.getPrimaryService(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
-            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_SERVICE_UUID);
+            this.characteristic = await this.service.getCharacteristic(APP_CONFIG.BLUETOOTH_CHARACTERISTIC_UUID);
 
             await this.characteristic.startNotifications();
             this.characteristic.addEventListener('characteristicvaluechanged', (event) => {
@@ -573,10 +575,10 @@ class BLEController extends EventEmitter {
             if (this.connectionAttempts < this.maxConnectionAttempts) {
                 // Retry connection with exponential backoff
                 const retryDelay = Math.min(2000 * Math.pow(2, this.connectionAttempts - 1), 10000);
-                this.logger.log(`Retrying connection in ${retryDelay/1000} seconds...`, 'info');
+                (window.app?.logger ? window.app.logger : console).log(`Retrying connection in ${retryDelay/1000} seconds...`, 'info');
                 setTimeout(() => this.connect(), retryDelay);
             } else {
-                this.logger.log('Maximum connection attempts reached. Please try again manually.', 'error');
+                (window.app?.logger ? window.app.logger : console).log('Maximum connection attempts reached. Please try again manually.', 'error');
             }
 
             return false;
