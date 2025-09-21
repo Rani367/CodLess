@@ -434,12 +434,15 @@ class BLEController extends EventEmitter {
             }
             this.emit('connecting');
             this.device = await navigator.bluetooth.requestDevice({
-                // Use acceptAllDevices with optionalServices to allow hubs with different names
-                acceptAllDevices: true,
+                // Show only Pybricks hubs
+                filters: [
+                    { services: [APP_CONFIG.BLUETOOTH_SERVICE_UUID] },
+                    { namePrefix: APP_CONFIG.HUB_NAME_PREFIX }
+                ],
                 optionalServices: [
-                    APP_CONFIG.BLUETOOTH_SERVICE_UUID, // Pybricks service
-                    APP_CONFIG.BLUETOOTH_CHARACTERISTIC_UUID,
-                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e' // Nordic UART service (some hubs expose this during DFU)
+                    APP_CONFIG.BLUETOOTH_SERVICE_UUID,
+                    'battery_service',
+                    'device_information'
                 ]
             });
             this.device.addEventListener('gattserverdisconnected', () => {
