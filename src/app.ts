@@ -506,18 +506,35 @@ class BLEController extends EventEmitter {
 
             this.emit('connecting');
             
-            this.device = await navigator.bluetooth.requestDevice({
-                // Show only Pybricks hubs
-                filters: [
-                    { services: [APP_CONFIG.BLUETOOTH_SERVICE_UUID] },
-                    { namePrefix: APP_CONFIG.HUB_NAME_PREFIX }
-                ],
-                optionalServices: [
-                    APP_CONFIG.BLUETOOTH_SERVICE_UUID,
-                    'battery_service',
-                    'device_information'
-                ]
-            });
+            try {
+                this.device = await navigator.bluetooth.requestDevice({
+                    // Show only Pybricks hubs
+                    filters: [
+                        { services: [APP_CONFIG.BLUETOOTH_SERVICE_UUID] },
+                        { namePrefix: APP_CONFIG.HUB_NAME_PREFIX }
+                    ],
+                    optionalServices: [
+                        APP_CONFIG.BLUETOOTH_SERVICE_UUID,
+                        'battery_service',
+                        'device_information'
+                    ]
+                });
+            } catch (primaryError) {
+                // Pybricks-like fallback: if filtered scan finds none or browser throws TypeError for filters, try a broad scan
+                if (primaryError.name === 'NotFoundError' || primaryError.name === 'TypeError') {
+                    (window.app?.logger ? window.app.logger : console).log('No devices matched filters. Falling back to broad scan.', 'warning');
+                    this.device = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [
+                            APP_CONFIG.BLUETOOTH_SERVICE_UUID,
+                            'battery_service',
+                            'device_information'
+                        ]
+                    });
+                } else {
+                    throw primaryError;
+                }
+            }
 
             this.device.addEventListener('gattserverdisconnected', () => {
                 this.handleDisconnection();
@@ -564,6 +581,10 @@ class BLEController extends EventEmitter {
                 errorMessage = 'Bluetooth access requires HTTPS. Please use a secure connection.';
             } else if (error.name === 'NetworkError') {
                 errorMessage = 'Failed to connect to the hub. Make sure it\'s in range and try again.';
+            } else if ((error.name === 'NotSupportedError') || /getPrimaryService|No Service/i.test(error.message)) {
+                errorMessage = 'Selected device does not expose the required Pybricks service. Please pick a Pybricks hub.';
+            } else if (this.device && this.device.name && !this.device.name.toLowerCase().startsWith(APP_CONFIG.HUB_NAME_PREFIX.toLowerCase())) {
+                errorMessage = 'Selected device is not a Pybricks hub. Select a device whose name starts with "Pybricks".';
             } else if (error.message.includes('User cancelled')) {
                 errorMessage = 'Device selection was cancelled.';
             }
@@ -2611,6 +2632,15 @@ class FLLRoboticsApp extends EventEmitter {
     }
 
     async toggleConnection() {
+        // If Bluetooth is unavailable or context insecure, guide user and offer simulation
+        if ((!navigator.bluetooth || !window.isSecureContext) && !this.bleController.isSimulatingConnection && !this.config.simulateConnected) {
+            const reason = !navigator.bluetooth ? 'Web Bluetooth not supported in this browser' : 'Secure context (HTTPS) required';
+            this.toastManager.show(`${reason}. Enabling simulation mode.`, 'warning', 6000);
+            this.config.simulateConnected = true;
+            try { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config)); } catch (e) {}
+            this.applySimulationState();
+            return;
+        }
         // Check if we should simulate connection instead of real connection
         if (this.config.simulateConnected && !this.bleController.connected && !this.bleController.isSimulatingConnection) {
             // Start simulating connection
@@ -2744,14 +2774,15 @@ class FLLRoboticsApp extends EventEmitter {
         
         if (!connectBtn || !hubStatus) return;
 
-        // If Bluetooth unavailable, keep app interactive but disable connect button with debug message
+        // If Bluetooth unavailable, keep app interactive and keep connect enabled with helpful message
         if ((!navigator.bluetooth || !window.isSecureContext) && !this.bleController.isSimulatingConnection && !this.config.simulateConnected) {
-            connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Bluetooth Unavailable';
-            connectBtn.disabled = true;
-            hubStatus.className = 'status-indicator error';
+            connectBtn.innerHTML = 'Connect to Pybricks Hub';
+            connectBtn.disabled = false;
             const reason = !navigator.bluetooth ? 'No Web Bluetooth' : 'HTTPS required';
-            hubStatus.innerHTML = `<div class=\"status-dot\" aria-hidden=\"true\"></div><span>Bluetooth Unavailable - ${reason}. Debug-only mode.</span>`;
-            if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}. Debug-only mode.`;
+            connectBtn.title = `Bluetooth Unavailable - ${reason}. Click to use simulator.`;
+            hubStatus.className = 'status-indicator error';
+            hubStatus.innerHTML = `<div class="status-dot" aria-hidden="true"></div><span>Bluetooth Unavailable - ${reason}. You can enable Simulation in Settings.</span>`;
+            if (connectionStatus) connectionStatus.textContent = `Bluetooth Unavailable - ${reason}`;
             this.enableRecordingControls(false);
             return;
         }
