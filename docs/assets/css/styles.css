@@ -561,6 +561,17 @@ body {
     border-radius: 3px;
 }
 
+/* Allow selecting and copying text inside the console/status area */
+#statusDisplay,
+.status-display,
+.status-display * {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    cursor: text;
+}
+
 .controls-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
