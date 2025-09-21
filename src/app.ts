@@ -752,7 +752,7 @@ class BLEController extends EventEmitter {
     processHubMessage(message) {
         this.emit('hubMessage', { message });
         
-        if (message === "ready") {
+        if (message === "ready" || message === "rdy") {
             this.emit('hubReady');
         } else if (message.startsWith("error:")) {
             this.emit('hubError', { error: message.substring(6) });
@@ -785,9 +785,28 @@ class BLEController extends EventEmitter {
     }
 
     async requestBatteryLevel() {
-        if (this.connected) {
-            await this.sendCommand({ type: 'get_battery' }, true);
+        if (!this.connected) return;
+        try {
+            await this.readBatteryServiceLevel();
+        } catch (e) {
+            try {
+                await this.sendCommand({ type: 'get_battery' }, true);
+            } catch (err) {
+                // swallow; battery will remain last known
+            }
         }
+    }
+
+    async readBatteryServiceLevel() {
+        if (!this.server) throw new Error('No GATT server');
+        // Use standard GATT Battery Service (0x180F) and Battery Level (0x2A19)
+        const batteryService = await this.server.getPrimaryService('battery_service');
+        const batteryChar = await batteryService.getCharacteristic('battery_level');
+        const value = await batteryChar.readValue();
+        const level = value.getUint8(0);
+        this.batteryLevel = level;
+        this.emit('batteryUpdate', { level });
+        return level;
     }
 
     emergencyStop() {
@@ -1551,6 +1570,19 @@ class FLLRoboticsApp extends EventEmitter {
         // Note: init() will be called explicitly after construction
     }
 
+    async ensureHubProgramRunning() {
+        try {
+            if (this.bleController.isSimulatingConnection) return;
+            if (!this.bleController.connected) return;
+            // Upload minimal control program that listens for our JSON commands over stdin
+            const code = this.generateHubCode();
+            await this.uploadAndRunCode(code);
+            this.logger.log('Hub control program ensured running', 'success');
+        } catch (e) {
+            this.logger.log(`Failed to start hub program automatically: ${e.message}`, 'warning');
+        }
+    }
+
     async init() {
         try {
             console.log('Starting application initialization...');
@@ -2037,6 +2069,10 @@ class FLLRoboticsApp extends EventEmitter {
             this.toastManager.show(`Connected to ${data.deviceName}`, 'success');
             this.logger.log(`Connected to ${data.deviceName}`, 'success');
             this.startBatteryMonitoring();
+            // Request battery immediately for instant UI feedback
+            this.bleController.requestBatteryLevel().catch(() => {});
+            // Ensure the hub control program is uploaded and running so keyboard/Xbox commands work
+            this.ensureHubProgramRunning();
         });
 
         this.bleController.on('disconnected', () => {
@@ -2079,6 +2115,10 @@ class FLLRoboticsApp extends EventEmitter {
 
         this.bleController.on('hubMessage', (data) => {
             this.logger.log(`Hub: ${data.message}`, 'info');
+            // If hub signals ready, make sure our program is in place
+            if (data.message === 'ready' || data.message === 'rdy') {
+                this.ensureHubProgramRunning();
+            }
         });
 
         this.bleController.on('hubError', (data) => {
